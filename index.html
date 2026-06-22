@@ -571,8 +571,12 @@
 
   
     /* ThesisOS dynamic stock / ETF analysis */
+    #stockFundamentalsPanel{display:none}
     #etfAnalysisPanel{display:none}
+    #analysis.stock-mode #stockFundamentalsPanel{display:block}
     #analysis.stock-mode #etfAnalysisPanel{display:none!important}
+    #analysis.stock-mode #realMarketDataCard ~ *:not(#stockFundamentalsPanel){display:none!important}
+    #analysis.etf-mode #stockFundamentalsPanel{display:none!important}
     #analysis.etf-mode #etfAnalysisPanel{display:block}
     #analysis.etf-mode #realMarketDataCard ~ *:not(#etfAnalysisPanel){display:none!important}
     #analysis.analysis-neutral #realMarketDataCard ~ *{display:none!important}
@@ -616,6 +620,70 @@
     }
     @media (max-width:560px){
       .etf-analysis-grid{grid-template-columns:1fr}
+    }
+
+  
+    .stock-fundamentals-grid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:12px;
+      margin-top:14px;
+    }
+    .stock-fundamentals-grid .card{min-height:112px}
+    .stock-fundamentals-details{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:12px;
+      margin-top:14px;
+    }
+    .stock-fundamental-item{
+      padding:15px;
+      border:1px solid var(--border);
+      border-radius:15px;
+      background:var(--panel-2);
+    }
+    .stock-fundamental-item span{
+      display:block;
+      margin-bottom:7px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .stock-fundamental-item strong{
+      display:block;
+      line-height:1.35;
+    }
+    .stock-fundamental-item small{
+      display:block;
+      margin-top:6px;
+      color:var(--muted);
+      line-height:1.35;
+    }
+    .stock-fundamentals-footer{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      margin-top:14px;
+      padding:14px 15px;
+      border:1px dashed var(--border);
+      border-radius:15px;
+      color:var(--muted);
+      line-height:1.5;
+    }
+    @media (max-width:900px){
+      .stock-fundamentals-grid{
+        grid-template-columns:repeat(2,minmax(0,1fr));
+      }
+      .stock-fundamentals-details{
+        grid-template-columns:1fr;
+      }
+    }
+    @media (max-width:560px){
+      .stock-fundamentals-grid{grid-template-columns:1fr}
+      .stock-fundamentals-footer{
+        align-items:flex-start;
+        flex-direction:column;
+      }
     }
 
   </style>
@@ -1041,6 +1109,104 @@
           A análise fundamental e a decisão continuam demonstrativas.
         </div>
       </div>
+
+      <section class="card" id="stockFundamentalsPanel" style="margin-bottom:16px">
+        <div class="section-head" style="margin:0 0 10px">
+          <div>
+            <h2>Fundamentais reais da ação</h2>
+            <p class="sub">
+              Dados financeiros oficiais extraídos dos relatórios 10-Q e 10-K apresentados à SEC.
+            </p>
+          </div>
+          <span class="pill" id="stockFundamentalsBadge">A aguardar</span>
+        </div>
+
+        <div class="stock-fundamentals-grid">
+          <div class="card">
+            <div class="metric-label">Receitas trimestrais</div>
+            <div class="metric" id="stockRevenueQuarter">—</div>
+            <div class="sub" id="stockRevenuePeriod">Período indisponível</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Crescimento das receitas</div>
+            <div class="metric" id="stockRevenueYoY">—</div>
+            <div class="sub">Comparação homóloga do trimestre</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Margem operacional</div>
+            <div class="metric" id="stockOperatingMargin">—</div>
+            <div class="sub">Resultado operacional / receitas</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Margem líquida</div>
+            <div class="metric" id="stockNetMargin">—</div>
+            <div class="sub">Lucro líquido / receitas</div>
+          </div>
+        </div>
+
+        <div class="stock-fundamentals-details">
+          <div class="stock-fundamental-item">
+            <span>Lucro líquido trimestral</span>
+            <strong id="stockNetIncomeQuarter">—</strong>
+            <small id="stockNetIncomeYoY">Crescimento homólogo indisponível</small>
+          </div>
+          <div class="stock-fundamental-item">
+            <span>Resultado operacional trimestral</span>
+            <strong id="stockOperatingIncomeQuarter">—</strong>
+            <small id="stockOperatingIncomeYoY">Crescimento homólogo indisponível</small>
+          </div>
+          <div class="stock-fundamental-item">
+            <span>Receitas acumuladas no exercício</span>
+            <strong id="stockRevenueYtd">—</strong>
+            <small id="stockRevenueYtdPeriod">Período indisponível</small>
+          </div>
+          <div class="stock-fundamental-item">
+            <span>Receitas do último ano fiscal</span>
+            <strong id="stockRevenueAnnual">—</strong>
+            <small id="stockRevenueAnnualPeriod">Período indisponível</small>
+          </div>
+          <div class="stock-fundamental-item">
+            <span>Ativos</span>
+            <strong id="stockAssets">—</strong>
+            <small id="stockBalancePeriod">Data do balanço indisponível</small>
+          </div>
+          <div class="stock-fundamental-item">
+            <span>Caixa e equivalentes</span>
+            <strong id="stockCash">—</strong>
+            <small>Valor reportado no último balanço</small>
+          </div>
+          <div class="stock-fundamental-item">
+            <span>Passivos</span>
+            <strong id="stockLiabilities">—</strong>
+            <small id="stockLiabilitiesRatio">Passivos / ativos indisponível</small>
+          </div>
+          <div class="stock-fundamental-item">
+            <span>Capital próprio</span>
+            <strong id="stockEquity">—</strong>
+            <small>Valor contabilístico reportado</small>
+          </div>
+          <div class="stock-fundamental-item">
+            <span>Ações diluídas</span>
+            <strong id="stockDilutedShares">—</strong>
+            <small id="stockDilutedSharesYoY">Variação homóloga indisponível</small>
+          </div>
+        </div>
+
+        <div class="stock-fundamentals-footer">
+          <div>
+            <strong id="stockFundamentalsStatus">Dados ainda não carregados.</strong>
+            <div class="sub" id="stockFundamentalsSource">
+              Fonte pendente.
+            </div>
+          </div>
+          <a
+            id="stockSecLink"
+            class="link-btn"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Abrir empresa na SEC</a>
+        </div>
+      </section>
 
       <section class="card" id="etfAnalysisPanel" style="margin-bottom:16px">
         <div class="section-head" style="margin:0 0 10px">
@@ -1550,6 +1716,314 @@
     return `${currency || ""} ${formatNumber(millions)} M`.trim();
   }
 
+  let stockFundamentalsRequestId=0;
+
+  function formatFinancialFact(fact){
+    const value=Number(fact?.value);
+
+    if(!Number.isFinite(value)) return "—";
+
+    const unit=fact?.unit || "";
+
+    if(unit==="shares"){
+      if(Math.abs(value)>=1e9){
+        return `${formatNumber(value/1e9)} B ações`;
+      }
+
+      if(Math.abs(value)>=1e6){
+        return `${formatNumber(value/1e6)} M ações`;
+      }
+
+      return `${formatNumber(value)} ações`;
+    }
+
+    if(unit==="USD"){
+      if(Math.abs(value)>=1e12){
+        return `USD ${formatNumber(value/1e12)} T`;
+      }
+
+      if(Math.abs(value)>=1e9){
+        return `USD ${formatNumber(value/1e9)} B`;
+      }
+
+      if(Math.abs(value)>=1e6){
+        return `USD ${formatNumber(value/1e6)} M`;
+      }
+
+      return `USD ${formatNumber(value)}`;
+    }
+
+    return `${formatNumber(value)} ${unit}`.trim();
+  }
+
+  function formatFundamentalPercent(value){
+    const number=Number(value);
+
+    if(!Number.isFinite(number)) return "—";
+
+    return `${number>=0?"+":""}${formatNumber(number)}%`;
+  }
+
+  function factPeriod(fact){
+    return fact?.end
+      ? `Período terminado em ${fact.end}`
+      : "Período indisponível";
+  }
+
+  function setStockFundamentalsState(state="idle"){
+    const values=[
+      "#stockRevenueQuarter",
+      "#stockRevenueYoY",
+      "#stockOperatingMargin",
+      "#stockNetMargin",
+      "#stockNetIncomeQuarter",
+      "#stockOperatingIncomeQuarter",
+      "#stockRevenueYtd",
+      "#stockRevenueAnnual",
+      "#stockAssets",
+      "#stockCash",
+      "#stockLiabilities",
+      "#stockEquity",
+      "#stockDilutedShares"
+    ];
+
+    values.forEach(selector=>{
+      const element=$(selector);
+      if(element) element.textContent="—";
+    });
+
+    if($("#stockRevenuePeriod")){
+      $("#stockRevenuePeriod").textContent="Período indisponível";
+    }
+
+    if($("#stockRevenueYtdPeriod")){
+      $("#stockRevenueYtdPeriod").textContent="Período indisponível";
+    }
+
+    if($("#stockRevenueAnnualPeriod")){
+      $("#stockRevenueAnnualPeriod").textContent="Período indisponível";
+    }
+
+    if($("#stockBalancePeriod")){
+      $("#stockBalancePeriod").textContent="Data do balanço indisponível";
+    }
+
+    if($("#stockNetIncomeYoY")){
+      $("#stockNetIncomeYoY").textContent=
+        "Crescimento homólogo indisponível";
+    }
+
+    if($("#stockOperatingIncomeYoY")){
+      $("#stockOperatingIncomeYoY").textContent=
+        "Crescimento homólogo indisponível";
+    }
+
+    if($("#stockLiabilitiesRatio")){
+      $("#stockLiabilitiesRatio").textContent=
+        "Passivos / ativos indisponível";
+    }
+
+    if($("#stockDilutedSharesYoY")){
+      $("#stockDilutedSharesYoY").textContent=
+        "Variação homóloga indisponível";
+    }
+
+    const badge=$("#stockFundamentalsBadge");
+    const status=$("#stockFundamentalsStatus");
+    const source=$("#stockFundamentalsSource");
+    const link=$("#stockSecLink");
+
+    if(link){
+      link.removeAttribute("href");
+      link.style.pointerEvents="none";
+      link.style.opacity=".55";
+    }
+
+    if(state==="loading"){
+      if(badge) badge.textContent="A carregar";
+      if(status) status.textContent="A consultar os relatórios oficiais.";
+      if(source) source.textContent="Fonte: SEC EDGAR.";
+      return;
+    }
+
+    if(state==="error"){
+      if(badge) badge.textContent="Indisponível";
+      if(status) status.textContent="Não foi possível carregar os fundamentais.";
+      if(source) source.textContent="Os dados de mercado continuam disponíveis.";
+      return;
+    }
+
+    if(badge) badge.textContent="A aguardar";
+    if(status) status.textContent="Dados ainda não carregados.";
+    if(source) source.textContent="Fonte pendente.";
+  }
+
+  function resetStockFundamentals(){
+    stockFundamentalsRequestId+=1;
+    setStockFundamentalsState("idle");
+  }
+
+  async function loadStockFundamentals(symbol){
+    const requestId=++stockFundamentalsRequestId;
+    setStockFundamentalsState("loading");
+
+    try{
+      const response=await fetch(
+        `/api/fundamentals/${encodeURIComponent(symbol)}`
+      );
+
+      const data=await response.json();
+
+      if(requestId!==stockFundamentalsRequestId){
+        return;
+      }
+
+      if(!response.ok){
+        throw new Error(
+          data.detail ||
+          data.error ||
+          "Fundamentais indisponíveis."
+        );
+      }
+
+      const duration=data.duration_metrics || {};
+      const instant=data.instant_metrics || {};
+      const derived=data.derived_metrics || {};
+
+      const revenue=duration.revenue || {};
+      const netIncome=duration.net_income || {};
+      const operatingIncome=duration.operating_income || {};
+      const dilutedShares=duration.diluted_shares || {};
+
+      const revenueQuarter=revenue.latest_quarter;
+      const revenueYtd=revenue.latest_ytd;
+      const revenueAnnual=revenue.latest_annual;
+      const netIncomeQuarter=netIncome.latest_quarter;
+      const operatingIncomeQuarter=operatingIncome.latest_quarter;
+      const dilutedSharesQuarter=dilutedShares.latest_quarter;
+
+      $("#stockRevenueQuarter").textContent=
+        formatFinancialFact(revenueQuarter);
+
+      $("#stockRevenuePeriod").textContent=
+        factPeriod(revenueQuarter);
+
+      $("#stockRevenueYoY").textContent=
+        formatFundamentalPercent(
+          revenue.quarter_yoy_percentage
+        );
+
+      $("#stockOperatingMargin").textContent=
+        formatFundamentalPercent(
+          derived.operating_margin_quarter_percentage
+        );
+
+      $("#stockNetMargin").textContent=
+        formatFundamentalPercent(
+          derived.net_margin_quarter_percentage
+        );
+
+      $("#stockNetIncomeQuarter").textContent=
+        formatFinancialFact(netIncomeQuarter);
+
+      $("#stockNetIncomeYoY").textContent=
+        `YoY ${formatFundamentalPercent(
+          netIncome.quarter_yoy_percentage
+        )}`;
+
+      $("#stockOperatingIncomeQuarter").textContent=
+        formatFinancialFact(operatingIncomeQuarter);
+
+      $("#stockOperatingIncomeYoY").textContent=
+        `YoY ${formatFundamentalPercent(
+          operatingIncome.quarter_yoy_percentage
+        )}`;
+
+      $("#stockRevenueYtd").textContent=
+        formatFinancialFact(revenueYtd);
+
+      $("#stockRevenueYtdPeriod").textContent=
+        factPeriod(revenueYtd);
+
+      $("#stockRevenueAnnual").textContent=
+        formatFinancialFact(revenueAnnual);
+
+      $("#stockRevenueAnnualPeriod").textContent=
+        factPeriod(revenueAnnual);
+
+      $("#stockAssets").textContent=
+        formatFinancialFact(instant.assets);
+
+      $("#stockCash").textContent=
+        formatFinancialFact(instant.cash);
+
+      $("#stockLiabilities").textContent=
+        formatFinancialFact(instant.liabilities);
+
+      $("#stockEquity").textContent=
+        formatFinancialFact(instant.equity);
+
+      $("#stockDilutedShares").textContent=
+        formatFinancialFact(dilutedSharesQuarter);
+
+      $("#stockBalancePeriod").textContent=
+        factPeriod(instant.assets);
+
+      $("#stockLiabilitiesRatio").textContent=
+        `Passivos / ativos ${formatFundamentalPercent(
+          derived.liabilities_to_assets_percentage
+        )}`;
+
+      $("#stockDilutedSharesYoY").textContent=
+        `YoY ${formatFundamentalPercent(
+          dilutedShares.quarter_yoy_percentage
+        )}`;
+
+      $("#stockFundamentalsBadge").textContent="SEC verificada";
+      $("#stockFundamentalsStatus").textContent=
+        `Último período disponível: ${data.latest_period || "—"}.`;
+      $("#stockFundamentalsSource").textContent=
+        `Fonte: ${data.source}. Valores reportados, não estimativas.`;
+
+      const link=$("#stockSecLink");
+
+      if(link && data.cik){
+        link.href=
+          `https://www.sec.gov/edgar/browse/?CIK=${encodeURIComponent(data.cik)}&owner=exclude`;
+        link.style.pointerEvents="";
+        link.style.opacity="";
+      }
+
+      const detail=$("#assetDataDetail");
+
+      if(detail){
+        detail.textContent=
+          "Preço e perfil carregados pela Finnhub/OpenFIGI. Fundamentais oficiais carregados através da SEC EDGAR.";
+      }
+
+      showToast(`${symbol}: fundamentais SEC carregados.`);
+    }catch(error){
+      if(requestId!==stockFundamentalsRequestId){
+        return;
+      }
+
+      setStockFundamentalsState("error");
+
+      const status=$("#stockFundamentalsStatus");
+      const source=$("#stockFundamentalsSource");
+
+      if(status){
+        status.textContent=
+          error.message || "Fundamentais indisponíveis.";
+      }
+
+      if(source){
+        source.textContent=
+          "A SEC pode não cobrir este ticker ou a empresa pode não reportar em US-GAAP.";
+      }
+    }
+  }
+
   function setAnalysisMode(mode, asset={}){
     const analysis=$("#analysis");
 
@@ -1615,6 +2089,7 @@
 
   function resetRealAssetView(symbol, state){
     setAnalysisMode("neutral");
+    resetStockFundamentals();
 
     const isError=state==="error";
     const isLoading=state==="loading";
@@ -1713,6 +2188,12 @@
 
       applyAssetAnalysisMode(data);
 
+      if(data.asset_type==="stock"){
+        void loadStockFundamentals(data.symbol);
+      }else{
+        resetStockFundamentals();
+      }
+
       const logo=$("#assetLogo");
 
       if(data.logo){
@@ -1800,7 +2281,7 @@
       detail.textContent=
         data.asset_type==="etf"
           ? "A identificação e a cotação disponível são reais. A página mudou para critérios próprios de ETF; os restantes fundamentos aparecem como não ligados."
-          : "Os dados do cabeçalho são reais. Receitas, margens, ROIC, dívida, valuation e decisão abaixo continuam demonstrativos nesta fase.";
+          : "O preço e o perfil são reais. Os fundamentais oficiais estão a ser carregados através da SEC EDGAR.";
 
       updated.textContent=
         `Atualizado ${formatAssetDate(data.updated_at)}`;

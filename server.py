@@ -1,8 +1,10 @@
+import gzip
 import json
 import os
 import re
 import time
-from datetime import datetime, timezone
+import zlib
+from datetime import date, datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlencode, urlparse
@@ -15,11 +17,17 @@ PORT = 3000
 FINNHUB_BASE_URL = "https://finnhub.io/api/v1"
 OPENFIGI_MAPPING_URL = "https://api.openfigi.com/v3/mapping"
 EODHD_SEARCH_URL = "https://eodhd.com/api/search"
+SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+SEC_COMPANY_FACTS_URL = (
+    "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
+)
 
 OPENFIGI_CACHE_TTL_SECONDS = 24 * 60 * 60
 EODHD_CACHE_TTL_SECONDS = 24 * 60 * 60
+SEC_CACHE_TTL_SECONDS = 24 * 60 * 60
 OPENFIGI_CACHE = {}
 EODHD_CACHE = {}
+SEC_CACHE = {}
 
 
 def fetch_json(request: Request, timeout: int = 20):
@@ -160,6 +168,483 @@ def fetch_eodhd_search(query: str) -> list:
     }
 
     return response
+
+
+SEC_DURATION_METRICS = {
+    "revenue": [
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "Revenues",
+        "SalesRevenueNet",
+    ],
+    "net_income": [
+        "NetIncomeLoss",
+        "ProfitLoss",
+    ],
+    "operating_income": [
+        "OperatingIncomeLoss",
+    ],
+    "diluted_shares": [
+        "WeightedAverageNumberOfDilutedSharesOutstanding",
+    ],
+}
+
+SEC_INSTANT_METRICS = {
+    "assets": ["Assets"],
+    "liabilities": ["Liabilities"],
+    "equity": [
+        "StockholdersEquity",
+        (
+            "StockholdersEquityIncludingPortion"
+            "AttributableToNoncontrollingInterest"
+        ),
+    ],
+    "cash": [
+        "CashAndCashEquivalentsAtCarryingValue",
+        (
+            "CashCashEquivalentsRestrictedCashAnd"
+            "RestrictedCashEquivalents"
+        ),
+    ],
+}
+
+
+def fetch_sec_json(url: str):
+    user_agent = os.getenv("SEC_USER_AGENT")
+
+    if not user_agent:
+        raise RuntimeError("SEC_USER_AGENT não está configurado.")
+
+    cached = SEC_CACHE.get(url)
+
+    if cached:
+        age = time.time() - cached["created_at"]
+
+        if age < SEC_CACHE_TTL_SECONDS:
+            return cached["data"]
+
+    request = Request(
+        url,
+        headers={
+            "User-Agent": user_agent,
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate",
+        },
+    )
+
+    with urlopen(request, timeout=25) as response:
+        raw = response.read()
+        encoding = (
+            response.headers.get("Content-Encoding", "")
+            .strip()
+            .lower()
+        )
+
+        if encoding == "gzip":
+            raw = gzip.decompress(raw)
+
+        elif encoding == "deflate":
+            try:
+                raw = zlib.decompress(raw)
+            except zlib.error:
+                raw = zlib.decompress(raw, -zlib.MAX_WBITS)
+
+        data = json.loads(raw.decode("utf-8"))
+
+    SEC_CACHE[url] = {
+        "created_at": time.time(),
+        "data": data,
+    }
+
+    return data
+
+
+def find_sec_company(ticker: str):
+    companies = fetch_sec_json(SEC_TICKERS_URL)
+
+    for item in companies.values():
+        if str(item.get("ticker", "")).upper() == ticker:
+            return {
+                "ticker": ticker,
+                "name": item.get("title"),
+                "cik": str(item.get("cik_str", "")).zfill(10),
+            }
+
+    return None
+
+
+def parse_sec_date(value):
+    if not value:
+        return None
+
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def sec_duration_days(entry):
+    start = parse_sec_date(entry.get("start"))
+    end = parse_sec_date(entry.get("end"))
+
+    if not start or not end:
+        return None
+
+    return (end - start).days + 1
+
+
+def normalize_sec_fact(concept, fact, entry):
+    return {
+        "concept": concept,
+        "label": fact.get("label"),
+        "value": entry.get("val"),
+        "unit": entry.get("_unit"),
+        "start": entry.get("start"),
+        "end": entry.get("end"),
+        "duration_days": sec_duration_days(entry),
+        "filed": entry.get("filed"),
+        "form": entry.get("form"),
+        "fiscal_year": entry.get("fy"),
+        "fiscal_period": entry.get("fp"),
+        "frame": entry.get("frame"),
+        "accession": entry.get("accn"),
+    }
+
+
+def sec_concept_entries(company_facts, concepts):
+    us_gaap = (
+        company_facts
+        .get("facts", {})
+        .get("us-gaap", {})
+    )
+
+    collected = []
+
+    for concept in concepts:
+        fact = us_gaap.get(concept)
+
+        if not fact:
+            continue
+
+        for unit_name, entries in fact.get("units", {}).items():
+            if unit_name not in {"USD", "shares", "USD/shares"}:
+                continue
+
+            for original in entries:
+                if original.get("form") not in {"10-K", "10-Q"}:
+                    continue
+
+                if original.get("val") is None:
+                    continue
+
+                entry = dict(original)
+                entry["_unit"] = unit_name
+
+                collected.append(
+                    {
+                        "concept": concept,
+                        "fact": fact,
+                        "entry": entry,
+                    }
+                )
+
+        if collected:
+            break
+
+    return collected
+
+
+def unique_sec_entries(items):
+    seen = set()
+    result = []
+
+    for item in items:
+        entry = item["entry"]
+
+        key = (
+            entry.get("val"),
+            entry.get("_unit"),
+            entry.get("start"),
+            entry.get("end"),
+            entry.get("form"),
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        result.append(item)
+
+    return result
+
+
+def select_sec_latest_instant(company_facts, concepts):
+    items = sec_concept_entries(company_facts, concepts)
+
+    valid = [
+        item
+        for item in items
+        if item["entry"].get("end")
+        and not item["entry"].get("start")
+    ]
+
+    valid = unique_sec_entries(valid)
+
+    if not valid:
+        return None
+
+    valid.sort(
+        key=lambda item: (
+            item["entry"].get("end", ""),
+            item["entry"].get("filed", ""),
+        ),
+        reverse=True,
+    )
+
+    selected = valid[0]
+
+    return normalize_sec_fact(
+        selected["concept"],
+        selected["fact"],
+        selected["entry"],
+    )
+
+
+def select_sec_latest_duration(company_facts, concepts, mode):
+    items = sec_concept_entries(company_facts, concepts)
+    valid = []
+
+    for item in items:
+        days = sec_duration_days(item["entry"])
+
+        if days is None:
+            continue
+
+        if mode == "quarter" and 70 <= days <= 120:
+            valid.append(item)
+
+        elif mode == "ytd" and 121 <= days <= 300:
+            valid.append(item)
+
+        elif mode == "annual" and 300 <= days <= 430:
+            valid.append(item)
+
+    valid = unique_sec_entries(valid)
+
+    if not valid:
+        return None
+
+    valid.sort(
+        key=lambda item: (
+            item["entry"].get("end", ""),
+            item["entry"].get("filed", ""),
+        ),
+        reverse=True,
+    )
+
+    selected = valid[0]
+
+    return normalize_sec_fact(
+        selected["concept"],
+        selected["fact"],
+        selected["entry"],
+    )
+
+
+def select_sec_prior_comparable(
+    company_facts,
+    concepts,
+    current_fact,
+):
+    if not current_fact:
+        return None
+
+    current_end = parse_sec_date(current_fact.get("end"))
+    current_days = current_fact.get("duration_days")
+
+    if not current_end or current_days is None:
+        return None
+
+    candidates = []
+
+    for item in sec_concept_entries(company_facts, concepts):
+        entry = item["entry"]
+        end = parse_sec_date(entry.get("end"))
+        days = sec_duration_days(entry)
+
+        if not end or days is None:
+            continue
+
+        day_gap = (current_end - end).days
+
+        if not 330 <= day_gap <= 400:
+            continue
+
+        if abs(days - current_days) > 15:
+            continue
+
+        candidates.append(item)
+
+    candidates = unique_sec_entries(candidates)
+
+    if not candidates:
+        return None
+
+    candidates.sort(
+        key=lambda item: (
+            item["entry"].get("end", ""),
+            item["entry"].get("filed", ""),
+        ),
+        reverse=True,
+    )
+
+    selected = candidates[0]
+
+    return normalize_sec_fact(
+        selected["concept"],
+        selected["fact"],
+        selected["entry"],
+    )
+
+
+def sec_percentage_change(current_fact, prior_fact):
+    if not current_fact or not prior_fact:
+        return None
+
+    current = current_fact.get("value")
+    prior = prior_fact.get("value")
+
+    if not isinstance(current, (int, float)):
+        return None
+
+    if not isinstance(prior, (int, float)) or prior == 0:
+        return None
+
+    return round(((current / prior) - 1) * 100, 2)
+
+
+def safe_ratio(numerator, denominator):
+    if not isinstance(numerator, (int, float)):
+        return None
+
+    if not isinstance(denominator, (int, float)) or denominator == 0:
+        return None
+
+    return round((numerator / denominator) * 100, 2)
+
+
+def get_sec_fundamentals(ticker: str):
+    company = find_sec_company(ticker)
+
+    if not company:
+        return None
+
+    company_facts = fetch_sec_json(
+        SEC_COMPANY_FACTS_URL.format(cik=company["cik"])
+    )
+
+    duration_metrics = {}
+
+    for metric_name, concepts in SEC_DURATION_METRICS.items():
+        quarter = select_sec_latest_duration(
+            company_facts,
+            concepts,
+            "quarter",
+        )
+
+        prior_quarter = select_sec_prior_comparable(
+            company_facts,
+            concepts,
+            quarter,
+        )
+
+        duration_metrics[metric_name] = {
+            "latest_quarter": quarter,
+            "prior_year_quarter": prior_quarter,
+            "quarter_yoy_percentage": sec_percentage_change(
+                quarter,
+                prior_quarter,
+            ),
+            "latest_ytd": select_sec_latest_duration(
+                company_facts,
+                concepts,
+                "ytd",
+            ),
+            "latest_annual": select_sec_latest_duration(
+                company_facts,
+                concepts,
+                "annual",
+            ),
+        }
+
+    instant_metrics = {
+        metric_name: select_sec_latest_instant(
+            company_facts,
+            concepts,
+        )
+        for metric_name, concepts in SEC_INSTANT_METRICS.items()
+    }
+
+    revenue_quarter = (
+        duration_metrics
+        .get("revenue", {})
+        .get("latest_quarter")
+        or {}
+    ).get("value")
+
+    operating_income_quarter = (
+        duration_metrics
+        .get("operating_income", {})
+        .get("latest_quarter")
+        or {}
+    ).get("value")
+
+    net_income_quarter = (
+        duration_metrics
+        .get("net_income", {})
+        .get("latest_quarter")
+        or {}
+    ).get("value")
+
+    assets = (instant_metrics.get("assets") or {}).get("value")
+    liabilities = (
+        instant_metrics.get("liabilities") or {}
+    ).get("value")
+
+    latest_period = None
+
+    for metric in (
+        duration_metrics.get("revenue", {}).get("latest_quarter"),
+        instant_metrics.get("assets"),
+    ):
+        if metric and metric.get("end"):
+            latest_period = metric["end"]
+            break
+
+    return {
+        "ticker": company["ticker"],
+        "name": company["name"],
+        "cik": company["cik"],
+        "entity_name": company_facts.get("entityName"),
+        "latest_period": latest_period,
+        "duration_metrics": duration_metrics,
+        "instant_metrics": instant_metrics,
+        "derived_metrics": {
+            "operating_margin_quarter_percentage": safe_ratio(
+                operating_income_quarter,
+                revenue_quarter,
+            ),
+            "net_margin_quarter_percentage": safe_ratio(
+                net_income_quarter,
+                revenue_quarter,
+            ),
+            "liabilities_to_assets_percentage": safe_ratio(
+                liabilities,
+                assets,
+            ),
+        },
+        "source": "SEC EDGAR Company Facts",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 def classify_figi_asset(item: dict) -> str:
     security_type = str(item.get("securityType") or "").lower()
@@ -452,6 +937,7 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
                         "Finnhub",
                         "OpenFIGI",
                         "EODHD",
+                        "SEC EDGAR",
                     ],
                 }
             )
@@ -459,6 +945,10 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
 
         if parsed_url.path.startswith("/api/search/"):
             self.handle_search_request(parsed_url.path)
+            return
+
+        if parsed_url.path.startswith("/api/fundamentals/"):
+            self.handle_fundamentals_request(parsed_url.path)
             return
 
         if parsed_url.path.startswith("/api/asset/"):
@@ -521,6 +1011,70 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             self.send_json(
                 {
                     "error": "Erro ao pesquisar o ativo.",
+                    "detail": str(error),
+                },
+                status=500,
+            )
+
+    def handle_fundamentals_request(self, path: str) -> None:
+        ticker = (
+            unquote(path.removeprefix("/api/fundamentals/"))
+            .strip()
+            .upper()
+        )
+
+        if not re.fullmatch(r"[A-Z0-9.\-]{1,20}", ticker):
+            self.send_json(
+                {"error": "Ticker inválido."},
+                status=400,
+            )
+            return
+
+        try:
+            fundamentals = get_sec_fundamentals(ticker)
+
+            if not fundamentals:
+                self.send_json(
+                    {
+                        "error": (
+                            "A SEC não encontrou fundamentais "
+                            "para este ticker."
+                        ),
+                        "ticker": ticker,
+                    },
+                    status=404,
+                )
+                return
+
+            self.send_json(fundamentals)
+
+        except HTTPError as error:
+            detail = error.read().decode(
+                "utf-8",
+                errors="replace",
+            )
+
+            self.send_json(
+                {
+                    "error": "A SEC recusou o pedido.",
+                    "status": error.code,
+                    "detail": detail[:500],
+                },
+                status=502,
+            )
+
+        except URLError:
+            self.send_json(
+                {
+                    "error": "Não foi possível contactar a SEC.",
+                },
+                status=502,
+            )
+
+        except Exception as error:
+            self.send_json(
+                {
+                    "error": "Erro ao consultar fundamentais.",
                     "detail": str(error),
                 },
                 status=500,
