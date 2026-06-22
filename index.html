@@ -812,6 +812,62 @@
       </div>
 
       <div class="status-banner" style="margin-bottom:14px"><div><strong id="assetDataStatus">Estado dos dados: demonstrativo</strong><div class="sub" id="assetDataDetail" style="font-size:12px">Pesquisa um ticker para carregar preço e perfil reais. As métricas fundamentais abaixo continuam demonstrativas.</div></div><span class="freshness" id="assetUpdated">A aguardar pesquisa</span></div>
+      <div class="card" id="realMarketDataCard" style="margin-bottom:16px">
+        <div class="section-head" style="margin:0 0 12px">
+          <div>
+            <h2>Dados de mercado reais</h2>
+            <p class="sub">Cotação e perfil devolvidos pela API. Não são estimativas do ThesisOS.</p>
+          </div>
+          <span class="freshness" id="realDataBadge">A aguardar pesquisa</span>
+        </div>
+
+        <div class="grid g4">
+          <div class="card">
+            <div class="metric-label">Abertura</div>
+            <div class="metric" id="realOpen">—</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Máximo do dia</div>
+            <div class="metric" id="realHigh">—</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Mínimo do dia</div>
+            <div class="metric" id="realLow">—</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Fecho anterior</div>
+            <div class="metric" id="realPreviousClose">—</div>
+          </div>
+        </div>
+
+        <div class="impact-list" style="margin-top:12px">
+          <div class="impact-item">
+            <span>Capitalização bolsista</span>
+            <strong id="realMarketCap">—</strong>
+          </div>
+          <div class="impact-item">
+            <span>Ações em circulação</span>
+            <strong id="realShares">—</strong>
+          </div>
+          <div class="impact-item">
+            <span>País</span>
+            <strong id="realCountry">—</strong>
+          </div>
+          <div class="impact-item">
+            <span>Data de entrada em bolsa</span>
+            <strong id="realIpoDate">—</strong>
+          </div>
+          <div class="impact-item">
+            <span>Website oficial</span>
+            <a id="realWebsite" class="link-btn" target="_blank" rel="noopener noreferrer">Indisponível</a>
+          </div>
+        </div>
+
+        <div class="source-note">
+          Nesta fase, apenas esta secção e o cabeçalho usam dados reais.
+          A análise fundamental e a decisão continuam demonstrativas.
+        </div>
+      </div>
       <div class="grid g4">
         <div class="card"><div class="metric-label">Receitas YoY</div><div class="metric">+14,8%</div><div class="delta">acima do setor</div></div>
         <div class="card"><div class="metric-label">Margem operacional</div><div class="metric">8,9%</div><div class="delta">+0,7 p.p.</div></div>
@@ -1201,6 +1257,22 @@
     }).format(date);
   }
 
+  function formatMarketCap(value, currency){
+    const millions=Number(value);
+
+    if(!Number.isFinite(millions)) return "—";
+
+    if(millions>=1000000){
+      return `${currency || ""} ${formatNumber(millions/1000000)} T`.trim();
+    }
+
+    if(millions>=1000){
+      return `${currency || ""} ${formatNumber(millions/1000)} B`.trim();
+    }
+
+    return `${currency || ""} ${formatNumber(millions)} M`.trim();
+  }
+
   async function loadAsset(symbol){
     const cleanSymbol=symbol.trim().toUpperCase();
 
@@ -1265,6 +1337,51 @@
       $("#assetFx").textContent=
         `Fonte: ${data.source}. Conversão cambial ainda não ligada.`;
 
+      const currency=data.currency || "";
+
+      $("#realOpen").textContent=
+        data.open!==null && data.open!==undefined
+          ? `${currency} ${formatNumber(data.open)}`.trim()
+          : "—";
+
+      $("#realHigh").textContent=
+        data.high!==null && data.high!==undefined
+          ? `${currency} ${formatNumber(data.high)}`.trim()
+          : "—";
+
+      $("#realLow").textContent=
+        data.low!==null && data.low!==undefined
+          ? `${currency} ${formatNumber(data.low)}`.trim()
+          : "—";
+
+      $("#realPreviousClose").textContent=
+        data.previous_close!==null && data.previous_close!==undefined
+          ? `${currency} ${formatNumber(data.previous_close)}`.trim()
+          : "—";
+
+      $("#realMarketCap").textContent=
+        formatMarketCap(data.market_cap_millions, currency);
+
+      $("#realShares").textContent=
+        data.shares_outstanding_millions!==null &&
+        data.shares_outstanding_millions!==undefined
+          ? `${formatNumber(data.shares_outstanding_millions)} M`
+          : "—";
+
+      $("#realCountry").textContent=data.country || "—";
+      $("#realIpoDate").textContent=data.ipo_date || "—";
+      $("#realDataBadge").textContent=`Fonte: ${data.source}`;
+
+      const website=$("#realWebsite");
+
+      if(data.website){
+        website.href=data.website;
+        website.textContent="Abrir site oficial";
+      }else{
+        website.removeAttribute("href");
+        website.textContent="Indisponível";
+      }
+
       status.textContent="Preço e perfil reais carregados";
 
       detail.textContent=
@@ -1278,6 +1395,7 @@
       status.textContent="Não foi possível carregar o ativo";
       detail.textContent=error.message;
       updated.textContent="Erro da API";
+      $("#realDataBadge").textContent="Dados indisponíveis";
       showToast("Erro ao consultar o ticker.");
     }
   }
