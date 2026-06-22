@@ -445,6 +445,130 @@
       .radar-controls{align-items:stretch}
     }
 
+  
+    /* ThesisOS OpenFIGI search UI */
+    .asset-search-overlay{
+      position:fixed;
+      inset:0;
+      z-index:10000;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      background:rgba(2,8,23,.78);
+      backdrop-filter:blur(8px);
+    }
+    .asset-search-overlay.open{display:flex}
+    .asset-search-dialog{
+      width:min(760px,100%);
+      max-height:min(760px,88vh);
+      overflow:hidden;
+      border:1px solid var(--border);
+      border-radius:22px;
+      background:var(--panel);
+      box-shadow:0 30px 90px rgba(0,0,0,.45);
+    }
+    .asset-search-dialog-head{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:18px;
+      padding:20px 22px 16px;
+      border-bottom:1px solid var(--border);
+    }
+    .asset-search-dialog-head h2{margin:0 0 6px}
+    .asset-search-dialog-head p{margin:0}
+    .asset-search-close{
+      flex:0 0 auto;
+      width:38px;
+      height:38px;
+      padding:0;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:var(--panel-2);
+      color:var(--text);
+      font-size:22px;
+      cursor:pointer;
+    }
+    .asset-search-results{
+      display:grid;
+      gap:10px;
+      max-height:58vh;
+      overflow:auto;
+      padding:16px 18px 20px;
+    }
+    .asset-search-result{
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:18px;
+      padding:14px 15px;
+      border:1px solid var(--border);
+      border-radius:15px;
+      background:var(--panel-2);
+      color:var(--text);
+      text-align:left;
+      cursor:pointer;
+      transition:.18s ease;
+    }
+    .asset-search-result:hover,
+    .asset-search-result:focus-visible{
+      transform:translateY(-1px);
+      border-color:var(--accent);
+      outline:none;
+    }
+    .asset-search-result-main{
+      min-width:0;
+      display:grid;
+      gap:5px;
+    }
+    .asset-search-result-title{
+      display:flex;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .asset-search-result-title strong{font-size:15px}
+    .asset-search-result-name{
+      overflow:hidden;
+      color:var(--muted);
+      font-size:13px;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .asset-search-result-meta{
+      flex:0 0 auto;
+      display:grid;
+      justify-items:end;
+      gap:5px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .asset-type-pill{
+      display:inline-flex;
+      align-items:center;
+      padding:4px 8px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      background:rgba(124,92,255,.10);
+      color:var(--text);
+      font-size:11px;
+      font-weight:700;
+      letter-spacing:.02em;
+      text-transform:uppercase;
+    }
+    .asset-search-note{
+      padding:0 20px 18px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    @media (max-width:640px){
+      .asset-search-overlay{padding:12px}
+      .asset-search-result{align-items:flex-start}
+      .asset-search-result-meta{justify-items:start}
+    }
+
   </style>
 </head>
 <body>
@@ -476,7 +600,7 @@
 
   <main>
     <div class="topbar">
-      <div class="search"><span>⌕</span><input id="globalSearch" placeholder="Pesquisar empresa, ETF ou ticker…" /></div>
+      <div class="search"><span>⌕</span><input id="globalSearch" placeholder="Pesquisar ticker, ETF ou ISIN…" /></div>
       <div class="view-toggle"><button id="simpleModeBtn" class="active">Modo simples</button><button id="advancedModeBtn">Modo avançado</button></div>
       <div class="user"><div><strong>Tiago</strong><div style="font-size:11px;color:var(--muted)">Perfil crescimento</div></div><div class="avatar">TS</div></div>
     </div>
@@ -1191,6 +1315,46 @@
 <div class="toast" id="toast">Adicionado à watchlist.</div>
 
 
+
+<div
+  class="asset-search-overlay"
+  id="assetSearchOverlay"
+  aria-hidden="true"
+>
+  <section
+    class="asset-search-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="assetSearchTitle"
+  >
+    <div class="asset-search-dialog-head">
+      <div>
+        <h2 id="assetSearchTitle">Escolher uma listagem</h2>
+        <p class="sub" id="assetSearchMeta">
+          A OpenFIGI encontrou várias correspondências.
+        </p>
+      </div>
+      <button
+        class="asset-search-close"
+        id="assetSearchClose"
+        type="button"
+        aria-label="Fechar resultados"
+      >×</button>
+    </div>
+
+    <div
+      class="asset-search-results"
+      id="assetSearchResults"
+    ></div>
+
+    <div class="asset-search-note">
+      A identificação vem da OpenFIGI. Para listagens ainda não
+      suportadas pela Finnhub, o ThesisOS apresenta a identificação
+      sem inventar uma cotação.
+    </div>
+  </section>
+</div>
+
 <script>
 (() => {
   "use strict";
@@ -1469,6 +1633,304 @@
     }
   }
 
+  const assetSearchOverlay=$("#assetSearchOverlay");
+  const assetSearchResults=$("#assetSearchResults");
+  const assetSearchMeta=$("#assetSearchMeta");
+  const assetSearchClose=$("#assetSearchClose");
+
+  function assetTypeLabel(assetType){
+    const labels={
+      stock:"Ação",
+      etf:"ETF",
+      fund:"Fundo",
+      index:"Índice",
+      other:"Outro"
+    };
+
+    return labels[assetType] || "Ativo";
+  }
+
+  function closeAssetSearchResults(){
+    assetSearchOverlay?.classList.remove("open");
+    assetSearchOverlay?.setAttribute("aria-hidden","true");
+  }
+
+  function clearObservedMarketFields(){
+    [
+      "#realOpen",
+      "#realHigh",
+      "#realLow",
+      "#realPreviousClose",
+      "#realMarketCap",
+      "#realShares",
+      "#realCountry",
+      "#realIpoDate"
+    ].forEach(selector=>{
+      const element=$(selector);
+      if(element) element.textContent="—";
+    });
+
+    const website=$("#realWebsite");
+
+    if(website){
+      website.removeAttribute("href");
+      website.textContent="Indisponível";
+    }
+  }
+
+  function showOpenFigiIdentification(result){
+    closeAssetSearchResults();
+    openPage("analysis");
+
+    const symbol=result.ticker || "—";
+    const logo=$("#assetLogo");
+
+    if(logo){
+      logo.innerHTML="";
+      logo.textContent=symbol;
+    }
+
+    if($("#assetName")){
+      $("#assetName").textContent=result.name || symbol;
+    }
+
+    if($("#assetMeta")){
+      $("#assetMeta").textContent=[
+        result.exchange_code,
+        assetTypeLabel(result.asset_type),
+        result.security_type
+      ].filter(Boolean).join(" · ");
+    }
+
+    if($("#assetPrice")){
+      $("#assetPrice").textContent="Cotação não ligada";
+    }
+
+    if($("#assetChange")){
+      $("#assetChange").textContent="Listagem identificada";
+    }
+
+    if($("#assetFx")){
+      $("#assetFx").textContent=
+        "Fonte: OpenFIGI. Esta bolsa ainda não está ligada ao fornecedor de preços.";
+    }
+
+    if($("#assetDataStatus")){
+      $("#assetDataStatus").textContent=
+        "Ativo identificado pela OpenFIGI";
+    }
+
+    if($("#assetDataDetail")){
+      $("#assetDataDetail").textContent=
+        `Foi identificada a listagem ${symbol} em ${result.exchange_code || "bolsa não especificada"}. A cotação desta bolsa será integrada numa fase seguinte.`;
+    }
+
+    if($("#assetUpdated")){
+      $("#assetUpdated").textContent="Identificação concluída";
+    }
+
+    if($("#realDataBadge")){
+      $("#realDataBadge").textContent="Sem cotação ligada";
+    }
+
+    clearObservedMarketFields();
+    showToast(`${symbol} identificado pela OpenFIGI.`);
+  }
+
+  function canLoadFinnhubQuote(result){
+    const exchange=String(result.exchange_code || "").toUpperCase();
+
+    return ["US","UN","UW","UR"].includes(exchange);
+  }
+
+  function selectAssetSearchResult(result){
+    closeAssetSearchResults();
+
+    if(search && result.ticker){
+      search.value=result.ticker;
+    }
+
+    if(result.ticker && canLoadFinnhubQuote(result)){
+      loadAsset(result.ticker);
+      return;
+    }
+
+    showOpenFigiIdentification(result);
+  }
+
+  function createAssetResultButton(result){
+    const button=document.createElement("button");
+    button.type="button";
+    button.className="asset-search-result";
+
+    const main=document.createElement("span");
+    main.className="asset-search-result-main";
+
+    const title=document.createElement("span");
+    title.className="asset-search-result-title";
+
+    const ticker=document.createElement("strong");
+    ticker.textContent=result.ticker || "Sem ticker";
+
+    const type=document.createElement("span");
+    type.className="asset-type-pill";
+    type.textContent=assetTypeLabel(result.asset_type);
+
+    title.append(ticker,type);
+
+    const name=document.createElement("span");
+    name.className="asset-search-result-name";
+    name.textContent=result.name || "Nome indisponível";
+
+    main.append(title,name);
+
+    const meta=document.createElement("span");
+    meta.className="asset-search-result-meta";
+
+    const exchange=document.createElement("strong");
+    exchange.textContent=result.exchange_code || "Bolsa —";
+
+    const security=document.createElement("span");
+    security.textContent=result.security_type || result.market_sector || "Tipo —";
+
+    meta.append(exchange,security);
+    button.append(main,meta);
+
+    button.addEventListener(
+      "click",
+      ()=>selectAssetSearchResult(result)
+    );
+
+    return button;
+  }
+
+  function openAssetSearchResults(payload){
+    if(!assetSearchOverlay || !assetSearchResults) return;
+
+    assetSearchResults.replaceChildren();
+
+    payload.results.forEach(result=>{
+      assetSearchResults.append(
+        createAssetResultButton(result)
+      );
+    });
+
+    if(assetSearchMeta){
+      assetSearchMeta.textContent=
+        payload.total_results>payload.returned_results
+          ? `Encontrámos ${payload.total_results} correspondências. São mostradas as primeiras ${payload.returned_results}.`
+          : `Encontrámos ${payload.total_results} correspondência${payload.total_results===1 ? "" : "s"}.`;
+    }
+
+    assetSearchOverlay.classList.add("open");
+    assetSearchOverlay.setAttribute("aria-hidden","false");
+
+    const firstResult=assetSearchResults.querySelector(
+      ".asset-search-result"
+    );
+
+    firstResult?.focus();
+  }
+
+  function preferredAutomaticResult(payload){
+    const results=payload.results || [];
+
+    if(results.length===1){
+      return results[0];
+    }
+
+    if(payload.query_type!=="ticker"){
+      return null;
+    }
+
+    const query=String(payload.query || "").toUpperCase();
+
+    return results.find(result=>{
+      const ticker=String(result.ticker || "").toUpperCase();
+      const exchange=String(
+        result.exchange_code || ""
+      ).toUpperCase();
+
+      return (
+        ticker===query &&
+        ["US","UN","UW","UR"].includes(exchange)
+      );
+    }) || null;
+  }
+
+  async function searchAssets(query){
+    const cleanQuery=String(query || "").trim().toUpperCase();
+
+    if(!cleanQuery){
+      showToast("Escreve um ticker ou ISIN.");
+      return;
+    }
+
+    const originalPlaceholder=
+      search?.placeholder || "Pesquisar ativo…";
+
+    if(search){
+      search.disabled=true;
+      search.placeholder="A pesquisar na OpenFIGI…";
+      search.setAttribute("aria-busy","true");
+    }
+
+    try{
+      const response=await fetch(
+        `/api/search/${encodeURIComponent(cleanQuery)}`
+      );
+
+      const payload=await response.json();
+
+      if(!response.ok){
+        throw new Error(
+          payload.detail ||
+          payload.error ||
+          "Não foi possível pesquisar o ativo."
+        );
+      }
+
+      const automaticResult=
+        preferredAutomaticResult(payload);
+
+      if(automaticResult){
+        selectAssetSearchResult(automaticResult);
+        return;
+      }
+
+      openAssetSearchResults(payload);
+    }catch(error){
+      showToast(error.message || "Erro na pesquisa OpenFIGI.");
+    }finally{
+      if(search){
+        search.disabled=false;
+        search.placeholder=originalPlaceholder;
+        search.removeAttribute("aria-busy");
+        search.focus();
+      }
+    }
+  }
+
+  assetSearchClose?.addEventListener(
+    "click",
+    closeAssetSearchResults
+  );
+
+  assetSearchOverlay?.addEventListener("click",event=>{
+    if(event.target===assetSearchOverlay){
+      closeAssetSearchResults();
+    }
+  });
+
+  document.addEventListener("keydown",event=>{
+    if(
+      event.key==="Escape" &&
+      assetSearchOverlay?.classList.contains("open")
+    ){
+      closeAssetSearchResults();
+    }
+  });
+
   search?.addEventListener("input",()=>{
     const term=search.value.toLowerCase().trim();
 
@@ -1485,7 +1947,8 @@
 
   search?.addEventListener("keydown",event=>{
     if(event.key==="Enter"){
-      loadAsset(search.value);
+      event.preventDefault();
+      searchAssets(search.value);
     }
   });
 
