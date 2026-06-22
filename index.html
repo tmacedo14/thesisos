@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ThesisOS — Investment Intelligence</title>
+  <style>
+    :root{
+      --bg:#09111f;
+      --panel:#101b2d;
+      --panel-2:#142238;
+      --muted:#8391a8;
+      --text:#eef4ff;
+      --line:#24334d;
+      --accent:#7c9cff;
+      --accent-2:#56d6b2;
+      --warn:#f0b35a;
+      --danger:#f1707f;
+      --success:#56d6b2;
+      --shadow:0 18px 50px rgba(0,0,0,.28);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      background:
+        radial-gradient(circle at 12% 10%, rgba(124,156,255,.14), transparent 28%),
+        radial-gradient(circle at 90% 0%, rgba(86,214,178,.09), transparent 24%),
+        var(--bg);
+      color:var(--text);
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height:100vh;
+    }
+    button,input,select{font:inherit}
+    button{cursor:pointer}
+    .app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+    .sidebar{
+      border-right:1px solid var(--line);
+      background:rgba(9,17,31,.88);
+      backdrop-filter: blur(18px);
+      padding:24px 18px;
+      position:sticky;top:0;height:100vh;
+    }
+    .brand{display:flex;align-items:center;gap:12px;padding:2px 8px 26px}
+    .logo{
+      width:42px;height:42px;border-radius:13px;
+      display:grid;place-items:center;
+      background:linear-gradient(135deg,var(--accent),#a476ff);
+      box-shadow:0 10px 24px rgba(124,156,255,.32);
+      font-weight:900;
+    }
+    .brand strong{font-size:18px}
+    .brand small{display:block;color:var(--muted);margin-top:2px}
+    .nav-title{font-size:11px;color:#60718f;letter-spacing:.13em;text-transform:uppercase;margin:14px 10px 8px}
+    .nav-btn{
+      width:100%;display:flex;align-items:center;gap:12px;
+      padding:12px 13px;border:0;border-radius:12px;
+      background:transparent;color:#aeb9cc;text-align:left;margin:4px 0;
+      transition:.2s ease;
+    }
+    .nav-btn:hover,.nav-btn.active{background:#16243a;color:#fff}
+    .nav-btn.active{box-shadow:inset 3px 0 0 var(--accent)}
+    .nav-icon{width:22px;text-align:center}
+    .side-card{
+      position:absolute;left:18px;right:18px;bottom:22px;
+      padding:14px;border:1px solid var(--line);border-radius:14px;
+      background:linear-gradient(180deg,#132039,#0f1a2c);
+    }
+    .side-card strong{font-size:13px}
+    .side-card p{font-size:12px;color:var(--muted);line-height:1.45;margin:7px 0 0}
+    main{padding:24px 30px 60px;min-width:0}
+    .topbar{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:22px}
+    .search{
+      flex:1;max-width:720px;display:flex;align-items:center;gap:10px;
+      background:rgba(16,27,45,.9);border:1px solid var(--line);border-radius:14px;padding:0 14px;
+    }
+    .search input{width:100%;padding:13px 0;background:transparent;border:0;outline:0;color:#fff}
+    .user{display:flex;align-items:center;gap:10px}
+    .avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#213352;border:1px solid #334769;font-weight:700}
+    .page{display:none;animation:fade .25s ease}
+    .page.active{display:block}
+    @keyframes fade{from{opacity:.25;transform:translateY(4px)}to{opacity:1;transform:none}}
+    .hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:20px}
+    h1{font-size:30px;letter-spacing:-.03em;margin:0 0 6px}
+    h2{font-size:19px;margin:0 0 14px}
+    h3{font-size:15px;margin:0}
+    .sub{color:var(--muted);margin:0}
+    .badge{
+      display:inline-flex;gap:7px;align-items:center;padding:7px 10px;
+      border-radius:999px;background:#172743;border:1px solid #2e4367;color:#bcd0ef;font-size:12px
+    }
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--success)}
+    .grid{display:grid;gap:16px}
+    .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .card{
+      background:linear-gradient(180deg,rgba(18,31,52,.97),rgba(13,24,41,.97));
+      border:1px solid var(--line);border-radius:var(--radius);padding:18px;
+      box-shadow:var(--shadow);
+    }
+    .metric-label{font-size:12px;color:var(--muted)}
+    .metric{font-size:26px;font-weight:800;margin:8px 0 3px;letter-spacing:-.03em}
+    .delta{font-size:12px;color:var(--success)}
+    .delta.warn{color:var(--warn)}
+    .delta.bad{color:var(--danger)}
+    .section-head{display:flex;justify-content:space-between;align-items:center;margin:26px 0 12px}
+    .link-btn,.ghost,.primary,.danger-btn{
+      border:0;border-radius:11px;padding:10px 13px;font-weight:700;
+    }
+    .link-btn,.ghost{background:#182841;color:#c8d5e9;border:1px solid #2b3f60}
+    .primary{background:linear-gradient(135deg,var(--accent),#8b76ff);color:white;box-shadow:0 10px 24px rgba(124,156,255,.25)}
+    .danger-btn{background:rgba(241,112,127,.13);color:#ff9caa;border:1px solid rgba(241,112,127,.35)}
+    .market-row{display:flex;align-items:center;justify-content:space-between;margin:13px 0}
+    .bar{height:8px;background:#1c2b43;border-radius:99px;overflow:hidden;margin-top:7px}
+    .bar span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+    .opportunity{position:relative;overflow:hidden}
+    .opportunity:after{
+      content:"";position:absolute;width:110px;height:110px;border-radius:50%;
+      right:-45px;top:-45px;background:radial-gradient(circle,rgba(124,156,255,.18),transparent 65%);
+    }
+    .ticker{display:flex;align-items:center;gap:10px}
+    .ticker-logo{width:42px;height:42px;border-radius:13px;background:#213352;display:grid;place-items:center;font-weight:900}
+    .ticker-meta small{color:var(--muted)}
+    .score-line{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+    .score{font-size:24px;font-weight:800}
+    .pill{font-size:11px;padding:6px 9px;border-radius:999px;background:#183428;color:#80e2c7;border:1px solid #2d5a4c}
+    .pill.warn{background:#382c18;color:#f6c97f;border-color:#5c4824}
+    .pill.bad{background:#3a2028;color:#ff9eac;border-color:#60303c}
+    .mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}
+    .mini{padding:10px;border-radius:11px;background:#111d30;border:1px solid #22324b}
+    .mini span{display:block;font-size:10px;color:var(--muted)}
+    .mini strong{font-size:13px}
+    .spark{width:100%;height:54px;margin:6px 0 2px}
+    .card-actions{display:flex;gap:8px;margin-top:12px}
+    .card-actions button{flex:1}
+    .two-col{display:grid;grid-template-columns:1.55fr .85fr;gap:16px}
+    .timeline{display:grid;gap:12px}
+    .news-item{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:start;padding:12px;border:1px solid #22324b;border-radius:13px;background:#111d30}
+    .news-icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:#1c2b43}
+    .news-item p{margin:3px 0;color:var(--muted);font-size:12px}
+    .priority{font-size:10px;padding:5px 7px;border-radius:999px;background:#3a2028;color:#ff9eac}
+    .portfolio-wrap{display:grid;grid-template-columns:1.25fr .75fr;gap:16px}
+    .donut{
+      width:210px;height:210px;border-radius:50%;margin:6px auto 18px;
+      background:conic-gradient(#7c9cff 0 62%,#56d6b2 62% 78%,#f0b35a 78% 90%,#a476ff 90% 97%,#4a5a73 97% 100%);
+      position:relative;
+    }
+    .donut:after{
+      content:attr(data-value) "\A Carteira";white-space:pre;position:absolute;inset:35px;border-radius:50%;
+      background:#101b2d;display:grid;place-items:center;text-align:center;font-weight:800;line-height:1.6;
+    }
+    .legend{display:grid;gap:10px}
+    .legend-row{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+    .legend-left{display:flex;gap:8px;align-items:center}
+    .swatch{width:10px;height:10px;border-radius:3px}
+    .risk-box{padding:14px;border-radius:14px;background:#111d30;border:1px solid #22324b}
+    .risk-value{font-size:30px;font-weight:900}
+    .analysis-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}
+    .price{font-size:34px;font-weight:900}
+    .tabs{display:flex;gap:8px;margin:18px 0}
+    .tab{padding:9px 12px;border:1px solid #2a3b59;border-radius:10px;background:#142238;color:#afbdd2}
+    .tab.active{background:#263a60;color:#fff;border-color:#486491}
+    .thesis-map{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .pillar{padding:14px;border:1px solid #29405f;border-radius:14px;background:#111d30}
+    .pillar small{color:var(--muted)}
+    .pillar strong{display:block;margin-top:8px;font-size:16px}
+    .pillar.green{box-shadow:inset 0 -3px 0 var(--success)}
+    .pillar.yellow{box-shadow:inset 0 -3px 0 var(--warn)}
+    .pillar.red{box-shadow:inset 0 -3px 0 var(--danger)}
+    .evidence{display:grid;gap:10px}
+    .evidence-row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px;border-radius:12px;background:#111d30;border:1px solid #22324b}
+    .evidence-row p{margin:3px 0 0;color:var(--muted);font-size:12px}
+    .status{font-size:11px;padding:6px 8px;border-radius:999px;height:max-content}
+    .status.ok{background:#183428;color:#80e2c7}
+    .status.warn{background:#382c18;color:#f6c97f}
+    .decision{border:1px solid #31486c;background:linear-gradient(135deg,#182946,#142237);border-radius:16px;padding:18px}
+    .decision h3{font-size:18px}
+    .decision-call{display:flex;align-items:center;justify-content:space-between;margin:14px 0}
+    .decision-call strong{font-size:28px}
+    .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+    label{font-size:12px;color:#aab7ca}
+    input,select{
+      width:100%;margin-top:6px;padding:12px;border-radius:11px;border:1px solid #2a3b59;
+      background:#101b2d;color:#fff;outline:0;
+    }
+    input:focus,select:focus{border-color:#6e8fe8}
+    input[type=range]{padding:0;border:0;background:transparent}
+    .allocation{display:grid;gap:12px;margin-top:16px}
+    .allocation-row{display:grid;grid-template-columns:150px 1fr 50px;gap:10px;align-items:center;font-size:13px}
+    .allocation-row .bar{margin:0}
+    .alert-card{display:flex;justify-content:space-between;align-items:start;gap:14px}
+    .alert-card p{margin:5px 0 0;color:var(--muted);font-size:13px;line-height:1.45}
+    .alert-left{display:flex;gap:12px}
+    .filter-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+    .filter{padding:8px 11px;border-radius:999px;background:#132039;border:1px solid #2a3d5d;color:#b6c2d4}
+    .filter.active{background:#263c64;color:#fff}
+    .toast{
+      position:fixed;right:24px;bottom:24px;padding:13px 16px;border-radius:12px;
+      background:#15263f;border:1px solid #33507c;color:#fff;box-shadow:var(--shadow);
+      opacity:0;transform:translateY(15px);pointer-events:none;transition:.25s;
+    }
+    .toast.show{opacity:1;transform:none}
+    .prototype-note{font-size:11px;color:#66758d;margin-top:8px}
+    @media(max-width:1100px){
+      .g4{grid-template-columns:repeat(2,1fr)}
+      .g3{grid-template-columns:1fr}
+      .two-col,.portfolio-wrap{grid-template-columns:1fr}
+      .thesis-map{grid-template-columns:repeat(2,1fr)}
+    }
+    @media(max-width:760px){
+      .app{grid-template-columns:1fr}
+      .sidebar{position:relative;height:auto;border-right:0;border-bottom:1px solid var(--line)}
+      .side-card{position:static;margin-top:18px}
+      main{padding:18px}
+      .g4,.g2,.form-grid{grid-template-columns:1fr}
+      .topbar{align-items:stretch;flex-direction:column}
+      .user{display:none}
+      .hero,.analysis-head{flex-direction:column;align-items:flex-start}
+      .thesis-map{grid-template-columns:1fr}
+      .allocation-row{grid-template-columns:110px 1fr 42px}
+    }
+
+    /* V2 enhancements */
+    .glow-success{box-shadow:0 0 14px rgba(86,214,178,.18)}
+    .glow-warn{box-shadow:0 0 14px rgba(240,179,90,.18)}
+    .glow-danger{box-shadow:0 0 14px rgba(241,112,127,.20)}
+    .pillar.green{box-shadow:inset 0 -3px 0 var(--success),0 0 14px rgba(86,214,178,.10)}
+    .pillar.yellow{box-shadow:inset 0 -3px 0 var(--warn),0 0 14px rgba(240,179,90,.10)}
+    .pillar.red{box-shadow:inset 0 -3px 0 var(--danger),0 0 14px rgba(241,112,127,.14)}
+    .spark polyline{
+      stroke-dasharray:520;
+      stroke-dashoffset:520;
+      animation:drawSpark 1.6s ease forwards;
+    }
+    @keyframes drawSpark{to{stroke-dashoffset:0}}
+    .allocation-amount{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+    .fx-note,.source-note,.logic-note{
+      margin-top:12px;padding:11px 12px;border-radius:12px;
+      background:#101d31;border:1px solid #283d5d;color:#aebbd0;font-size:12px;line-height:1.5
+    }
+    .source-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .source-card{padding:13px;border:1px solid #263a59;background:#111d30;border-radius:13px}
+    .source-card span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .source-card strong{display:block;margin:6px 0 3px;font-size:14px}
+    .source-card small{color:var(--muted);line-height:1.4}
+    .change-list{display:grid;gap:9px}
+    .change-row{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:11px 12px;border:1px solid #243650;border-radius:12px;background:#111d30}
+    .change-symbol{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:#1d2d47}
+    .change-row small{color:var(--muted)}
+    .change-value{font-size:12px;font-weight:800}
+    .simulation-box{padding:14px;border:1px solid #304968;background:linear-gradient(180deg,#14243b,#101c2f);border-radius:15px}
+    .simulation-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .impact-list{display:grid;gap:8px;margin-top:12px}
+    .impact-item{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;border-radius:10px;background:#0f1b2d;border:1px solid #22344f;font-size:12px}
+    .confidence{display:flex;align-items:center;gap:8px;margin-top:10px}
+    .confidence-meter{height:7px;flex:1;background:#1d2c43;border-radius:99px;overflow:hidden}
+    .confidence-meter span{display:block;height:100%;width:86%;background:linear-gradient(90deg,var(--success),var(--accent));border-radius:99px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;background:#162640;border:1px solid #2c4366;color:#c6d4e8;font-size:11px}
+    .chip-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+
+
+    /* V3 enhancements */
+    .help{
+      position:relative;display:inline-grid;place-items:center;
+      width:17px;height:17px;margin-left:5px;border-radius:50%;
+      border:1px solid #3a4f70;color:#9fb0c8;font-size:11px;font-weight:800;
+      cursor:help;vertical-align:middle;background:#122039;
+    }
+    .help:hover::after,.help:focus::after{
+      content:attr(data-tip);
+      position:absolute;z-index:50;left:50%;bottom:calc(100% + 10px);
+      transform:translateX(-50%);
+      width:260px;padding:10px 12px;border-radius:11px;
+      background:#07101f;border:1px solid #385174;color:#e7eefb;
+      box-shadow:0 16px 40px rgba(0,0,0,.35);
+      font-size:12px;font-weight:500;line-height:1.45;text-align:left;
+      white-space:normal;
+    }
+    .help:hover::before,.help:focus::before{
+      content:"";position:absolute;z-index:51;left:50%;bottom:calc(100% + 4px);
+      transform:translateX(-50%);border:6px solid transparent;border-top-color:#385174;
+    }
+    .mode-switch{
+      display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:6px;
+      background:#0f1b2d;border:1px solid #263a59;border-radius:14px;margin-bottom:16px
+    }
+    .mode-btn{
+      border:0;border-radius:10px;padding:11px 12px;background:transparent;
+      color:#9fb0c8;font-weight:800
+    }
+    .mode-btn.active{background:#243b61;color:#fff;box-shadow:0 8px 18px rgba(0,0,0,.22)}
+    .mode-panel{display:none}
+    .mode-panel.active{display:block}
+    .portfolio-table{width:100%;border-collapse:collapse;font-size:13px}
+    .portfolio-table th,.portfolio-table td{padding:11px 10px;border-bottom:1px solid #22344d;text-align:left}
+    .portfolio-table th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+    .portfolio-table td:last-child,.portfolio-table th:last-child{text-align:right}
+    .tag{
+      display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;
+      font-size:10px;font-weight:800;border:1px solid #2c4569;background:#162640;color:#c8d5e8
+    }
+    .tag.good{background:#17352a;color:#7ee0c4;border-color:#285a49}
+    .tag.warn{background:#3b2f1b;color:#f3c878;border-color:#664d25}
+    .tag.bad{background:#3b2028;color:#ffa0ae;border-color:#66333f}
+    .decision-sections{display:grid;gap:12px;margin-top:14px}
+    .decision-section{padding:13px;border-radius:13px;background:#101d31;border:1px solid #29405f}
+    .decision-section .eyebrow{font-size:10px;color:#7e91ae;text-transform:uppercase;letter-spacing:.1em}
+    .decision-section strong{display:block;font-size:17px;margin:5px 0}
+    .calc-trace{display:grid;gap:7px;margin-top:10px}
+    .calc-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:8px 9px;border-radius:9px;background:#0e192a}
+    .inline-note{font-size:11px;color:#7890b2;margin-top:5px}
+
+
+    /* V4 full-product preview */
+    .view-toggle{display:inline-flex;gap:6px;padding:5px;border:1px solid #29415f;background:#0f1b2d;border-radius:12px}
+    .view-toggle button{border:0;background:transparent;color:#9eb0c8;padding:8px 11px;border-radius:9px;font-weight:800}
+    .view-toggle button.active{background:#263d64;color:white}
+    .advanced-only{display:none!important}.advanced-mode .advanced-only{display:block!important}
+    .reason-list{display:none;gap:7px;margin-top:12px}.reason-list.open{display:grid}
+    .reason-item{display:flex;gap:8px;align-items:flex-start;padding:8px 9px;border-radius:10px;background:#101b2d;border:1px solid #22344d;font-size:12px;color:#bcc9dc}
+    .reason-item.ok::before{content:'✓';color:var(--success);font-weight:900}.reason-item.warn::before{content:'!';color:var(--warn);font-weight:900}.reason-item.bad::before{content:'×';color:var(--danger);font-weight:900}
+    .freshness{display:inline-flex;align-items:center;gap:6px;font-size:10px;padding:5px 7px;border-radius:999px;background:#16263f;border:1px solid #2b4264;color:#b9c8dc}
+    .freshness:before{content:'';width:7px;height:7px;border-radius:50%;background:var(--success)}.freshness.warn:before{background:var(--warn)}.freshness.bad:before{background:var(--danger)}
+    .journal-entry{padding:14px;border-radius:14px;background:#111d30;border:1px solid #263a59}.journal-top{display:flex;justify-content:space-between;gap:12px;align-items:start}.journal-entry p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
+    .version-line{position:relative;padding-left:26px;margin:12px 0}.version-line:before{content:'';position:absolute;left:7px;top:6px;bottom:-18px;width:2px;background:#2b4162}.version-line:last-child:before{display:none}.version-line:after{content:'';position:absolute;left:1px;top:3px;width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px rgba(124,156,255,.12)}.version-line strong{display:block}.version-line small{color:var(--muted)}
+    .compare-grid{display:grid;grid-template-columns:170px repeat(3,1fr);gap:1px;background:#243650;border-radius:14px;overflow:hidden}.compare-grid>div{padding:11px;background:#111d30;font-size:12px}.compare-grid .head{font-weight:900;background:#17263e}.compare-grid .label{color:#aebbd0}
+    .goal-card{padding:14px;border:1px solid #263a59;border-radius:14px;background:#111d30}.goal-card.active{border-color:#5777b3;box-shadow:0 0 18px rgba(124,156,255,.12)}.goal-card h3{margin-bottom:5px}.goal-card p{margin:0;color:var(--muted);font-size:12px}.goal-progress{margin-top:12px}
+    .benchmark-table{width:100%;border-collapse:collapse}.benchmark-table th,.benchmark-table td{padding:10px;border-bottom:1px solid #22344d;text-align:left;font-size:12px}.benchmark-table th{color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.06em}
+    .status-banner{padding:12px 14px;border-radius:13px;border:1px solid #345079;background:#132139;display:flex;justify-content:space-between;gap:12px;align-items:center}.status-banner.warn{border-color:#6a4f25;background:#2c2417}.status-banner.bad{border-color:#6a3340;background:#2b1d24}
+    .tax-box{padding:13px;border-radius:13px;background:#111d30;border:1px solid #263a59}.tax-box small{color:var(--muted);line-height:1.4}
+    .strategy-pills{display:flex;gap:7px;flex-wrap:wrap}.strategy-pills .tag{cursor:pointer}.strategy-pills .tag.active{background:#263d64;color:#fff;border-color:#4c6ea6}
+    .data-pill-row{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+    @media(max-width:900px){.compare-grid{grid-template-columns:140px repeat(3,1fr);overflow:auto}.view-toggle{display:none}}
+
+
+    /* V5 — Market-aware automation and horizon radar */
+    .market-grid{
+      display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px
+    }
+    .market-card{
+      padding:14px;border-radius:15px;border:1px solid #263b5b;
+      background:linear-gradient(180deg,#13223a,#101b2e);position:relative;overflow:hidden
+    }
+    .market-card::after{
+      content:"";position:absolute;width:75px;height:75px;border-radius:50%;
+      right:-30px;top:-32px;background:radial-gradient(circle,rgba(124,156,255,.15),transparent 68%)
+    }
+    .market-top{display:flex;justify-content:space-between;gap:10px;align-items:start}
+    .market-name{font-weight:900}
+    .market-exchange{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+    .market-state{
+      display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;
+      font-size:10px;font-weight:900;border:1px solid #31557b;background:#172a45;color:#bcd0e9
+    }
+    .market-state::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted)}
+    .market-state.open{background:#17372c;border-color:#2d604f;color:#82e4c8}
+    .market-state.open::before{background:var(--success);box-shadow:0 0 10px rgba(86,214,178,.65)}
+    .market-state.closed{background:#2a2530;border-color:#4f3d52;color:#c9b7ce}
+    .market-state.closed::before{background:#8b7790}
+    .market-time{font-size:22px;font-weight:900;margin:14px 0 3px}
+    .market-next{font-size:11px;color:var(--muted);line-height:1.4}
+    .market-snapshot{
+      margin-top:10px;padding-top:10px;border-top:1px solid #243650;
+      display:flex;justify-content:space-between;gap:8px;color:#9fb0c8;font-size:10px
+    }
+    .automation-flow{
+      display:grid;grid-template-columns:repeat(5,1fr);gap:8px;align-items:stretch;margin-top:12px
+    }
+    .automation-step{
+      padding:11px;border-radius:12px;background:#101c2f;border:1px solid #263b59;text-align:center
+    }
+    .automation-step strong{display:block;font-size:12px}
+    .automation-step span{display:block;font-size:10px;color:var(--muted);margin-top:4px}
+    .horizon-tabs{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:6px;
+      background:#0f1b2d;border:1px solid #263a59;border-radius:15px;margin-bottom:13px
+    }
+    .horizon-btn{
+      border:0;border-radius:11px;padding:12px;background:transparent;color:#9fafc5;
+      font-weight:900;text-align:center
+    }
+    .horizon-btn small{display:block;font-weight:500;color:#6f819e;margin-top:3px}
+    .horizon-btn.active{background:#263e65;color:white;box-shadow:0 8px 22px rgba(0,0,0,.25)}
+    .horizon-btn.active small{color:#b9c9df}
+    .radar-controls{
+      display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px
+    }
+    .market-filters{display:flex;gap:7px;flex-wrap:wrap}
+    .market-filter{
+      border:1px solid #2b4162;background:#132139;color:#aebbd0;border-radius:999px;padding:8px 11px
+    }
+    .market-filter.active{background:#284268;color:white;border-color:#4c6c9e}
+    .radar-card-meta{
+      display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin:11px 0
+    }
+    .radar-meta-item{
+      padding:8px 9px;border:1px solid #243650;background:#0f1a2c;border-radius:10px
+    }
+    .radar-meta-item span{display:block;font-size:9px;color:#7184a2;text-transform:uppercase;letter-spacing:.06em}
+    .radar-meta-item strong{display:block;font-size:11px;margin-top:4px}
+    .why-now{
+      margin-top:10px;padding:10px 11px;border-left:3px solid var(--accent);
+      background:#101d31;border-radius:0 10px 10px 0;color:#b8c5d9;font-size:12px;line-height:1.45
+    }
+    .validity{
+      display:flex;justify-content:space-between;gap:10px;margin-top:9px;color:#7f91ad;font-size:10px
+    }
+    .sync-strip{
+      display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;
+      padding:13px 15px;border:1px solid #2b4365;border-radius:14px;background:#13223a;margin-bottom:16px
+    }
+    .sync-left{display:flex;gap:11px;align-items:center}
+    .sync-icon{
+      width:39px;height:39px;border-radius:12px;display:grid;place-items:center;
+      background:#1b3050;border:1px solid #34547d;font-size:18px
+    }
+    .sync-strip strong{display:block}
+    .sync-strip small{color:var(--muted)}
+    .update-pulse{animation:updatePulse .8s ease}
+    @keyframes updatePulse{
+      0%{box-shadow:0 0 0 rgba(86,214,178,0)}
+      50%{box-shadow:0 0 28px rgba(86,214,178,.38)}
+      100%{box-shadow:0 0 0 rgba(86,214,178,0)}
+    }
+    .session-label{
+      display:inline-flex;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:900;
+      background:#172840;border:1px solid #2c4567;color:#b7c8dd
+    }
+    .session-label.daily{background:#19362d;color:#83e1c6;border-color:#2d5f4e}
+    .session-label.weekly{background:#1e3150;color:#a9c4f0;border-color:#355581}
+    .session-label.monthly{background:#382d1b;color:#f0c77c;border-color:#604a26}
+    .session-label.long{background:#302347;color:#ccb5f2;border-color:#533a78}
+    .radar-empty{
+      display:none;padding:28px;text-align:center;border:1px dashed #354b6c;border-radius:16px;color:var(--muted)
+    }
+    @media(max-width:1100px){
+      .market-grid{grid-template-columns:repeat(2,1fr)}
+      .automation-flow{grid-template-columns:repeat(3,1fr)}
+    }
+    @media(max-width:760px){
+      .market-grid,.horizon-tabs{grid-template-columns:1fr}
+      .automation-flow{grid-template-columns:1fr}
+      .radar-controls{align-items:stretch}
+    }
+
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">T</div>
+      <div><strong>ThesisOS</strong><small>Investment Intelligence</small></div>
+    </div>
+
+    <div class="nav-title">Workspace</div>
+    <button class="nav-btn active" data-page="dashboard"><span class="nav-icon">⌂</span>Dashboard</button>
+    <button class="nav-btn" data-page="radar"><span class="nav-icon">◎</span>Opportunity Radar</button>
+    <button class="nav-btn" data-page="analysis"><span class="nav-icon">◫</span>Analisar ativo</button>
+    <button class="nav-btn" data-page="compare"><span class="nav-icon">⇄</span>Comparar ativos</button>
+    <button class="nav-btn" data-page="portfolio"><span class="nav-icon">◔</span>Portfolio Builder</button>
+    <button class="nav-btn" data-page="myportfolio"><span class="nav-icon">◒</span>My Portfolio</button>
+    <button class="nav-btn" data-page="journal"><span class="nav-icon">✎</span>Investment Journal</button>
+
+    <div class="nav-title">Monitorização</div>
+    <button class="nav-btn" data-page="alerts"><span class="nav-icon">◉</span>Notícias & Alertas</button>
+    <button class="nav-btn" data-page="profile"><span class="nav-icon">⚙</span>Perfil de investidor</button>
+
+    <div class="side-card">
+      <strong>Protótipo académico</strong>
+      <p>Dados simulados. O produto final ligará APIs financeiras, notícias, macroeconomia e documentos oficiais.</p>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="search"><span>⌕</span><input id="globalSearch" placeholder="Pesquisar empresa, ETF ou ticker…" /></div>
+      <div class="view-toggle"><button id="simpleModeBtn" class="active">Modo simples</button><button id="advancedModeBtn">Modo avançado</button></div>
+      <div class="user"><div><strong>Tiago</strong><div style="font-size:11px;color:var(--muted)">Perfil crescimento</div></div><div class="avatar">TS</div></div>
+    </div>
+
+    <section id="dashboard" class="page active">
+      <div class="hero">
+        <div>
+          <h1>Bom dia, Tiago.</h1>
+          <p class="sub">O mercado está neutro, mas existem 4 oportunidades a aproximar-se das tuas zonas de interesse.</p>
+        </div>
+        <div class="badge"><span class="dot"></span> Dados atualizados hoje, 09:42</div>
+      </div>
+
+      <div class="grid g4">
+        <div class="card"><div class="metric-label">Valor da carteira</div><div class="metric">€18.450</div><div class="delta">+8,4% desde o início</div></div>
+        <div class="card"><div class="metric-label">Oportunidades abertas</div><div class="metric">4</div><div class="delta">2 em zona de pullback</div></div>
+        <div class="card"><div class="metric-label">Risco da carteira <span class="help" tabindex="0" data-tip="Combina concentração, volatilidade, correlação, moeda, exposição setorial e peso de posições especulativas.">?</span></div><div class="metric">Moderado</div><div class="delta warn">Tecnologia acima do alvo</div></div>
+        <div class="card"><div class="metric-label">Próxima revisão</div><div class="metric">6 dias</div><div class="delta">PWR — resultados trimestrais</div></div>
+      </div>
+
+
+      <div class="section-head">
+        <div>
+          <h2>Mercados e atualizações</h2>
+          <p class="sub">A versão real confirmará feriados e sessões especiais através da API de market hours.</p>
+        </div>
+        <button class="link-btn update-now-btn">Atualizar agora</button>
+      </div>
+      <div class="market-grid" id="marketGrid">
+        <div class="market-card" data-market-clock data-zone="Europe/Amsterdam" data-open="09:00" data-close="17:30" data-code="AMS">
+          <div class="market-top"><div><span class="market-name">Amsterdam</span><span class="market-exchange">Euronext Amsterdam</span></div><span class="market-state">A verificar</span></div>
+          <div class="market-time">--:--</div><div class="market-next">A calcular sessão…</div>
+          <div class="market-snapshot"><span>Abertura +15 min</span><strong class="market-updated">Snapshot 09:15</strong></div>
+        </div>
+        <div class="market-card" data-market-clock data-zone="Europe/London" data-open="08:00" data-close="16:30" data-code="LSE">
+          <div class="market-top"><div><span class="market-name">Londres</span><span class="market-exchange">London Stock Exchange</span></div><span class="market-state">A verificar</span></div>
+          <div class="market-time">--:--</div><div class="market-next">A calcular sessão…</div>
+          <div class="market-snapshot"><span>Abertura +15 min</span><strong class="market-updated">Snapshot 08:15</strong></div>
+        </div>
+        <div class="market-card" data-market-clock data-zone="Europe/Rome" data-open="09:00" data-close="17:30" data-code="MIL">
+          <div class="market-top"><div><span class="market-name">Milão</span><span class="market-exchange">Euronext Milan</span></div><span class="market-state">A verificar</span></div>
+          <div class="market-time">--:--</div><div class="market-next">A calcular sessão…</div>
+          <div class="market-snapshot"><span>Abertura +15 min</span><strong class="market-updated">Snapshot 09:15</strong></div>
+        </div>
+        <div class="market-card" data-market-clock data-zone="America/New_York" data-open="09:30" data-close="16:00" data-code="NYSE">
+          <div class="market-top"><div><span class="market-name">Nova Iorque</span><span class="market-exchange">NYSE / Nasdaq</span></div><span class="market-state">A verificar</span></div>
+          <div class="market-time">--:--</div><div class="market-next">A calcular sessão…</div>
+          <div class="market-snapshot"><span>Abertura +15 min</span><strong class="market-updated">Snapshot 09:45</strong></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="section-head" style="margin:0">
+          <div><h2>Automação planeada</h2><p class="sub">Cada evento chama apenas as APIs necessárias e guarda um snapshot no Supabase.</p></div>
+          <span class="freshness" id="nextAutomation">Próxima atualização automática</span>
+        </div>
+        <div class="automation-flow">
+          <div class="automation-step"><strong>Verificar mercado</strong><span>Market-hours API</span></div>
+          <div class="automation-step"><strong>Obter preços</strong><span>FMP batch quotes</span></div>
+          <div class="automation-step"><strong>Atualizar câmbio</strong><span>ECB EUR/USD/GBP</span></div>
+          <div class="automation-step"><strong>Recalcular carteira</strong><span>Supabase + motor próprio</span></div>
+          <div class="automation-step"><strong>Gerar sinais</strong><span>Radar + explicação IA</span></div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-top:16px">
+        <div class="card">
+          <div class="section-head" style="margin:0 0 8px"><div><h2>Market Regime</h2><p class="sub">Contexto macroeconómico e técnico</p></div><span class="pill warn">Neutro</span></div>
+          <div class="market-row"><div><strong>Valuation agregado</strong><div class="metric-label">S&P 500 forward P/E</div></div><div style="text-align:right"><strong>Elevado</strong><div class="metric-label">21,4x</div></div></div>
+          <div class="bar"><span style="width:78%"></span></div>
+          <div class="market-row"><div><strong>Liquidez e taxas</strong><div class="metric-label">Condições financeiras</div></div><div style="text-align:right"><strong>Neutras</strong><div class="metric-label">sem alteração</div></div></div>
+          <div class="bar"><span style="width:54%"></span></div>
+          <div class="market-row"><div><strong>Amplitude do mercado</strong><div class="metric-label">Participação das ações</div></div><div style="text-align:right"><strong>Saudável</strong><div class="metric-label">63%</div></div></div>
+          <div class="bar"><span style="width:63%"></span></div>
+          <div class="market-row"><div><strong>Volatilidade</strong><div class="metric-label">Regime atual</div></div><div style="text-align:right"><strong>Baixa</strong><div class="metric-label">VIX 15,8</div></div></div>
+          <div class="bar"><span style="width:32%"></span></div>
+        </div>
+
+        <div class="card">
+          <div class="section-head" style="margin:0 0 8px"><div><h2>Carteira</h2><p class="sub">Exposição atual</p></div><button class="link-btn" data-go="myportfolio">Abrir carteira real</button></div>
+          <div class="donut" data-value="€18.450"></div>
+          <div class="legend">
+            <div class="legend-row"><div class="legend-left"><span class="swatch" style="background:#7c9cff"></span>ETF Core</div><strong>62%</strong></div>
+            <div class="legend-row"><div class="legend-left"><span class="swatch" style="background:#56d6b2"></span>Ações quality</div><strong>16%</strong></div>
+            <div class="legend-row"><div class="legend-left"><span class="swatch" style="background:#f0b35a"></span>Dividendos</div><strong>12%</strong></div>
+            <div class="legend-row"><div class="legend-left"><span class="swatch" style="background:#a476ff"></span>Especulativas</div><strong>7%</strong></div>
+            <div class="legend-row"><div class="legend-left"><span class="swatch" style="background:#4a5a73"></span>Caixa</div><strong>3%</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-head"><div><h2>Oportunidades para o teu perfil</h2><p class="sub">Qualidade, valuation, pullback e encaixe na carteira</p></div><button class="link-btn" data-go="radar">Ver todas</button></div>
+      <div class="grid g3 opportunity-list">
+        <div class="card opportunity" data-category="ai-infra pullback quality" data-name="PWR Quanta Services infraestrutura">
+          <div class="ticker"><div class="ticker-logo">PWR</div><div class="ticker-meta"><strong>Quanta Services</strong><small>Infraestrutura elétrica</small></div></div>
+          <svg class="spark" viewBox="0 0 220 54" preserveAspectRatio="none"><polyline fill="none" stroke="#56d6b2" stroke-width="3" points="0,42 20,39 40,40 60,27 80,31 100,21 120,24 140,15 160,20 180,11 200,16 220,7"/></svg>
+          <div class="score-line"><div><span class="metric-label">Convicção</span><div class="score">7,8/10</div></div><span class="pill warn glow-warn">Observar</span></div>
+          <div class="mini-grid"><div class="mini"><span>Qualidade</span><strong>9/10</strong></div><div class="mini"><span>Valuation</span><strong>4/10</strong></div><div class="mini"><span>Pullback</span><strong>-8,2%</strong></div></div>
+          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
+        </div>
+
+        <div class="card opportunity" data-category="quality pullback" data-name="ZTS Zoetis saúde animal">
+          <div class="ticker"><div class="ticker-logo">ZTS</div><div class="ticker-meta"><strong>Zoetis</strong><small>Saúde animal</small></div></div>
+          <svg class="spark" viewBox="0 0 220 54" preserveAspectRatio="none"><polyline fill="none" stroke="#7c9cff" stroke-width="3" points="0,20 20,16 40,19 60,25 80,22 100,32 120,29 140,36 160,31 180,26 200,18 220,12"/></svg>
+          <div class="score-line"><div><span class="metric-label">Convicção</span><div class="score">8,1/10</div></div><span class="pill glow-success">Iniciar pequena</span></div>
+          <div class="mini-grid"><div class="mini"><span>Qualidade</span><strong>9/10</strong></div><div class="mini"><span>Valuation</span><strong>6/10</strong></div><div class="mini"><span>Pullback</span><strong>-17,4%</strong></div></div>
+          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
+        </div>
+
+        <div class="card opportunity" data-category="etf dividend" data-name="VGWE Vanguard High Dividend ETF">
+          <div class="ticker"><div class="ticker-logo">VGWE</div><div class="ticker-meta"><strong>Vanguard High Dividend</strong><small>ETF global dividendos</small></div></div>
+          <svg class="spark" viewBox="0 0 220 54" preserveAspectRatio="none"><polyline fill="none" stroke="#f0b35a" stroke-width="3" points="0,38 20,35 40,31 60,33 80,25 100,23 120,26 140,18 160,20 180,14 200,10 220,12"/></svg>
+          <div class="score-line"><div><span class="metric-label">Compatibilidade</span><div class="score">7,4/10</div></div><span class="pill">Compatível</span></div>
+          <div class="mini-grid"><div class="mini"><span>Overlap</span><strong>12%</strong></div><div class="mini"><span>TER</span><strong>0,29%</strong></div><div class="mini"><span>Peso alvo</span><strong>6%</strong></div></div>
+          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
+        </div>
+      </div>
+
+      <div class="section-head"><div><h2>Eventos importantes</h2><p class="sub">Filtrados por impacto na tese</p></div></div>
+      <div class="card timeline">
+        <div class="news-item"><div class="news-icon">▣</div><div><strong>PWR apresenta resultados dentro de 6 dias</strong><p>Acompanhar backlog, guidance, margens e integração de aquisições.</p></div><span class="priority">Crítico</span></div>
+        <div class="news-item"><div class="news-icon">↗</div><div><strong>ZTS entra na zona de valuation definida</strong><p>Preço está 3,1% acima da primeira zona de entrada.</p></div><span class="pill warn">Preço</span></div>
+        <div class="news-item"><div class="news-icon">◎</div><div><strong>Exposição tecnológica ultrapassa o alvo</strong><p>O peso efetivo, incluindo ETFs, atingiu 31%.</p></div><span class="pill warn">Carteira</span></div>
+      </div>
+    </section>
+
+    <section id="radar" class="page">
+      <div class="hero">
+        <div>
+          <h1>Opportunity Radar</h1>
+          <p class="sub">Sinais diferentes para hoje, 7 dias, 30 dias e investimento de longo prazo.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="freshness" id="radarUpdated">Atualizado há 2h</span>
+          <button class="ghost update-now-btn">Atualizar agora</button>
+          <button class="primary">+ Criar filtro</button>
+        </div>
+      </div>
+
+      <div class="status-banner" style="margin-bottom:14px">
+        <div>
+          <strong>Radar automático ativo</strong>
+          <div class="sub" style="font-size:12px">Preço: abertura e fecho · notícias: diária · fundamentais: após resultados · ETFs: mensal.</div>
+        </div>
+        <span class="freshness">70 instrumentos monitorizados</span>
+      </div>
+
+      <div class="horizon-tabs">
+        <button class="horizon-btn active" data-horizon="daily">Hoje<small>Eventos e zonas</small></button>
+        <button class="horizon-btn" data-horizon="weekly">7 dias<small>Pullbacks e tendência</small></button>
+        <button class="horizon-btn" data-horizon="monthly">30 dias<small>Fundamentais e revisões</small></button>
+        <button class="horizon-btn" data-horizon="long">Longo prazo<small>Framework completo</small></button>
+      </div>
+
+      <div class="radar-controls">
+        <div class="market-filters">
+          <button class="market-filter active" data-market-filter="all">Todos os mercados</button>
+          <button class="market-filter" data-market-filter="amsterdam">Amsterdam</button>
+          <button class="market-filter" data-market-filter="london">Londres</button>
+          <button class="market-filter" data-market-filter="milan">Milão</button>
+          <button class="market-filter" data-market-filter="new-york">Nova Iorque</button>
+        </div>
+        <div class="filter-row" style="margin:0">
+          <button class="filter active" data-filter="all">Todas</button>
+          <button class="filter" data-filter="quality">Quality</button>
+          <button class="filter" data-filter="pullback">Pullback</button>
+          <button class="filter" data-filter="ai-infra">AI Infrastructure</button>
+          <button class="filter" data-filter="high-risk">High risk</button>
+        </div>
+      </div>
+
+      <div class="grid g3 opportunity-list" id="radarCards">
+
+        <div class="card opportunity radar-opportunity"
+             data-horizon="daily weekly"
+             data-market="amsterdam"
+             data-category="quality pullback ai-infra"
+             data-name="ASML Holding semicondutores Amsterdam">
+          <div class="ticker"><div class="ticker-logo">ASML</div><div class="ticker-meta"><strong>ASML Holding</strong><small>Amsterdam · EUR · Semicondutores</small></div></div>
+          <div class="score-line"><div><span class="metric-label">Sinal atual</span><div class="score">8,0/10</div></div><span class="session-label daily">Hoje</span></div>
+          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Queda diária relevante aproximou o preço da primeira zona de interesse, sem nova deterioração fundamental identificada.</div>
+          <div class="radar-card-meta">
+            <div class="radar-meta-item"><span>Último preço</span><strong>Snapshot Amsterdam</strong></div>
+            <div class="radar-meta-item"><span>Compatibilidade</span><strong>Boa · overlap moderado</strong></div>
+            <div class="radar-meta-item"><span>Gatilho</span><strong>Pullback + volume</strong></div>
+            <div class="radar-meta-item"><span>Ação</span><strong>Rever entrada</strong></div>
+          </div>
+          <div class="validity"><span>Gerado: fecho anterior</span><strong>Válido até ao próximo fecho</strong></div>
+          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
+        </div>
+
+        <div class="card opportunity radar-opportunity"
+             data-horizon="daily weekly"
+             data-market="new-york"
+             data-category="quality pullback"
+             data-name="ZTS Zoetis saúde animal New York">
+          <div class="ticker"><div class="ticker-logo">ZTS</div><div class="ticker-meta"><strong>Zoetis</strong><small>NYSE · USD · Saúde animal</small></div></div>
+          <div class="score-line"><div><span class="metric-label">Sinal atual</span><div class="score">8,2/10</div></div><span class="session-label daily">Hoje</span></div>
+          <div class="why-now"><strong>Porque apareceu agora?</strong><br>O preço entrou na zona superior de interesse e a tese continua intacta após a última atualização.</div>
+          <div class="radar-card-meta">
+            <div class="radar-meta-item"><span>Último preço</span><strong>NYSE abertura +15 min</strong></div>
+            <div class="radar-meta-item"><span>Compatibilidade</span><strong>Elevada</strong></div>
+            <div class="radar-meta-item"><span>Gatilho</span><strong>Zona de interesse</strong></div>
+            <div class="radar-meta-item"><span>Ação</span><strong>Simular 0,5–1%</strong></div>
+          </div>
+          <div class="validity"><span>Gerado: hoje 14:45</span><strong>Válido até nova informação</strong></div>
+          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
+        </div>
+
+        <div class="card opportunity radar-opportunity"
+             data-horizon="weekly monthly"
+             data-market="london"
+             data-category="quality pullback"
+             data-name="LSEG London Stock Exchange Group weekly">
+          <div class="ticker"><div class="ticker-logo">LSEG</div><div class="ticker-meta"><strong>London Stock Exchange Group</strong><small>Londres · GBP · Financial Data</small></div></div>
+          <div class="score-line"><div><span class="metric-label">Sinal semanal</span><div class="score">7,7/10</div></div><span class="session-label weekly">7 dias</span></div>
+          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Pullback semanal, força relativa estabilizada e ausência de alterações materiais no guidance.</div>
+          <div class="radar-card-meta">
+            <div class="radar-meta-item"><span>Janela</span><strong>5 sessões</strong></div>
+            <div class="radar-meta-item"><span>Moeda</span><strong>GBP · risco cambial</strong></div>
+            <div class="radar-meta-item"><span>Gatilho</span><strong>Tendência + valuation</strong></div>
+            <div class="radar-meta-item"><span>Ação</span><strong>Manter observação</strong></div>
+          </div>
+          <div class="validity"><span>Gerado: fecho semanal</span><strong>Válido por 7 dias</strong></div>
+          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
+        </div>
+
+        <div class="card opportunity radar-opportunity"
+             data-horizon="monthly long"
+             data-market="milan"
+             data-category="quality"
+             data-name="RACE Ferrari Milan monthly long term">
+          <div class="ticker"><div class="ticker-logo">RACE</div><div class="ticker-meta"><strong>Ferrari</strong><small>Milão · EUR · Luxury Automotive</small></div></div>
+          <div class="score-line"><div><span class="metric-label">Sinal mensal</span><div class="score">7,4/10</div></div><span class="session-label monthly">30 dias</span></div>
+          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Estimativas mantêm-se fortes, margens resilientes e o valuation normalizou ligeiramente no último mês.</div>
+          <div class="radar-card-meta">
+            <div class="radar-meta-item"><span>Fundamentais</span><strong>Em melhoria</strong></div>
+            <div class="radar-meta-item"><span>Valuation</span><strong>Ainda premium</strong></div>
+            <div class="radar-meta-item"><span>Carteira</span><strong>Baixo overlap</strong></div>
+            <div class="radar-meta-item"><span>Ação</span><strong>Aguardar margem</strong></div>
+          </div>
+          <div class="validity"><span>Gerado: revisão mensal</span><strong>Válido até resultados</strong></div>
+          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
+        </div>
+
+        <div class="card opportunity radar-opportunity"
+             data-horizon="monthly long"
+             data-market="new-york"
+             data-category="quality ai-infra"
+             data-name="PWR Quanta Services monthly long term">
+          <div class="ticker"><div class="ticker-logo">PWR</div><div class="ticker-meta"><strong>Quanta Services</strong><small>NYSE · USD · AI Infrastructure</small></div></div>
+          <div class="score-line"><div><span class="metric-label">Sinal estrutural</span><div class="score">8,4/10</div></div><span class="session-label long">Longo prazo</span></div>
+          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Qualidade e crescimento estrutural fortes; continua no radar, mas o preço exige maior margem de segurança.</div>
+          <div class="radar-card-meta">
+            <div class="radar-meta-item"><span>Qualidade</span><strong>Forte</strong></div>
+            <div class="radar-meta-item"><span>Valuation</span><strong>Exigente</strong></div>
+            <div class="radar-meta-item"><span>Peso máximo</span><strong>4% personalizado</strong></div>
+            <div class="radar-meta-item"><span>Ação</span><strong>Observar</strong></div>
+          </div>
+          <div class="validity"><span>Revisto: último 10-Q</span><strong>Válido até quebra da tese</strong></div>
+          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
+        </div>
+
+        <div class="card opportunity radar-opportunity"
+             data-horizon="long"
+             data-market="new-york"
+             data-category="quality"
+             data-name="ADP Automatic Data Processing long term">
+          <div class="ticker"><div class="ticker-logo">ADP</div><div class="ticker-meta"><strong>Automatic Data Processing</strong><small>Nasdaq · USD · Payroll Software</small></div></div>
+          <div class="score-line"><div><span class="metric-label">Qualidade estrutural</span><div class="score">8,5/10</div></div><span class="session-label long">Longo prazo</span></div>
+          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Receitas recorrentes, ROIC elevado e execução consistente; oportunidade dependente do preço de entrada.</div>
+          <div class="radar-card-meta">
+            <div class="radar-meta-item"><span>Moat</span><strong>Elevado</strong></div>
+            <div class="radar-meta-item"><span>FCF</span><strong>Consistente</strong></div>
+            <div class="radar-meta-item"><span>Encaixe</span><strong>Satélite quality</strong></div>
+            <div class="radar-meta-item"><span>Ação</span><strong>Quality watch</strong></div>
+          </div>
+          <div class="validity"><span>Revisão: trimestral</span><strong>Válido até novos resultados</strong></div>
+          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
+        </div>
+
+        <div class="card opportunity radar-opportunity"
+             data-horizon="weekly monthly"
+             data-market="new-york"
+             data-category="high-risk ai-infra"
+             data-name="IREN data centers speculative weekly monthly">
+          <div class="ticker"><div class="ticker-logo">IREN</div><div class="ticker-meta"><strong>IREN</strong><small>Nasdaq · USD · Data centers</small></div></div>
+          <div class="score-line"><div><span class="metric-label">Assimetria</span><div class="score">6,5/10</div></div><span class="pill bad glow-danger">Alto risco</span></div>
+          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Momentum e crescimento elevados, mas com risco de capital, diluição e volatilidade incompatíveis com um peso elevado.</div>
+          <div class="radar-card-meta">
+            <div class="radar-meta-item"><span>Risco</span><strong>Muito elevado</strong></div>
+            <div class="radar-meta-item"><span>Limite</span><strong>0,5–2%</strong></div>
+            <div class="radar-meta-item"><span>Gatilho</span><strong>Momentum</strong></div>
+            <div class="radar-meta-item"><span>Ação</span><strong>Não reforçar</strong></div>
+          </div>
+          <div class="validity"><span>Gerado: 7 dias</span><strong>Expira se momentum quebrar</strong></div>
+          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
+        </div>
+
+      </div>
+      <div class="radar-empty" id="radarEmpty">Nenhuma oportunidade cumpre simultaneamente estes filtros e horizonte.</div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="section-head" style="margin:0 0 8px">
+          <div><h2>O que muda por horizonte?</h2><p class="sub">O mesmo ativo pode ser interessante estruturalmente e não ter um bom ponto de entrada hoje.</p></div>
+        </div>
+        <div class="automation-flow" style="grid-template-columns:repeat(4,1fr)">
+          <div class="automation-step"><strong>Hoje</strong><span>Preço, volume, gaps, resultados e notícias materiais.</span></div>
+          <div class="automation-step"><strong>7 dias</strong><span>Pullbacks, força relativa, revisões e rotação setorial.</span></div>
+          <div class="automation-step"><strong>30 dias</strong><span>Margens, estimativas, dívida, valuation e contexto macro.</span></div>
+          <div class="automation-step"><strong>Longo prazo</strong><span>Moat, ROIC, FCF, gestão, cenários e encaixe na carteira.</span></div>
+        </div>
+      </div>
+    </section>
+
+
+<section id="analysis" class="page">
+      <div class="analysis-head">
+        <div>
+          <div class="ticker"><div class="ticker-logo">PWR</div><div class="ticker-meta"><h1 style="margin:0">Quanta Services</h1><small>NYSE · Infraestrutura elétrica · USD</small></div></div>
+        </div>
+        <div style="text-align:right">
+      <div class="price">$421,80</div>
+      <div class="delta">+1,24% hoje</div>
+      <div class="fx-note">≈ €388,06 a EUR/USD 1,087 · ativo cotado em USD, sujeito a risco cambial.</div>
+    </div>
+      </div>
+      <div class="tabs"><button class="tab active">Resumo</button><button class="tab">Financeiro</button><button class="tab">Valuation</button><button class="tab">Riscos</button><button class="tab">Fontes</button></div>
+      <div class="chip-row">
+        <span class="chip">Dados observados</span>
+        <span class="chip">Cálculos ThesisOS</span>
+        <span class="chip">Interpretação assistida por IA</span>
+      </div>
+
+      <div class="status-banner" style="margin-bottom:14px"><div><strong>Estado dos dados: completo</strong><div class="sub" style="font-size:12px">Resultados, balanço, cash flow, preço e documentos oficiais disponíveis.</div></div><span class="freshness">Q1 2026 · atual</span></div>
+      <div class="grid g4">
+        <div class="card"><div class="metric-label">Receitas YoY</div><div class="metric">+14,8%</div><div class="delta">acima do setor</div></div>
+        <div class="card"><div class="metric-label">Margem operacional</div><div class="metric">8,9%</div><div class="delta">+0,7 p.p.</div></div>
+        <div class="card"><div class="metric-label">ROIC</div><div class="metric">12,6%</div><div class="delta">melhoria gradual</div></div>
+        <div class="card"><div class="metric-label">Dívida líquida/EBITDA</div><div class="metric">2,1x</div><div class="delta warn">monitorizar aquisições</div></div>
+      </div>
+
+      <div class="section-head"><div><h2>Thesis Map</h2><p class="sub">Estado automático dos pilares da tese</p></div><span class="badge"><span class="dot"></span> Evidência 86%</span></div>
+      <div class="thesis-map">
+        <div class="pillar green"><small>Qualidade do negócio <span class="help" tabindex="0" data-tip="Avalia moat, pricing power, recorrência, concorrência, clientes, fornecedores e qualidade da gestão.">?</span></small><strong>Forte</strong></div>
+        <div class="pillar green"><small>Crescimento</small><strong>Forte</strong></div>
+        <div class="pillar yellow"><small>Balanço</small><strong>Adequado</strong></div>
+        <div class="pillar red"><small>Valuation <span class="help" tabindex="0" data-tip="Compara o preço atual com fundamentais, histórico, concorrentes e expectativas incorporadas.">?</span></small><strong>Exigente</strong></div>
+        <div class="pillar green"><small>Cash flow <span class="help" tabindex="0" data-tip="Mede a capacidade do negócio transformar lucros contabilísticos em dinheiro real.">?</span></small><strong>Saudável</strong></div>
+        <div class="pillar yellow"><small>Concentração</small><strong>Moderada</strong></div>
+        <div class="pillar yellow"><small>Entrada técnica <span class="help" tabindex="0" data-tip="Usa tendência, pullback, suportes, médias móveis, volume e RSI para fasear a entrada.">?</span></small><strong>Neutra</strong></div>
+        <div class="pillar green"><small>Qualidade das fontes <span class="help" tabindex="0" data-tip="Prioriza documentos oficiais, filings, resultados e fontes primárias antes de notícias e opiniões.">?</span></small><strong>Elevada</strong></div>
+      </div>
+
+
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card">
+          <div class="section-head" style="margin:0 0 10px">
+            <div><h2>Origem e qualidade dos dados</h2><p class="sub">Cada conclusão mantém ligação à fonte e à data.</p></div>
+            <span class="pill glow-success">86% cobertura</span>
+          </div>
+          <div class="source-grid">
+            <div class="source-card"><span>Oficial</span><strong>10-Q / SEC</strong><small>Publicado em 02/05/2026<br>Resultados e balanço</small></div>
+            <div class="source-card"><span>Mercado</span><strong>Preço e técnico</strong><small>Atualizado hoje, 09:42<br>Preço, RSI e médias</small></div>
+            <div class="source-card"><span>Interpretação</span><strong>ThesisOS AI</strong><small>Resumo com base exclusiva nas fontes selecionadas</small></div>
+          </div>
+          <div class="confidence"><span class="metric-label">Confiança da análise</span><div class="confidence-meter"><span></span></div><strong>Alta</strong></div>
+          <div class="source-note">Dados observados, cálculos e interpretação aparecem separados para evitar que uma opinião seja confundida com um facto.</div>
+        </div>
+        <div class="card">
+          <div class="section-head" style="margin:0 0 10px">
+            <div><h2>O que mudou desde a última revisão?</h2><p class="sub">Comparação automática com a análise anterior.</p></div>
+            <span class="pill warn glow-warn">3 alterações</span>
+          </div>
+          <div class="change-list">
+            <div class="change-row"><div class="change-symbol">↗</div><div><strong>Margem operacional</strong><small>Melhoria de 8,2% para 8,9%</small></div><div class="change-value" style="color:var(--success)">+0,7 p.p.</div></div>
+            <div class="change-row"><div class="change-symbol">↗</div><div><strong>Dívida líquida/EBITDA</strong><small>Subiu após aquisição recente</small></div><div class="change-value" style="color:var(--warn)">1,8x → 2,1x</div></div>
+            <div class="change-row"><div class="change-symbol">↘</div><div><strong>Margem de segurança</strong><small>Preço valorizou mais depressa que o fair range</small></div><div class="change-value" style="color:var(--danger)">Reduziu</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col" style="margin-top:16px">
+        <div class="card">
+          <h2>Tese automática</h2>
+          <p class="sub" style="line-height:1.65">
+            A Quanta Services beneficia do investimento estrutural em redes elétricas, data centers e modernização de infraestruturas.
+            O crescimento e o backlog permanecem fortes, mas o valuation atual já exige execução elevada e integração disciplinada das aquisições.
+          </p>
+          <div class="section-head"><h3>Evidence Board</h3><button class="link-btn">Ver 14 fontes</button></div>
+          <div class="evidence">
+            <div class="evidence-row"><div><strong>Backlog atingiu novo máximo</strong><p>Fonte oficial · resultados trimestrais</p></div><span class="status ok">Confirmado</span></div>
+            <div class="evidence-row"><div><strong>Margens deverão expandir</strong><p>Guidance da administração · validar nos próximos resultados</p></div><span class="status warn">A monitorizar</span></div>
+            <div class="evidence-row"><div><strong>Aquisições acrescentam crescimento</strong><p>Relatório anual · crescimento orgânico deve ser separado</p></div><span class="status ok">Confirmado</span></div>
+          </div>
+        </div>
+
+        <div class="decision">
+          <div class="metric-label">Decisão sugerida <span class="help" tabindex="0" data-tip="Combina a análise objetiva do ativo com o teu perfil, carteira, liquidez e exposição existente.">?</span></div>
+          <div class="decision-call"><strong>Observar</strong><span class="pill warn glow-warn">Valuation</span></div>
+          <div class="decision-sections">
+            <div class="decision-section">
+              <div class="eyebrow">Análise do ativo</div>
+              <strong>Excelente negócio, oportunidade incompleta</strong>
+              <span class="sub">Qualidade forte, crescimento saudável e valuation ainda exigente.</span>
+            </div>
+            <div class="decision-section">
+              <div class="eyebrow">Ação personalizada</div>
+              <strong>Aguardar zona de interesse</strong>
+              <span class="sub">A tua carteira já tem exposição indireta ao tema através do ETF Core.</span>
+            </div>
+          </div>
+          <p class="sub" style="line-height:1.55">Excelente negócio, mas a margem de segurança é reduzida. O perfil atual favorece uma entrada pequena apenas numa correção adicional.</p>
+          <div class="logic-note">
+            <strong>Porque não é “Comprar”?</strong><br>
+            Qualidade elevada, mas valuation 4/10, exposição indireta já existente via ETF core e preço ainda acima da zona de interesse.
+          </div>
+          <div class="calc-trace">
+            <div class="calc-row"><span>Limite base para ação quality</span><strong>6%</strong></div>
+            <div class="calc-row"><span>Ajuste por valuation exigente</span><strong>-1%</strong></div>
+            <div class="calc-row"><span>Ajuste por overlap e setor</span><strong>-1%</strong></div>
+            <div class="calc-row"><span>Limite personalizado final</span><strong>4%</strong></div>
+          </div>
+          <div class="mini-grid">
+            <div class="mini"><span>Zona de interesse <span class="help" tabindex="0" data-tip="Intervalo calculado principalmente a partir do valuation, cenários, margem de segurança e níveis técnicos do ativo.">?</span></span><strong>$365–390</strong><span class="inline-note">Análise do ativo</span></div>
+            <div class="mini"><span>Peso inicial <span class="help" tabindex="0" data-tip="Primeira entrada sugerida, personalizada pelo risco do ativo, perfil do investidor e exposição já existente.">?</span></span><strong>1–1,5%</strong><span class="inline-note">Personalizado</span></div>
+            <div class="mini"><span>Peso máximo <span class="help" tabindex="0" data-tip="Limite absoluto atual, considerando risco, volatilidade, overlap, setor, moeda e carteira existente.">?</span></span><strong>4%</strong><span class="inline-note">Personalizado</span></div>
+          </div>
+          <h3 style="margin-top:18px">Sinais de quebra</h3>
+          <ul style="color:#b7c3d6;line-height:1.7;padding-left:19px;font-size:13px">
+            <li>Backlog e guidance deterioram-se.</li>
+            <li>Margens comprimem durante vários trimestres.</li>
+            <li>Dívida aumenta sem melhoria proporcional do cash flow.</li>
+          </ul>
+          <div class="card-actions"><button class="ghost watch-btn">Adicionar à watchlist</button><button class="primary" data-go="portfolio">Simular na carteira</button></div>
+        </div>
+      </div>
+    </section>
+
+    
+    <section id="compare" class="page">
+      <div class="hero"><div><h1>Comparar ativos</h1><p class="sub">Qualidade, valuation, risco e encaixe na carteira sem uma nota mágica.</p></div><button class="primary">+ Adicionar ativo</button></div>
+      <div class="card"><div class="compare-grid">
+        <div class="head">Critério</div><div class="head">PWR</div><div class="head">KRMN</div><div class="head">IESC</div>
+        <div class="label">Qualidade</div><div>Forte</div><div>Adequada</div><div>Adequada</div>
+        <div class="label">Crescimento</div><div>Forte</div><div>Forte</div><div>Forte</div>
+        <div class="label">Balanço</div><div>Adequado</div><div>Adequado</div><div>Sob observação</div>
+        <div class="label">Valuation</div><div>Exigente</div><div>Muito exigente</div><div>Exigente</div>
+        <div class="label">Diluição</div><div>Baixa</div><div>Moderada</div><div>Elevada</div>
+        <div class="label">Volatilidade</div><div>Moderada</div><div>Elevada</div><div>Muito elevada</div>
+        <div class="label">Peso inicial</div><div>1%</div><div>0,5%</div><div>0,25%</div>
+        <div class="label">Limite absoluto</div><div>4%</div><div>2%</div><div>1%</div>
+      </div></div>
+      <div class="grid g3" style="margin-top:16px"><div class="card"><div class="metric-label">Melhor empresa</div><div class="metric">PWR</div><div class="delta">qualidade e execução</div></div><div class="card"><div class="metric-label">Melhor valuation</div><div class="metric">KRMN</div><div class="delta warn">ainda exigente</div></div><div class="card"><div class="metric-label">Maior potencial</div><div class="metric">IESC</div><div class="delta bad">risco muito superior</div></div></div>
+    </section>
+<section id="portfolio" class="page">
+      <div class="hero"><div><h1>Portfolio Builder</h1><p class="sub">Carteira ajustada ao horizonte, risco, objetivos e exposições existentes.</p></div><button class="primary" id="generatePortfolio">Gerar proposta</button></div>
+
+      <div class="mode-switch">
+        <button class="mode-btn active" data-mode="zero">Começar do zero</button>
+        <button class="mode-btn" data-mode="existing">Já tenho carteira</button>
+      </div>
+      <div class="portfolio-wrap">
+        <div class="card">
+          <h2>Perfil do investidor</h2>
+          <div id="mode-zero" class="mode-panel active">
+            <div class="form-grid">
+              <label>Entrada inicial disponível (€)<input id="initialCapital" type="number" min="0" value="0"></label>
+              <label>Primeira contribuição já disponível?<select id="firstContributionNow"><option value="yes">Sim</option><option value="no">Ainda não</option></select></label>
+              <label>Contribuição mensal (€)<input id="monthlyContribution" type="number" min="0" value="150"></label>
+              <label>Método de construção<select id="buildMethod"><option value="smart">Construção inteligente</option><option value="proportional">Distribuição proporcional</option></select></label>
+            </div>
+            <div class="source-note">Se a carteira atual for €0 e a primeira contribuição já estiver disponível, o sistema usa essa contribuição como capital investível inicial.</div>
+          </div>
+          <div id="mode-existing" class="mode-panel">
+            <div class="form-grid">
+              <label>Valor atual da carteira (€)<input id="existingPortfolioValue" type="number" min="0" value="10000"></label>
+              <label>Capital novo disponível (€)<input id="newCapitalAvailable" type="number" min="0" value="500"></label>
+              <label>Contribuição mensal (€)<input id="existingMonthlyContribution" type="number" min="0" value="150"></label>
+              <label>Importar posições<select><option>Adicionar manualmente</option><option>Importar CSV</option></select></label>
+            </div>
+            <div class="source-note">A carteira real é atualizada por transações, preços atuais e câmbio — não por edição manual do valor total.</div>
+          </div>
+          <div class="form-grid" style="margin-top:14px">
+            <label>Idade<input id="age" type="number" min="18" max="90" value="30"></label><label>Capital usado na proposta (€) <span class="help" tabindex="0" data-tip="No modo começar do zero, usa a entrada inicial e, se disponível, a primeira contribuição mensal. No modo existente, usa o valor atual da carteira.">?</span><input id="portfolioCapital" type="number" min="0" value="150" readonly></label>
+            <label>Horizonte<select id="horizon"><option value="20">Mais de 15 anos</option><option value="10">7–15 anos</option><option value="5">3–7 anos</option><option value="2">Menos de 3 anos</option></select></label>
+            <label>Objetivo<select id="goal"><option>Crescimento de capital</option><option>Rendimento</option><option>Preservação</option><option>Compra de casa</option></select></label><label>Necessidade de liquidez<select id="liquidity"><option value="low">Baixa</option><option value="medium">Média</option><option value="high">Alta</option></select></label>
+            <label>Contribuição mensal<input id="legacyContribution" type="number" value="150"></label>
+          </div>
+          <label style="display:block;margin-top:16px">Queda máxima que suportarias sem vender: <strong id="riskText">-30%</strong><input id="riskRange" type="range" min="10" max="50" step="10" value="30"></label>
+          <div class="risk-box" style="margin-top:15px">
+            <div class="metric-label">Perfil calculado</div>
+            <div class="risk-value" id="profileLabel">Crescimento moderado</div>
+            <p class="sub" id="profileDesc">Horizonte longo, tolerância média-alta e necessidade de liquidez reduzida.</p>
+          </div>
+          <div class="section-head"><div><h2>Alocação proposta</h2><p class="sub">Estratégica para longo prazo ou tática para manter mais caixa temporariamente.</p></div></div>
+          <div class="strategy-pills" style="margin-bottom:12px"><span class="tag active" data-strategy="strategic">Estratégica</span><span class="tag" data-strategy="tactical">Tática</span></div>
+          <div class="allocation" id="allocation"></div>
+        </div>
+        <div class="card">
+          <h2>Diagnóstico</h2>
+          <div class="alert-card"><div class="alert-left"><div class="news-icon">⚠</div><div><strong>Concentração tecnológica</strong><p>Incluindo os ETFs, a exposição efetiva é 31%. Alvo recomendado: até 25%.</p></div></div></div>
+          <div class="alert-card" style="margin-top:12px"><div class="alert-left"><div class="news-icon">✓</div><div><strong>Boa base diversificada</strong><p>O ETF core reduz risco específico e mantém exposição global.</p></div></div></div>
+          <div class="alert-card" style="margin-top:12px"><div class="alert-left"><div class="news-icon">◎</div><div><strong>Caixa para oportunidades</strong><p>Reserva suficiente para reforços faseados sem alterar o plano mensal.</p></div></div></div>
+          <div class="section-head"><h3>Simular nova posição</h3></div>
+          <div class="simulation-box">
+            <div class="simulation-grid">
+              <label>Ativo<select id="simAsset"><option value="PWR">PWR · AI Infrastructure</option><option value="ZTS">ZTS · Saúde animal</option><option value="IREN">IREN · Especulativa</option></select></label>
+              <label>Peso pretendido<input id="simWeight" type="number" min="0.5" max="15" step="0.5" value="2"></label>
+            </div>
+            <button class="primary" id="simulatePosition" style="width:100%;margin-top:12px">Simular impacto</button>
+            <div class="impact-list" id="impactList">
+              <div class="impact-item"><span>Valor da posição</span><strong>€200</strong></div>
+              <div class="impact-item"><span>Exposição tecnológica</span><strong>31% → 33%</strong></div>
+              <div class="impact-item"><span>Overlap via ETF Core</span><strong>+0,6%</strong></div>
+              <div class="impact-item"><span>Risco cambial USD</span><strong>62% → 64%</strong></div>
+            </div>
+            <div class="logic-note" id="overlapWarning"><strong>⚠️ Alerta de overlap</strong><br>Esta empresa já está indiretamente presente no ETF Core. A posição direta aumenta a exposição ao mesmo fator de risco.</div>
+          </div>
+          <button class="primary" style="width:100%;margin-top:12px">Guardar carteira</button>
+        </div>
+      </div>
+    </section>
+
+    
+    <section id="myportfolio" class="page">
+      <div class="hero">
+        <div><h1>My Portfolio</h1><p class="sub">Carteira real, transações, pesos atuais e desvios face ao plano.</p></div>
+        <div style="display:flex;gap:8px"><button class="ghost">Importar CSV</button><button class="primary">+ Registar transação</button></div>
+      </div>
+
+      
+      <div class="sync-strip" id="portfolioSyncStrip">
+        <div class="sync-left">
+          <div class="sync-icon">↻</div>
+          <div>
+            <strong>Carteira global consolidada</strong>
+            <small id="portfolioSyncText">Fechos europeus guardados · Nova Iorque com último snapshot disponível</small>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="freshness" id="portfolioUpdated">Atualizada há 4 min</span>
+          <button class="link-btn update-now-btn">Atualizar agora</button>
+        </div>
+      </div>
+
+<div class="grid g3" style="margin-bottom:16px"><div class="goal-card active"><h3>Carteira principal</h3><p>Crescimento de longo prazo</p><div class="goal-progress"><div class="bar"><span style="width:62%"></span></div></div></div><div class="goal-card"><h3>Entrada para casa</h3><p>Objetivo em 3 anos · moderado</p><div class="goal-progress"><div class="bar"><span style="width:28%"></span></div></div></div><div class="goal-card"><h3>Carteira experimental</h3><p>Risco separado e limitado</p><div class="goal-progress"><div class="bar"><span style="width:12%"></span></div></div></div></div>
+      <div class="grid g4">
+        <div class="card"><div class="metric-label">Valor atual</div><div class="metric">€18.450</div><div class="delta">Europa: fecho · EUA: último snapshot</div></div>
+        <div class="card"><div class="metric-label">Capital investido</div><div class="metric">€17.020</div><div class="delta">€1.430 de valorização</div></div>
+        <div class="card"><div class="metric-label">Caixa disponível</div><div class="metric">€554</div><div class="delta">3% da carteira</div></div>
+        <div class="card"><div class="metric-label">Próxima contribuição</div><div class="metric">€150</div><div class="delta">1 de julho de 2026</div></div>
+      </div>
+
+      <div class="two-col" style="margin-top:16px">
+        <div class="card">
+          <div class="section-head" style="margin:0 0 8px"><div><h2>Posições reais</h2><p class="sub">Preço atual, peso real, objetivo e exposição indireta.</p></div><span class="badge"><span class="dot"></span> Atualizado hoje</span></div>
+          <div style="overflow:auto">
+            <table class="portfolio-table">
+              <thead><tr><th>Ativo</th><th>Valor</th><th>Peso atual</th><th>Peso-alvo</th><th>Estado</th><th>Diferença</th></tr></thead>
+              <tbody>
+                <tr><td><strong>VWCE</strong><br><small class="sub">ETF Core</small></td><td>€11.439</td><td>62%</td><td>70%</td><td><span class="tag warn">Abaixo do alvo</span></td><td>-8%</td></tr>
+                <tr><td><strong>MSFT</strong><br><small class="sub">Quality</small></td><td>€1.476</td><td>8%</td><td>5%</td><td><span class="tag bad">Acima do limite</span></td><td>+3%</td></tr>
+                <tr><td><strong>ZTS</strong><br><small class="sub">Quality</small></td><td>€1.107</td><td>6%</td><td>5%</td><td><span class="tag warn">Ligeiro excesso</span></td><td>+1%</td></tr>
+                <tr><td><strong>VGWE</strong><br><small class="sub">Dividendos</small></td><td>€2.214</td><td>12%</td><td>8%</td><td><span class="tag warn">Acima do alvo</span></td><td>+4%</td></tr>
+                <tr><td><strong>IREN</strong><br><small class="sub">Especulativa</small></td><td>€1.292</td><td>7%</td><td>2%</td><td><span class="tag bad">Risco elevado</span></td><td>+5%</td></tr>
+                <tr><td><strong>Caixa</strong></td><td>€554</td><td>3%</td><td>5%</td><td><span class="tag">Reserva</span></td><td>-2%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Aplicar próxima contribuição</h2>
+          <p class="sub">O motor usa dinheiro novo para aproximar a carteira do plano antes de sugerir vendas.</p>
+          <label style="display:block;margin-top:14px">Contribuição disponível (€)<input id="realContribution" type="number" value="150"></label>
+          <div class="impact-list" id="contributionPlan">
+            <div class="impact-item"><span>VWCE · ETF Core</span><strong>€105</strong></div>
+            <div class="impact-item"><span>Ações quality</span><strong>€30</strong></div>
+            <div class="impact-item"><span>Caixa</span><strong>€15</strong></div>
+          </div>
+          <button class="primary" id="recalculateContribution" style="width:100%;margin-top:12px">Recalcular plano</button>
+          <div class="logic-note"><strong>Sem venda necessária</strong><br>A próxima contribuição reduz o desvio do ETF Core e aumenta a reserva de caixa.</div>
+        </div>
+      </div>
+
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card">
+          <h2>Exposição invisível</h2>
+          <div class="alert-card"><div class="alert-left"><div class="news-icon">⚠</div><div><strong>Microsoft efetiva: 11,2%</strong><p>8% posição direta + 3,2% através dos ETFs.</p></div></div></div>
+          <div class="alert-card" style="margin-top:12px"><div class="alert-left"><div class="news-icon">◎</div><div><strong>USD efetivo: 62%</strong><p>Inclui ativos cotados em EUR com exposição económica ao dólar.</p></div></div></div>
+        </div>
+        <div class="card">
+          <h2>Plano vs. realidade</h2>
+          <div class="market-row"><span>ETF Core</span><strong>62% / 70%</strong></div><div class="bar"><span style="width:88%"></span></div>
+          <div class="market-row"><span>Ações quality</span><strong>14% / 15%</strong></div><div class="bar"><span style="width:93%"></span></div>
+          <div class="market-row"><span>Especulativas</span><strong>7% / 2%</strong></div><div class="bar"><span style="width:100%;background:var(--danger)"></span></div>
+        </div>
+      </div>
+    
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card"><h2>Performance vs. benchmark</h2><table class="benchmark-table"><thead><tr><th></th><th>Retorno</th><th>Volatilidade</th><th>Drawdown</th></tr></thead><tbody><tr><td>Minha carteira</td><td>+8,4%</td><td>14,2%</td><td>-9,8%</td></tr><tr><td>VWCE</td><td>+7,1%</td><td>12,6%</td><td>-8,4%</td></tr><tr><td>S&P 500</td><td>+9,0%</td><td>13,1%</td><td>-8,9%</td></tr></tbody></table><div class="source-note">Superou o VWCE em 1,3 p.p., mas com volatilidade superior.</div></div>
+        <div class="card"><h2>Custos e fiscalidade indicativa</h2><div class="tax-box"><strong>Compra simulada de €100</strong><div class="impact-list" style="margin-top:10px"><div class="impact-item"><span>Comissão</span><strong>€1,00</strong></div><div class="impact-item"><span>Câmbio estimado</span><strong>€0,50</strong></div><div class="impact-item"><span>Valor investido</span><strong>€98,50</strong></div></div><small>Estimativa demonstrativa. Não constitui aconselhamento fiscal.</small></div></div>
+      </div>
+</section>
+
+
+    <section id="journal" class="page">
+      <div class="hero"><div><h1>Investment Journal</h1><p class="sub">Regista decisões e mede a qualidade do processo, não apenas o resultado.</p></div><button class="primary">+ Nova decisão</button></div>
+      <div class="grid g2">
+        <div class="card"><h2>Decisões recentes</h2><div class="timeline">
+          <div class="journal-entry"><div class="journal-top"><div><strong>PWR · Observação</strong><p>Excelente negócio, valuation exigente. Aguardar $365–390.</p></div><span class="freshness">18/06/2026</span></div><div class="chip-row"><span class="chip">Peso inicial 1%</span><span class="chip">Limite 4%</span></div></div>
+          <div class="journal-entry"><div class="journal-top"><div><strong>ZTS · Compra inicial</strong><p>Pullback relevante, tese intacta e baixa exposição à saúde.</p></div><span class="freshness">12/06/2026</span></div><div class="chip-row"><span class="chip">€150</span><span class="chip">Peso 0,8%</span></div></div>
+          <div class="journal-entry"><div class="journal-top"><div><strong>IREN · Não reforçar</strong><p>Peso especulativo acima do limite e risco de diluição superior.</p></div><span class="freshness warn">09/06/2026</span></div></div>
+        </div></div>
+        <div class="card"><h2>Histórico da tese — PWR</h2><div class="version-line"><strong>Versão 3 · Q1 2026</strong><small>Margens melhoraram; dívida aumentou; manter observação.</small></div><div class="version-line"><strong>Versão 2 · Aquisição</strong><small>Peso máximo reduzido de 5% para 4%.</small></div><div class="version-line"><strong>Versão 1 · Inicial</strong><small>Qualidade forte, backlog elevado e valuation exigente.</small></div><button class="ghost" style="width:100%;margin-top:12px">Comparar versões</button></div>
+      </div>
+      <div class="grid g2" style="margin-top:16px"><div class="card"><h2>Previsão vs. realidade</h2><div class="impact-list"><div class="impact-item"><span>Crescimento esperado</span><strong>12–15%</strong></div><div class="impact-item"><span>Observado</span><strong>14,8%</strong></div><div class="impact-item"><span>Margem esperada</span><strong>Estável</strong></div><div class="impact-item"><span>Observada</span><strong>+0,7 p.p.</strong></div></div></div><div class="card"><h2>Qualidade da decisão</h2><div class="metric">8,1/10</div><p class="sub">Boa decisão com base na informação disponível, independentemente da cotação.</p><div class="logic-note"><strong>Decisão ≠ resultado</strong><br>Uma boa decisão pode perder dinheiro e uma má decisão pode beneficiar de sorte.</div></div></div>
+    </section>
+<section id="alerts" class="page">
+      <div class="hero"><div><h1>Notícias & Alertas</h1><p class="sub">Ruído removido. Apenas eventos com impacto potencial na tese ou na carteira.</p></div><button class="primary">Configurar alertas</button></div>
+      <div class="grid g2">
+        <div class="card alert-card"><div class="alert-left"><div class="news-icon">▣</div><div><strong>PWR — resultados trimestrais</strong><p>Evento crítico dentro de 6 dias. Acompanhar backlog, margem, guidance, dívida e aquisições.</p><div class="chip-row"><span class="chip">Impacto elevado</span><span class="chip">Ação: rever tese</span></div></div></div><span class="priority">Crítico</span></div>
+        <div class="card alert-card"><div class="alert-left"><div class="news-icon">↘</div><div><strong>ZTS — entrou na primeira zona de interesse</strong><p>Preço a menos de 3% da zona de entrada. Tese permanece intacta.</p><div class="chip-row"><span class="chip">Impacto moderado</span><span class="chip">Ação: simular compra</span></div></div></div><span class="pill warn">Preço</span></div>
+        <div class="card alert-card"><div class="alert-left"><div class="news-icon">⚠</div><div><strong>IREN — risco de diluição aumentado</strong><p>Nova necessidade de financiamento poderá alterar o peso máximo recomendado.</p></div></div><span class="priority">Crítico</span></div>
+        <div class="card alert-card"><div class="alert-left"><div class="news-icon">◎</div><div><strong>VWCE — overlap atualizado</strong><p>Exposição indireta às principais tecnológicas subiu ligeiramente após rebalanceamento.</p></div></div><span class="pill">Carteira</span></div>
+      </div>
+    </section>
+
+    <section id="profile" class="page">
+      <div class="hero"><div><h1>Perfil de investidor</h1><p class="sub">A idade é apenas um fator. Horizonte, liquidez e comportamento têm maior peso.</p></div><button class="primary">Guardar alterações</button></div>
+      <div class="grid g2">
+        <div class="card">
+          <h2>Dados principais</h2>
+          <div class="form-grid">
+            <label>Idade<input type="number" value="30"></label>
+            <label>Horizonte<select><option>20+ anos</option></select></label>
+            <label>Objetivo<select><option>Crescimento</option></select></label>
+            <label>Liquidez necessária<select><option>Baixa</option><option>Média</option><option>Alta</option></select></label>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Limites pessoais</h2>
+          <div class="market-row"><span>Máximo por ação</span><strong>6%</strong></div><div class="bar"><span style="width:60%"></span></div>
+          <div class="market-row"><span>Máximo especulativo</span><strong>2%</strong></div><div class="bar"><span style="width:20%"></span></div>
+          <div class="market-row"><span>Máximo por setor</span><strong>25%</strong></div><div class="bar"><span style="width:50%"></span></div>
+          <div class="market-row"><span>Caixa mínima</span><strong>3%</strong></div><div class="bar"><span style="width:30%"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <p class="prototype-note">ThesisOS Preview V4 · dados, custos e recomendações demonstrativos · sem execução de ordens ou aconselhamento fiscal.</p>
+  </main>
+</div>
+
+<div class="toast" id="toast">Adicionado à watchlist.</div>
+
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = (selector, root=document) => root.querySelector(selector);
+  const $$ = (selector, root=document) => [...root.querySelectorAll(selector)];
+
+  const toast = $("#toast");
+  function showToast(text){
+    if(!toast) return;
+    toast.textContent=text;
+    toast.classList.add("show");
+    clearTimeout(window.toastTimer);
+    window.toastTimer=setTimeout(()=>toast.classList.remove("show"),1900);
+  }
+
+  // ---------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------
+  const navButtons = $$(".nav-btn");
+  const pages = $$(".page");
+  function openPage(id){
+    pages.forEach(page=>page.classList.toggle("active",page.id===id));
+    navButtons.forEach(button=>button.classList.toggle("active",button.dataset.page===id));
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+  navButtons.forEach(button=>button.addEventListener("click",()=>openPage(button.dataset.page)));
+  $$("[data-go]").forEach(button=>button.addEventListener("click",()=>openPage(button.dataset.go)));
+
+  // ---------------------------------------------------------------
+  // Simple / advanced mode
+  // ---------------------------------------------------------------
+  const simpleModeBtn=$("#simpleModeBtn");
+  const advancedModeBtn=$("#advancedModeBtn");
+  function setViewMode(mode){
+    document.body.classList.toggle("advanced-mode",mode==="advanced");
+    simpleModeBtn?.classList.toggle("active",mode==="simple");
+    advancedModeBtn?.classList.toggle("active",mode==="advanced");
+    showToast(mode==="advanced" ? "Modo avançado ativado." : "Modo simples ativado.");
+  }
+  simpleModeBtn?.addEventListener("click",()=>setViewMode("simple"));
+  advancedModeBtn?.addEventListener("click",()=>setViewMode("advanced"));
+
+  // ---------------------------------------------------------------
+  // Search, generic actions and tooltips
+  // ---------------------------------------------------------------
+  $$(".watch-btn").forEach(button=>button.addEventListener("click",()=>showToast("Ativo adicionado à watchlist.")));
+  $$(".analyze-btn").forEach(button=>button.addEventListener("click",()=>openPage("analysis")));
+
+  const search=$("#globalSearch");
+  search?.addEventListener("input",()=>{
+    const term=search.value.toLowerCase().trim();
+    $$(".opportunity").forEach(card=>{
+      const matches=!term || (card.dataset.name||"").toLowerCase().includes(term);
+      card.dataset.searchVisible=matches ? "true" : "false";
+    });
+    applyRadarFilters();
+  });
+  search?.addEventListener("keydown",event=>{
+    if(event.key==="Enter"){openPage("radar");showToast("Pesquisa atualizada.");}
+  });
+
+  $$(".help").forEach(help=>{
+    help.addEventListener("click",event=>{
+      event.stopPropagation();
+      $$(".help").forEach(other=>{if(other!==help) other.classList.remove("popover-open");});
+      help.classList.toggle("popover-open");
+    });
+    help.addEventListener("keydown",event=>{
+      if(event.key==="Enter" || event.key===" "){event.preventDefault();help.click();}
+    });
+  });
+  document.addEventListener("click",()=>$$(".help").forEach(help=>help.classList.remove("popover-open")));
+
+  $$(".tab").forEach(button=>button.addEventListener("click",()=>{
+    const group=button.closest(".tabs");
+    $$(".tab",group).forEach(tab=>tab.classList.remove("active"));
+    button.classList.add("active");
+    showToast("Separador demonstrativo: "+button.textContent);
+  }));
+
+  // ---------------------------------------------------------------
+  // Market clocks — preview logic; real product will use market-hours API
+  // ---------------------------------------------------------------
+  const weekdays=new Set(["Mon","Tue","Wed","Thu","Fri"]);
+  function zonedParts(zone){
+    const parts=new Intl.DateTimeFormat("en-GB",{
+      timeZone:zone,weekday:"short",hour:"2-digit",minute:"2-digit",hour12:false
+    }).formatToParts(new Date());
+    const obj={};
+    parts.forEach(part=>{if(part.type!=="literal") obj[part.type]=part.value;});
+    return {weekday:obj.weekday,hour:Number(obj.hour),minute:Number(obj.minute)};
+  }
+  function toMinutes(text){
+    const [hour,minute]=text.split(":").map(Number);
+    return hour*60+minute;
+  }
+  function formatMinutes(value){
+    const hour=String(Math.floor(value/60)).padStart(2,"0");
+    const minute=String(value%60).padStart(2,"0");
+    return `${hour}:${minute}`;
+  }
+  function updateMarketClocks(){
+    let nextLabel="A aguardar próxima transição de mercado";
+    $$("[data-market-clock]").forEach(card=>{
+      const parts=zonedParts(card.dataset.zone);
+      const current=parts.hour*60+parts.minute;
+      const open=toMinutes(card.dataset.open);
+      const close=toMinutes(card.dataset.close);
+      const isWeekday=weekdays.has(parts.weekday);
+      const isOpen=isWeekday && current>=open && current<close;
+      const state=$(".market-state",card);
+      const time=$(".market-time",card);
+      const next=$(".market-next",card);
+
+      time.textContent=`${String(parts.hour).padStart(2,"0")}:${String(parts.minute).padStart(2,"0")}`;
+      state.textContent=isOpen ? "Aberto" : "Fechado";
+      state.classList.toggle("open",isOpen);
+      state.classList.toggle("closed",!isOpen);
+
+      if(!isWeekday){
+        next.textContent="Fim de semana · próxima sessão útil";
+      }else if(current<open){
+        next.textContent=`Abre às ${formatMinutes(open)} · snapshot previsto +15 min`;
+      }else if(isOpen){
+        next.textContent=`Fecha às ${formatMinutes(close)} · atualização final +10 min`;
+        nextLabel=`Próxima atualização: ${card.dataset.code} no fecho`;
+      }else{
+        next.textContent="Sessão concluída · fecho guardado no Supabase";
+      }
+    });
+    const nextAutomation=$("#nextAutomation");
+    if(nextAutomation) nextAutomation.textContent=nextLabel;
+  }
+  updateMarketClocks();
+  setInterval(updateMarketClocks,60000);
+
+  function simulateUpdate(){
+    const now=new Intl.DateTimeFormat("pt-PT",{hour:"2-digit",minute:"2-digit"}).format(new Date());
+    $$(".update-now-btn").forEach(button=>button.classList.add("update-pulse"));
+    setTimeout(()=>$$(".update-now-btn").forEach(button=>button.classList.remove("update-pulse")),850);
+    $$(".market-updated").forEach(label=>label.textContent=`Verificado ${now}`);
+    const radarUpdated=$("#radarUpdated");
+    const portfolioUpdated=$("#portfolioUpdated");
+    const portfolioSyncText=$("#portfolioSyncText");
+    if(radarUpdated) radarUpdated.textContent=`Atualizado agora · ${now}`;
+    if(portfolioUpdated) portfolioUpdated.textContent=`Atualizada agora · ${now}`;
+    if(portfolioSyncText) portfolioSyncText.textContent="Preços, câmbio e pesos recalculados com os últimos snapshots disponíveis";
+    $("#portfolioSyncStrip")?.classList.add("update-pulse");
+    setTimeout(()=>$("#portfolioSyncStrip")?.classList.remove("update-pulse"),850);
+    showToast("Preços e sinais atualizados na simulação.");
+  }
+  $$(".update-now-btn").forEach(button=>button.addEventListener("click",simulateUpdate));
+
+  // ---------------------------------------------------------------
+  // Opportunity Radar: horizon + market + category + search
+  // ---------------------------------------------------------------
+  let selectedHorizon="daily";
+  let selectedMarket="all";
+  let selectedCategory="all";
+
+  function applyRadarFilters(){
+    let visible=0;
+    $$("#radarCards .radar-opportunity").forEach(card=>{
+      const horizons=(card.dataset.horizon||"").split(/\s+/);
+      const categories=(card.dataset.category||"").split(/\s+/);
+      const market=card.dataset.market;
+      const searchVisible=card.dataset.searchVisible!=="false";
+      const show=
+        horizons.includes(selectedHorizon) &&
+        (selectedMarket==="all" || market===selectedMarket) &&
+        (selectedCategory==="all" || categories.includes(selectedCategory)) &&
+        searchVisible;
+      card.style.display=show ? "" : "none";
+      if(show) visible++;
+    });
+    const empty=$("#radarEmpty");
+    if(empty) empty.style.display=visible===0 ? "block" : "none";
+  }
+
+  $$(".horizon-btn").forEach(button=>button.addEventListener("click",()=>{
+    selectedHorizon=button.dataset.horizon;
+    $$(".horizon-btn").forEach(item=>item.classList.toggle("active",item===button));
+    applyRadarFilters();
+    showToast(`Horizonte selecionado: ${button.firstChild.textContent.trim()}`);
+  }));
+
+  $$(".market-filter").forEach(button=>button.addEventListener("click",()=>{
+    selectedMarket=button.dataset.marketFilter;
+    $$(".market-filter").forEach(item=>item.classList.toggle("active",item===button));
+    applyRadarFilters();
+  }));
+
+  $$("#radar .filter").forEach(button=>button.addEventListener("click",()=>{
+    selectedCategory=button.dataset.filter||"all";
+    $$("#radar .filter").forEach(item=>item.classList.toggle("active",item===button));
+    applyRadarFilters();
+  }));
+
+  applyRadarFilters();
+
+  // ---------------------------------------------------------------
+  // Portfolio Builder
+  // ---------------------------------------------------------------
+  let portfolioMode="zero";
+  const portfolioCapital=$("#portfolioCapital");
+  const riskRange=$("#riskRange");
+  const liquidity=$("#liquidity");
+
+  function euro(value){
+    return new Intl.NumberFormat("pt-PT",{
+      style:"currency",currency:"EUR",maximumFractionDigits:0
+    }).format(Number.isFinite(value)?value:0);
+  }
+
+  function renderAllocation(values){
+    if(!$("#allocation") || !portfolioCapital) return;
+    const capital=Number(portfolioCapital.value||0);
+    $("#allocation").innerHTML=values.map(([name,weight])=>`
+      <div class="allocation-row">
+        <span>${name}<span class="allocation-amount">${euro(capital*weight/100)}</span></span>
+        <div class="bar"><span style="width:${weight}%"></span></div>
+        <strong>${weight}%</strong>
+      </div>
+    `).join("");
+    window.currentAllocation=values;
+  }
+
+  function syncPortfolioCapital(){
+    if(!portfolioCapital) return;
+    let value=0;
+    if(portfolioMode==="zero"){
+      const initial=Number($("#initialCapital")?.value||0);
+      const monthly=Number($("#monthlyContribution")?.value||0);
+      const available=$("#firstContributionNow")?.value==="yes";
+      value=initial+(available?monthly:0);
+    }else{
+      value=Number($("#existingPortfolioValue")?.value||0);
+    }
+    portfolioCapital.value=value;
+    renderAllocation(window.currentAllocation||[
+      ["ETF Core global",70],["Ações quality",15],["Dividendos",8],["Especulativas",2],["Caixa",5]
+    ]);
+  }
+
+  function calculatePortfolio(){
+    if(!riskRange || !liquidity) return;
+    const age=Number($("#age")?.value||30);
+    const risk=Number(riskRange.value);
+    const horizon=Number($("#horizon")?.value||20);
+    const liq=liquidity.value;
+    let core=70,quality=15,dividend=8,spec=2,cash=5;
+
+    if(risk>=40 && horizon>=10){core=60;quality=22;dividend=7;spec=6;cash=5;}
+    if(risk<=20 || horizon<=5){core=62;quality=8;dividend=15;spec=0;cash=15;}
+    if(liq==="high"){cash+=10;core-=6;quality-=4;}
+    if(liq==="medium"){cash+=5;core-=3;quality-=2;}
+    if(age>=55){dividend+=5;spec=Math.max(0,spec-2);quality=Math.max(5,quality-3);}
+
+    const total=core+quality+dividend+spec+cash;
+    const values=[
+      ["ETF Core global",core],["Ações quality",quality],["Dividendos",dividend],["Especulativas",spec],["Caixa",cash]
+    ].map(([name,value])=>[name,Math.round(value/total*100)]);
+    const diff=100-values.reduce((sum,[,value])=>sum+value,0);
+    values[0][1]+=diff;
+    renderAllocation(values);
+  }
+
+  $$(".mode-btn").forEach(button=>button.addEventListener("click",()=>{
+    portfolioMode=button.dataset.mode;
+    $$(".mode-btn").forEach(item=>item.classList.toggle("active",item===button));
+    $$(".mode-panel").forEach(panel=>panel.classList.remove("active"));
+    $(`#mode-${portfolioMode}`)?.classList.add("active");
+    syncPortfolioCapital();
+    calculatePortfolio();
+  }));
+
+  ["initialCapital","monthlyContribution","firstContributionNow","existingPortfolioValue"].forEach(id=>{
+    const element=$("#"+id);
+    element?.addEventListener("input",syncPortfolioCapital);
+    element?.addEventListener("change",syncPortfolioCapital);
+  });
+
+  function updateRisk(){
+    if(!riskRange) return;
+    const value=Number(riskRange.value);
+    if($("#riskText")) $("#riskText").textContent=`-${value}%`;
+    const label=$("#profileLabel");
+    const desc=$("#profileDesc");
+    if(value<=10){label.textContent="Conservador";desc.textContent="Prioridade à preservação e liquidez.";}
+    else if(value<=20){label.textContent="Equilibrado";desc.textContent="Crescimento controlado com volatilidade moderada.";}
+    else if(value<=30){label.textContent="Crescimento moderado";desc.textContent="Horizonte longo, tolerância média-alta e liquidez reduzida.";}
+    else{label.textContent="Agressivo";desc.textContent="Aceita drawdowns elevados em troca de maior potencial.";}
+  }
+  riskRange?.addEventListener("input",updateRisk);
+  $("#generatePortfolio")?.addEventListener("click",()=>{calculatePortfolio();showToast("Proposta de carteira atualizada.");});
+  portfolioCapital?.addEventListener("input",()=>renderAllocation(window.currentAllocation||[
+    ["ETF Core global",70],["Ações quality",15],["Dividendos",8],["Especulativas",2],["Caixa",5]
+  ]));
+
+  $$(".strategy-pills .tag").forEach(tag=>tag.addEventListener("click",()=>{
+    $$(".strategy-pills .tag").forEach(item=>item.classList.remove("active"));
+    tag.classList.add("active");
+    if(tag.dataset.strategy==="tactical"){
+      renderAllocation([["ETF Core global",65],["Ações quality",14],["Dividendos",8],["Especulativas",2],["Caixa",11]]);
+      showToast("Alocação tática aplicada: mais caixa temporariamente.");
+    }else{
+      calculatePortfolio();
+      showToast("Alocação estratégica restaurada.");
+    }
+  }));
+
+  syncPortfolioCapital();
+  calculatePortfolio();
+  updateRisk();
+
+  // ---------------------------------------------------------------
+  // Monthly contribution and position simulation
+  // ---------------------------------------------------------------
+  const realContribution=$("#realContribution");
+  function updateContributionPlan(){
+    if(!realContribution || !$("#contributionPlan")) return;
+    const value=Number(realContribution.value||0);
+    const core=Math.round(value*.60);
+    const quality=Math.round(value*.20);
+    const cash=value-core-quality;
+    $("#contributionPlan").innerHTML=`
+      <div class="impact-item"><span>VWCE · ETF Core</span><strong>${euro(core)}</strong></div>
+      <div class="impact-item"><span>Ações quality</span><strong>${euro(quality)}</strong></div>
+      <div class="impact-item"><span>Manter em caixa</span><strong>${euro(cash)}</strong></div>
+    `;
+  }
+  $("#recalculateContribution")?.addEventListener("click",()=>{updateContributionPlan();showToast("Plano da contribuição recalculado.");});
+  realContribution?.addEventListener("input",updateContributionPlan);
+  updateContributionPlan();
+
+  const assetMeta={
+    PWR:{tech:2,overlap:.6,usd:2,label:"PWR"},
+    ZTS:{tech:0,overlap:.2,usd:2,label:"ZTS"},
+    IREN:{tech:3,overlap:.1,usd:2,label:"IREN"}
+  };
+  $("#simulatePosition")?.addEventListener("click",()=>{
+    const key=$("#simAsset").value;
+    const weight=Number($("#simWeight").value||0);
+    const capital=Number(portfolioCapital?.value||0);
+    const meta=assetMeta[key];
+    $("#impactList").innerHTML=`
+      <div class="impact-item"><span>Valor da posição</span><strong>${euro(capital*weight/100)}</strong></div>
+      <div class="impact-item"><span>Exposição tecnológica</span><strong>31% → ${31+(meta.tech?weight:0)}%</strong></div>
+      <div class="impact-item"><span>Overlap via ETF Core</span><strong>+${(meta.overlap*weight/2).toFixed(1)}%</strong></div>
+      <div class="impact-item"><span>Risco cambial USD</span><strong>62% → ${62+meta.usd}%</strong></div>
+    `;
+    $("#overlapWarning").innerHTML=meta.overlap>.3
+      ? `<strong>⚠️ Alerta de overlap</strong><br>${meta.label} já está indiretamente presente no ETF Core.`
+      : `<strong>✓ Overlap reduzido</strong><br>A nova posição acrescenta uma exposição relativamente distinta.`;
+    showToast("Impacto da posição simulado.");
+  });
+})();
+</script>
+
+</body>
+</html>
