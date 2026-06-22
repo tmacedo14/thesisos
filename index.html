@@ -1273,6 +1273,73 @@
     return `${currency || ""} ${formatNumber(millions)} M`.trim();
   }
 
+  function resetRealAssetView(symbol, state){
+    const isError=state==="error";
+    const isLoading=state==="loading";
+    const safeSymbol=symbol || "?";
+
+    const logo=$("#assetLogo");
+
+    if(logo){
+      logo.innerHTML="";
+      logo.textContent=safeSymbol;
+    }
+
+    if($("#assetName")){
+      $("#assetName").textContent=
+        isError ? "Ativo não encontrado" : safeSymbol;
+    }
+
+    if($("#assetMeta")){
+      $("#assetMeta").textContent=
+        isError
+          ? "Confirma o ticker e tenta novamente."
+          : "A consultar preço e perfil…";
+    }
+
+    if($("#assetPrice")) $("#assetPrice").textContent="—";
+    if($("#assetChange")) $("#assetChange").textContent="—";
+
+    if($("#assetFx")){
+      $("#assetFx").textContent=
+        isError
+          ? "Não foram carregados dados reais."
+          : "A aguardar resposta da API.";
+    }
+
+    [
+      "#realOpen",
+      "#realHigh",
+      "#realLow",
+      "#realPreviousClose",
+      "#realMarketCap",
+      "#realShares",
+      "#realCountry",
+      "#realIpoDate"
+    ].forEach(selector=>{
+      const element=$(selector);
+      if(element) element.textContent="—";
+    });
+
+    const website=$("#realWebsite");
+
+    if(website){
+      website.removeAttribute("href");
+      website.textContent="Indisponível";
+    }
+
+    const badge=$("#realDataBadge");
+
+    if(badge){
+      badge.textContent=
+        isError
+          ? "Dados indisponíveis"
+          : isLoading
+            ? "A carregar"
+            : "A aguardar pesquisa";
+    }
+  }
+
   async function loadAsset(symbol){
     const cleanSymbol=symbol.trim().toUpperCase();
 
@@ -1284,6 +1351,8 @@
     const status=$("#assetDataStatus");
     const detail=$("#assetDataDetail");
     const updated=$("#assetUpdated");
+
+    resetRealAssetView(cleanSymbol, "loading");
 
     status.textContent="A carregar dados reais…";
     detail.textContent=`A consultar ${cleanSymbol} através do backend seguro do ThesisOS.`;
@@ -1392,11 +1461,11 @@
 
       showToast(`${data.symbol} carregado com dados reais.`);
     }catch(error){
+      resetRealAssetView(cleanSymbol, "error");
       status.textContent="Não foi possível carregar o ativo";
       detail.textContent=error.message;
       updated.textContent="Erro da API";
-      $("#realDataBadge").textContent="Dados indisponíveis";
-      showToast("Erro ao consultar o ticker.");
+      showToast("Ticker não encontrado ou dados indisponíveis.");
     }
   }
 
