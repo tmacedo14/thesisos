@@ -686,6 +686,106 @@
       }
     }
 
+  
+    .analysis-quality-card{
+      margin-bottom:16px;
+    }
+    .analysis-quality-top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:18px;
+      margin-bottom:14px;
+    }
+    .analysis-quality-score{
+      display:flex;
+      align-items:baseline;
+      gap:6px;
+      white-space:nowrap;
+    }
+    .analysis-quality-score strong{
+      font-size:30px;
+      line-height:1;
+    }
+    .analysis-source-grid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:10px;
+    }
+    .analysis-source-item{
+      min-height:96px;
+      padding:13px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:var(--panel-2);
+    }
+    .analysis-source-item-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-bottom:8px;
+    }
+    .analysis-source-item strong{
+      font-size:13px;
+    }
+    .analysis-source-item small{
+      display:block;
+      color:var(--muted);
+      line-height:1.4;
+    }
+    .analysis-source-status{
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      padding:4px 7px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.03em;
+      text-transform:uppercase;
+    }
+    .analysis-source-status::before{
+      width:7px;
+      height:7px;
+      border-radius:50%;
+      background:var(--muted);
+      content:"";
+    }
+    .analysis-source-item[data-status="ok"] .analysis-source-status::before{
+      background:var(--good);
+    }
+    .analysis-source-item[data-status="unavailable"] .analysis-source-status::before{
+      background:var(--danger);
+    }
+    .analysis-source-item[data-status="not_applicable"] .analysis-source-status::before{
+      background:var(--warn);
+    }
+    .analysis-quality-warning{
+      display:none;
+      margin-top:12px;
+      padding:12px 14px;
+      border:1px solid var(--warn);
+      border-radius:13px;
+      background:rgba(255,183,77,.08);
+      color:var(--text);
+      line-height:1.45;
+    }
+    .analysis-quality-warning.visible{display:block}
+    @media (max-width:1000px){
+      .analysis-source-grid{
+        grid-template-columns:repeat(2,minmax(0,1fr));
+      }
+    }
+    @media (max-width:560px){
+      .analysis-quality-top{
+        align-items:flex-start;
+        flex-direction:column;
+      }
+      .analysis-source-grid{grid-template-columns:1fr}
+    }
+
   </style>
 </head>
 <body>
@@ -1053,6 +1153,56 @@
       </div>
 
       <div class="status-banner" style="margin-bottom:14px"><div><strong id="assetDataStatus">Estado dos dados: demonstrativo</strong><div class="sub" id="assetDataDetail" style="font-size:12px">Pesquisa um ticker para carregar preço e perfil reais. As métricas fundamentais abaixo continuam demonstrativas.</div></div><span class="freshness" id="assetUpdated">A aguardar pesquisa</span></div>
+      <section class="card analysis-quality-card" id="analysisQualityCard">
+        <div class="analysis-quality-top">
+          <div>
+            <h2 style="margin:0 0 6px">Qualidade e cobertura dos dados</h2>
+            <p class="sub" id="analysisQualitySummary" style="margin:0">
+              Pesquisa um ativo para validar todas as fontes necessárias.
+            </p>
+          </div>
+          <div style="text-align:right">
+            <div class="analysis-quality-score">
+              <strong id="analysisCompleteness">—</strong>
+              <span class="sub">completude</span>
+            </div>
+            <span class="pill" id="analysisRuleReadiness">A aguardar</span>
+          </div>
+        </div>
+
+        <div class="analysis-source-grid">
+          <div class="analysis-source-item" id="analysisSourceIdentification" data-status="waiting">
+            <div class="analysis-source-item-head">
+              <strong>Identificação</strong>
+              <span class="analysis-source-status">A aguardar</span>
+            </div>
+            <small>OpenFIGI</small>
+          </div>
+          <div class="analysis-source-item" id="analysisSourceMarket" data-status="waiting">
+            <div class="analysis-source-item-head">
+              <strong>Mercado</strong>
+              <span class="analysis-source-status">A aguardar</span>
+            </div>
+            <small>Finnhub ou EODHD</small>
+          </div>
+          <div class="analysis-source-item" id="analysisSourceFundamentals" data-status="waiting">
+            <div class="analysis-source-item-head">
+              <strong>Fundamentais</strong>
+              <span class="analysis-source-status">A aguardar</span>
+            </div>
+            <small>SEC EDGAR</small>
+          </div>
+          <div class="analysis-source-item" id="analysisSourceFx" data-status="waiting">
+            <div class="analysis-source-item-head">
+              <strong>Câmbio</strong>
+              <span class="analysis-source-status">A aguardar</span>
+            </div>
+            <small>ECB Data Portal</small>
+          </div>
+        </div>
+
+        <div class="analysis-quality-warning" id="analysisWarnings"></div>
+      </section>
       <div class="card" id="realMarketDataCard" style="margin-bottom:16px">
         <div class="section-head" style="margin:0 0 12px">
           <div>
@@ -2096,6 +2246,509 @@
     );
   }
 
+  let unifiedAnalysisRequestId=0;
+
+  function analysisStatusLabel(status){
+    const labels={
+      ok:"Disponível",
+      unavailable:"Indisponível",
+      not_applicable:"Não aplicável",
+      loading:"A carregar",
+      waiting:"A aguardar"
+    };
+
+    return labels[status] || "Desconhecido";
+  }
+
+  function updateAnalysisSourceCard(selector, source){
+    const card=$(selector);
+
+    if(!card) return;
+
+    const status=source?.status || "waiting";
+    const provider=source?.provider || "Fonte pendente";
+    const statusElement=card.querySelector(
+      ".analysis-source-status"
+    );
+    const detailElement=card.querySelector("small");
+
+    card.dataset.status=status;
+
+    if(statusElement){
+      statusElement.textContent=analysisStatusLabel(status);
+    }
+
+    if(detailElement){
+      const details=[];
+
+      if(source?.latest_period){
+        details.push(`Período ${source.latest_period}`);
+      }
+
+      if(source?.quote_date){
+        details.push(`Cotação ${source.quote_date}`);
+      }
+
+      if(source?.rate_date){
+        details.push(`Taxa ${source.rate_date}`);
+      }
+
+      if(source?.reason){
+        details.push(source.reason);
+      }
+
+      detailElement.textContent=[
+        provider,
+        ...details
+      ].filter(Boolean).join(" · ");
+    }
+  }
+
+  function resetAnalysisQuality(state="waiting"){
+    const loading=state==="loading";
+
+    if($("#analysisCompleteness")){
+      $("#analysisCompleteness").textContent=loading ? "…" : "—";
+    }
+
+    if($("#analysisRuleReadiness")){
+      $("#analysisRuleReadiness").textContent=
+        loading ? "A validar" : "A aguardar";
+    }
+
+    if($("#analysisQualitySummary")){
+      $("#analysisQualitySummary").textContent=
+        loading
+          ? "A consultar e validar as fontes necessárias."
+          : "Pesquisa um ativo para validar todas as fontes necessárias.";
+    }
+
+    [
+      "#analysisSourceIdentification",
+      "#analysisSourceMarket",
+      "#analysisSourceFundamentals",
+      "#analysisSourceFx"
+    ].forEach(selector=>{
+      updateAnalysisSourceCard(
+        selector,
+        {
+          status:loading ? "loading" : "waiting",
+          provider:loading ? "A consultar" : "Fonte pendente"
+        }
+      );
+    });
+
+    const warnings=$("#analysisWarnings");
+
+    if(warnings){
+      warnings.classList.remove("visible");
+      warnings.textContent="";
+    }
+  }
+
+  function renderAnalysisQuality(payload){
+    const quality=payload.data_quality || {};
+    const sources=payload.sources || {};
+    const completeness=Number(
+      quality.completeness_percentage
+    );
+    const ready=Boolean(quality.ready_for_rule_engine);
+
+    if($("#analysisCompleteness")){
+      $("#analysisCompleteness").textContent=
+        Number.isFinite(completeness)
+          ? `${formatNumber(completeness)}%`
+          : "—";
+    }
+
+    if($("#analysisRuleReadiness")){
+      $("#analysisRuleReadiness").textContent=
+        ready ? "Pronto para regras" : "Cobertura incompleta";
+    }
+
+    if($("#analysisQualitySummary")){
+      $("#analysisQualitySummary").textContent=
+        `${quality.available_sources ?? 0} de ${quality.required_sources ?? 0} fontes obrigatórias disponíveis.`;
+    }
+
+    updateAnalysisSourceCard(
+      "#analysisSourceIdentification",
+      sources.identification
+    );
+    updateAnalysisSourceCard(
+      "#analysisSourceMarket",
+      sources.market
+    );
+    updateAnalysisSourceCard(
+      "#analysisSourceFundamentals",
+      sources.fundamentals
+    );
+    updateAnalysisSourceCard(
+      "#analysisSourceFx",
+      sources.fx
+    );
+
+    const warnings=$("#analysisWarnings");
+    const warningItems=Array.isArray(payload.warnings)
+      ? payload.warnings.filter(Boolean)
+      : [];
+
+    if(warnings){
+      warnings.textContent=warningItems.join(" ");
+      warnings.classList.toggle(
+        "visible",
+        warningItems.length>0
+      );
+    }
+  }
+
+  function renderUnifiedFx(fx, marketProvider){
+    const fxNote=$("#assetFx");
+    const eurValue=$("#realPriceEur");
+    const fxRate=$("#realFxRate");
+
+    if(!fx){
+      if(eurValue) eurValue.textContent="—";
+      if(fxRate) fxRate.textContent="Indisponível";
+      if(fxNote){
+        fxNote.textContent=
+          `Fonte: ${marketProvider || "mercado"}. Conversão cambial indisponível.`;
+      }
+      return;
+    }
+
+    const converted=Number(fx.converted_amount);
+    const reference=Number(fx.source_reference_rate);
+    const sourceCurrency=String(
+      fx.from_currency || ""
+    ).toUpperCase();
+
+    if(eurValue){
+      eurValue.textContent=Number.isFinite(converted)
+        ? `EUR ${formatNumber(converted)}`
+        : "—";
+    }
+
+    if(fxRate){
+      fxRate.textContent=
+        sourceCurrency==="EUR"
+          ? "Moeda-base EUR · taxa 1,00"
+          : Number.isFinite(reference)
+            ? `1 EUR = ${formatNumber(reference)} ${sourceCurrency}`
+            : "Taxa indisponível";
+    }
+
+    if(fxNote){
+      fxNote.textContent=
+        sourceCurrency==="EUR"
+          ? `Fonte: ${marketProvider || "mercado"}. Valor já denominado em EUR.`
+          : `Fonte: ${marketProvider || "mercado"}. ≈ EUR ${formatNumber(converted)} · BCE ${fx.rate_date || "data indisponível"} · taxa oficial de referência.`;
+    }
+  }
+
+  function renderUnifiedFundamentals(data){
+    if(!data){
+      resetStockFundamentals("error");
+      return;
+    }
+
+    const duration=data.duration_metrics || {};
+    const instant=data.instant_metrics || {};
+    const derived=data.derived_metrics || {};
+
+    const revenue=duration.revenue || {};
+    const netIncome=duration.net_income || {};
+    const operatingIncome=duration.operating_income || {};
+    const dilutedShares=duration.diluted_shares || {};
+
+    const revenueQuarter=revenue.latest_quarter;
+    const revenueYtd=revenue.latest_ytd;
+    const revenueAnnual=revenue.latest_annual;
+    const netIncomeQuarter=netIncome.latest_quarter;
+    const operatingIncomeQuarter=operatingIncome.latest_quarter;
+    const dilutedSharesQuarter=dilutedShares.latest_quarter;
+
+    $("#stockRevenueQuarter").textContent=
+      formatFinancialFact(revenueQuarter);
+    $("#stockRevenuePeriod").textContent=
+      factPeriod(revenueQuarter);
+    $("#stockRevenueYoY").textContent=
+      formatFundamentalPercent(
+        revenue.quarter_yoy_percentage
+      );
+    $("#stockOperatingMargin").textContent=
+      formatFundamentalPercent(
+        derived.operating_margin_quarter_percentage
+      );
+    $("#stockNetMargin").textContent=
+      formatFundamentalPercent(
+        derived.net_margin_quarter_percentage
+      );
+    $("#stockNetIncomeQuarter").textContent=
+      formatFinancialFact(netIncomeQuarter);
+    $("#stockNetIncomeYoY").textContent=
+      `YoY ${formatFundamentalPercent(
+        netIncome.quarter_yoy_percentage
+      )}`;
+    $("#stockOperatingIncomeQuarter").textContent=
+      formatFinancialFact(operatingIncomeQuarter);
+    $("#stockOperatingIncomeYoY").textContent=
+      `YoY ${formatFundamentalPercent(
+        operatingIncome.quarter_yoy_percentage
+      )}`;
+    $("#stockRevenueYtd").textContent=
+      formatFinancialFact(revenueYtd);
+    $("#stockRevenueYtdPeriod").textContent=
+      factPeriod(revenueYtd);
+    $("#stockRevenueAnnual").textContent=
+      formatFinancialFact(revenueAnnual);
+    $("#stockRevenueAnnualPeriod").textContent=
+      factPeriod(revenueAnnual);
+    $("#stockAssets").textContent=
+      formatFinancialFact(instant.assets);
+    $("#stockCash").textContent=
+      formatFinancialFact(instant.cash);
+    $("#stockLiabilities").textContent=
+      formatFinancialFact(instant.liabilities);
+    $("#stockEquity").textContent=
+      formatFinancialFact(instant.equity);
+    $("#stockDilutedShares").textContent=
+      formatFinancialFact(dilutedSharesQuarter);
+    $("#stockBalancePeriod").textContent=
+      factPeriod(instant.assets);
+    $("#stockLiabilitiesRatio").textContent=
+      `Passivos / ativos ${formatFundamentalPercent(
+        derived.liabilities_to_assets_percentage
+      )}`;
+    $("#stockDilutedSharesYoY").textContent=
+      `YoY ${formatFundamentalPercent(
+        dilutedShares.quarter_yoy_percentage
+      )}`;
+
+    $("#stockFundamentalsBadge").textContent="SEC verificada";
+    $("#stockFundamentalsStatus").textContent=
+      `Último período disponível: ${data.latest_period || "—"}.`;
+    $("#stockFundamentalsSource").textContent=
+      `Fonte: ${data.source}. Valores reportados, não estimativas.`;
+
+    const link=$("#stockSecLink");
+
+    if(link && data.cik){
+      link.href=
+        `https://www.sec.gov/edgar/browse/?CIK=${encodeURIComponent(data.cik)}&owner=exclude`;
+      link.style.pointerEvents="";
+      link.style.opacity="";
+    }
+  }
+
+  function renderUnifiedAnalysis(payload){
+    const asset=payload.asset || {};
+    const market=payload.market || {};
+    const currency=market.currency || asset.currency || "";
+    const price=market.price;
+
+    applyAssetAnalysisMode({
+      ...asset,
+      quote_provider:market.provider
+    });
+
+    if(asset.asset_type==="stock"){
+      renderUnifiedFundamentals(payload.fundamentals);
+    }else{
+      resetStockFundamentals();
+    }
+
+    const logo=$("#assetLogo");
+
+    if(asset.logo){
+      logo.innerHTML=`
+        <img
+          src="${asset.logo}"
+          alt="${asset.symbol || "Ativo"}"
+          style="width:100%;height:100%;object-fit:contain;border-radius:11px;background:white;padding:4px"
+        >
+      `;
+    }else if(logo){
+      logo.innerHTML="";
+      logo.textContent=asset.symbol || "—";
+    }
+
+    $("#assetName").textContent=
+      asset.name || asset.symbol || payload.query;
+
+    $("#assetMeta").textContent=[
+      asset.exchange,
+      asset.asset_type==="etf"
+        ? assetTypeLabel(asset.asset_type)
+        : asset.industry,
+      currency,
+      asset.country
+    ].filter(Boolean).join(" · ");
+
+    $("#assetPrice").textContent=
+      price!==null && price!==undefined
+        ? `${currency} ${formatNumber(price)}`.trim()
+        : "Preço indisponível";
+
+    const change=Number(market.change_percentage);
+
+    $("#assetChange").textContent=
+      Number.isFinite(change)
+        ? `${change>=0?"+":""}${formatNumber(change)}% hoje`
+        : market.quote_type==="previous_close"
+          ? `Fecho de ${market.quote_date || "data indisponível"}`
+          : "Variação indisponível";
+
+    renderUnifiedFx(payload.fx, market.provider);
+
+    $("#realOpen").textContent=
+      market.open!==null && market.open!==undefined
+        ? `${currency} ${formatNumber(market.open)}`.trim()
+        : "—";
+    $("#realHigh").textContent=
+      market.high!==null && market.high!==undefined
+        ? `${currency} ${formatNumber(market.high)}`.trim()
+        : "—";
+    $("#realLow").textContent=
+      market.low!==null && market.low!==undefined
+        ? `${currency} ${formatNumber(market.low)}`.trim()
+        : "—";
+    $("#realPreviousClose").textContent=
+      market.previous_close!==null && market.previous_close!==undefined
+        ? `${currency} ${formatNumber(market.previous_close)}`.trim()
+        : "—";
+
+    $("#realMarketCap").textContent=
+      formatMarketCap(asset.market_cap_millions, currency);
+    $("#realShares").textContent=
+      asset.shares_outstanding_millions!==null &&
+      asset.shares_outstanding_millions!==undefined
+        ? `${formatNumber(asset.shares_outstanding_millions)} M`
+        : "—";
+    $("#realCountry").textContent=asset.country || "—";
+    $("#realIpoDate").textContent=asset.ipo_date || "—";
+    $("#realDataBadge").textContent=
+      `Fonte: ${market.provider || asset.source || "APIs"}`;
+
+    const website=$("#realWebsite");
+
+    if(asset.website){
+      website.href=asset.website;
+      website.textContent="Abrir site oficial";
+    }else{
+      website.removeAttribute("href");
+      website.textContent="Indisponível";
+    }
+
+    $("#assetDataStatus").textContent=
+      "Análise agregada carregada";
+    $("#assetDataDetail").textContent=
+      "Identificação, mercado, fundamentais aplicáveis e câmbio foram consolidados num único pedido.";
+    $("#assetUpdated").textContent=
+      `Atualizado ${formatAssetDate(payload.generated_at)}`;
+
+    renderAnalysisQuality(payload);
+
+    showToast(
+      `${asset.symbol || payload.query} carregado através da API agregada.`
+    );
+  }
+
+  async function loadUnifiedAnalysis(identifier, options={}){
+    const cleanIdentifier=String(identifier || "")
+      .trim()
+      .toUpperCase();
+
+    if(!cleanIdentifier){
+      showToast("Escreve um ticker ou ISIN.");
+      return;
+    }
+
+    const requestId=++unifiedAnalysisRequestId;
+    const status=$("#assetDataStatus");
+    const detail=$("#assetDataDetail");
+    const updated=$("#assetUpdated");
+
+    resetRealAssetView(cleanIdentifier, "loading");
+    resetAnalysisQuality("loading");
+
+    status.textContent="A construir análise agregada…";
+    detail.textContent=
+      `A validar ${cleanIdentifier} em todas as fontes necessárias.`;
+    updated.textContent="A atualizar";
+    openPage("analysis");
+
+    const params=new URLSearchParams({
+      base_currency:"EUR"
+    });
+
+    if(options.exchange){
+      params.set("exchange", options.exchange);
+    }
+
+    if(options.ticker){
+      params.set("ticker", options.ticker);
+    }
+
+    try{
+      const response=await fetch(
+        `/api/analysis/${encodeURIComponent(cleanIdentifier)}?${params.toString()}`
+      );
+
+      const payload=await response.json();
+
+      if(requestId!==unifiedAnalysisRequestId){
+        return;
+      }
+
+      if(
+        response.status===409 &&
+        payload.requires_selection &&
+        Array.isArray(payload.selection_options)
+      ){
+        const results=payload.selection_options.map(result=>({
+          ...result,
+          _analysis_identifier:cleanIdentifier
+        }));
+
+        status.textContent="Escolhe uma listagem";
+        detail.textContent=
+          "O ISIN tem várias listagens. Seleciona a bolsa e a moeda pretendidas.";
+        updated.textContent="Seleção necessária";
+
+        openAssetSearchResults({
+          results,
+          total_results:results.length,
+          returned_results:results.length
+        });
+        return;
+      }
+
+      if(!response.ok){
+        throw new Error(
+          payload.detail ||
+          payload.error ||
+          "Não foi possível construir a análise."
+        );
+      }
+
+      renderUnifiedAnalysis(payload);
+    }catch(error){
+      if(requestId!==unifiedAnalysisRequestId){
+        return;
+      }
+
+      resetRealAssetView(cleanIdentifier, "error");
+      resetAnalysisQuality();
+      status.textContent="Não foi possível carregar a análise";
+      detail.textContent=error.message;
+      updated.textContent="Erro da API";
+      showToast(
+        error.message || "Erro ao construir a análise."
+      );
+    }
+  }
+
   let assetFxRequestId=0;
 
   function resetAssetFx(message="Conversão cambial não carregada."){
@@ -2564,12 +3217,15 @@
       search.value=result.ticker;
     }
 
-    if(result.ticker && canLoadFinnhubQuote(result)){
-      loadAsset(result.ticker);
-      return;
-    }
+    const identifier=
+      result._analysis_identifier ||
+      result.isin ||
+      result.ticker;
 
-    showOpenFigiIdentification(result);
+    void loadUnifiedAnalysis(identifier, {
+      exchange:result.exchange_code,
+      ticker:result.ticker
+    });
   }
 
   function createAssetResultButton(result){
@@ -2685,36 +3341,12 @@
 
     if(search){
       search.disabled=true;
-      search.placeholder="A pesquisar na OpenFIGI…";
+      search.placeholder="A construir análise…";
       search.setAttribute("aria-busy","true");
     }
 
     try{
-      const response=await fetch(
-        `/api/search/${encodeURIComponent(cleanQuery)}`
-      );
-
-      const payload=await response.json();
-
-      if(!response.ok){
-        throw new Error(
-          payload.detail ||
-          payload.error ||
-          "Não foi possível pesquisar o ativo."
-        );
-      }
-
-      const automaticResult=
-        preferredAutomaticResult(payload);
-
-      if(automaticResult){
-        selectAssetSearchResult(automaticResult);
-        return;
-      }
-
-      openAssetSearchResults(payload);
-    }catch(error){
-      showToast(error.message || "Erro na pesquisa OpenFIGI.");
+      await loadUnifiedAnalysis(cleanQuery);
     }finally{
       if(search){
         search.disabled=false;
