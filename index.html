@@ -1348,9 +1348,8 @@
     ></div>
 
     <div class="asset-search-note">
-      A identificação vem da OpenFIGI. Para listagens ainda não
-      suportadas pela Finnhub, o ThesisOS apresenta a identificação
-      sem inventar uma cotação.
+      A OpenFIGI identifica o instrumento. Quando disponível, a
+      EODHD acrescenta a última cotação de fecho da listagem escolhida.
     </div>
   </section>
 </div>
@@ -1681,8 +1680,15 @@
   function showOpenFigiIdentification(result){
     closeAssetSearchResults();
     openPage("analysis");
+    clearObservedMarketFields();
 
     const symbol=result.ticker || "—";
+    const currency=result.currency || "";
+    const previousClose=Number(result.previous_close);
+    const hasEodhdClose=
+      result.quote_provider==="EODHD" &&
+      Number.isFinite(previousClose);
+
     const logo=$("#assetLogo");
 
     if(logo){
@@ -1698,43 +1704,74 @@
       $("#assetMeta").textContent=[
         result.exchange_code,
         assetTypeLabel(result.asset_type),
-        result.security_type
+        result.currency,
+        result.country
       ].filter(Boolean).join(" · ");
     }
 
     if($("#assetPrice")){
-      $("#assetPrice").textContent="Cotação não ligada";
+      $("#assetPrice").textContent=
+        hasEodhdClose
+          ? `${currency} ${formatNumber(previousClose)}`.trim()
+          : "Cotação não ligada";
     }
 
     if($("#assetChange")){
-      $("#assetChange").textContent="Listagem identificada";
+      $("#assetChange").textContent=
+        hasEodhdClose
+          ? `Fecho de ${result.previous_close_date || "data indisponível"}`
+          : "Listagem identificada";
     }
 
     if($("#assetFx")){
       $("#assetFx").textContent=
-        "Fonte: OpenFIGI. Esta bolsa ainda não está ligada ao fornecedor de preços.";
+        hasEodhdClose
+          ? "Fonte: EODHD. Último fecho disponível; não é uma cotação intradiária."
+          : "Fonte: OpenFIGI. Esta bolsa ainda não está ligada ao fornecedor de preços.";
     }
 
     if($("#assetDataStatus")){
       $("#assetDataStatus").textContent=
-        "Ativo identificado pela OpenFIGI";
+        hasEodhdClose
+          ? "Cotação de fim do dia carregada"
+          : "Ativo identificado pela OpenFIGI";
     }
 
     if($("#assetDataDetail")){
       $("#assetDataDetail").textContent=
-        `Foi identificada a listagem ${symbol} em ${result.exchange_code || "bolsa não especificada"}. A cotação desta bolsa será integrada numa fase seguinte.`;
+        hasEodhdClose
+          ? `A listagem ${symbol} em ${result.exchange_code || "bolsa não especificada"} foi identificada pela OpenFIGI e enriquecida com o último fecho disponível na EODHD.`
+          : `Foi identificada a listagem ${symbol} em ${result.exchange_code || "bolsa não especificada"}. A cotação desta bolsa ainda não está ligada.`;
     }
 
     if($("#assetUpdated")){
-      $("#assetUpdated").textContent="Identificação concluída";
+      $("#assetUpdated").textContent=
+        hasEodhdClose
+          ? `Fecho ${result.previous_close_date || ""}`.trim()
+          : "Identificação concluída";
     }
 
     if($("#realDataBadge")){
-      $("#realDataBadge").textContent="Sem cotação ligada";
+      $("#realDataBadge").textContent=
+        hasEodhdClose
+          ? "Fonte: EODHD"
+          : "Sem cotação ligada";
     }
 
-    clearObservedMarketFields();
-    showToast(`${symbol} identificado pela OpenFIGI.`);
+    if($("#realPreviousClose") && hasEodhdClose){
+      $("#realPreviousClose").textContent=
+        `${currency} ${formatNumber(previousClose)}`.trim();
+    }
+
+    if($("#realCountry")){
+      $("#realCountry").textContent=result.country || "—";
+    }
+
+    showToast(
+      hasEodhdClose
+        ? `${symbol}: último fecho carregado.`
+        : `${symbol} identificado pela OpenFIGI.`
+    );
   }
 
   function canLoadFinnhubQuote(result){

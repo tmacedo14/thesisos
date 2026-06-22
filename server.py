@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
-from urllib.parse import unquote, urlencode, urlparse
+from urllib.parse import quote, unquote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 
@@ -14,9 +14,12 @@ PORT = 3000
 
 FINNHUB_BASE_URL = "https://finnhub.io/api/v1"
 OPENFIGI_MAPPING_URL = "https://api.openfigi.com/v3/mapping"
+EODHD_SEARCH_URL = "https://eodhd.com/api/search"
 
 OPENFIGI_CACHE_TTL_SECONDS = 24 * 60 * 60
+EODHD_CACHE_TTL_SECONDS = 24 * 60 * 60
 OPENFIGI_CACHE = {}
+EODHD_CACHE = {}
 
 
 def fetch_json(request: Request, timeout: int = 20):
@@ -105,6 +108,59 @@ def fetch_openfigi_mapping(job: dict) -> list:
     return matches
 
 
+
+def fetch_eodhd_search(query: str) -> list:
+    api_token = os.getenv("EODHD_API_TOKEN")
+
+    if not api_token:
+        raise RuntimeError("EODHD_API_TOKEN não está configurado.")
+
+    clean_query = query.strip().upper()
+    cached = EODHD_CACHE.get(clean_query)
+
+    if cached:
+        age = time.time() - cached["created_at"]
+
+        if age < EODHD_CACHE_TTL_SECONDS:
+            return cached["data"]
+
+    params = urlencode(
+        {
+            "api_token": api_token,
+            "fmt": "json",
+            "limit": 20,
+        }
+    )
+
+    url = f"{EODHD_SEARCH_URL}/{quote(clean_query)}?{params}"
+
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "ThesisOS/0.6",
+        },
+    )
+
+    response = fetch_json(request, timeout=20)
+
+    if isinstance(response, dict):
+        if response.get("error"):
+            raise RuntimeError(response["error"])
+
+        if response.get("message"):
+            raise RuntimeError(response["message"])
+
+    if not isinstance(response, list):
+        raise RuntimeError("Resposta inesperada da EODHD.")
+
+    EODHD_CACHE[clean_query] = {
+        "created_at": time.time(),
+        "data": response,
+    }
+
+    return response
+
 def classify_figi_asset(item: dict) -> str:
     security_type = str(item.get("securityType") or "").lower()
     security_type_2 = str(item.get("securityType2") or "").lower()
@@ -189,6 +245,66 @@ def deduplicate_figi_matches(matches: list) -> list:
     return unique
 
 
+
+def classify_eodhd_asset(item: dict) -> str:
+    asset_type = str(item.get("Type") or "").lower()
+
+    if asset_type == "etf":
+        return "etf"
+
+    if asset_type in {"common stock", "stock"}:
+        return "stock"
+
+    if asset_type in {"fund", "mutual fund"}:
+        return "fund"
+
+    if asset_type == "index":
+        return "index"
+
+    return "other"
+
+
+def normalize_eodhd_match(item: dict) -> dict:
+    return {
+        "figi": None,
+        "composite_figi": None,
+        "share_class_figi": None,
+        "ticker": item.get("Code"),
+        "name": item.get("Name"),
+        "exchange_code": item.get("Exchange"),
+        "market_sector": "Equity",
+        "security_type": item.get("Type"),
+        "security_type_2": (
+            "Mutual Fund"
+            if str(item.get("Type") or "").upper() == "ETF"
+            else item.get("Type")
+        ),
+        "asset_type": classify_eodhd_asset(item),
+        "country": item.get("Country"),
+        "currency": item.get("Currency"),
+        "isin": item.get("ISIN"),
+        "previous_close": item.get("previousClose"),
+        "previous_close_date": item.get("previousCloseDate"),
+        "quote_provider": "EODHD",
+        "quote_type": "previous_close",
+    }
+
+
+def rank_eodhd_match(item: dict) -> tuple:
+    exchange = str(item.get("Exchange") or "").upper()
+    preferred_order = {
+        "XETRA": 5,
+        "LSE": 4,
+        "F": 3,
+        "MI": 2,
+        "AS": 1,
+    }
+
+    return (
+        preferred_order.get(exchange, 0),
+        1 if str(item.get("Type") or "").upper() == "ETF" else 0,
+    )
+
 def search_openfigi(query: str) -> dict:
     clean_query = query.strip().upper()
 
@@ -235,6 +351,53 @@ def search_openfigi(query: str) -> dict:
         "source": "OpenFIGI",
     }
 
+
+
+def search_assets(query: str) -> dict:
+    clean_query = query.strip().upper()
+    figi_result = search_openfigi(clean_query)
+
+    is_isin = bool(
+        re.fullmatch(
+            r"[A-Z]{2}[A-Z0-9]{9}[0-9]",
+            clean_query,
+        )
+    )
+
+    if not is_isin:
+        return figi_result
+
+    eodhd_matches = fetch_eodhd_search(clean_query)
+
+    exact_matches = [
+        item
+        for item in eodhd_matches
+        if str(item.get("ISIN") or "").upper() == clean_query
+    ]
+
+    exact_matches.sort(
+        key=rank_eodhd_match,
+        reverse=True,
+    )
+
+    normalized = [
+        normalize_eodhd_match(item)
+        for item in exact_matches[:20]
+    ]
+
+    if not normalized:
+        return figi_result
+
+    return {
+        "query": clean_query,
+        "query_type": "isin",
+        "total_results": len(exact_matches),
+        "returned_results": len(normalized),
+        "requires_selection": len(normalized) > 1,
+        "results": normalized,
+        "source": "OpenFIGI + EODHD",
+        "openfigi_total_results": figi_result["total_results"],
+    }
 
 def identify_us_symbol(symbol: str) -> dict | None:
     matches = fetch_openfigi_mapping(
@@ -288,6 +451,7 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
                     "providers": [
                         "Finnhub",
                         "OpenFIGI",
+                        "EODHD",
                     ],
                 }
             )
@@ -316,7 +480,7 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             return
 
         try:
-            result = search_openfigi(query)
+            result = search_assets(query)
 
             if not result["results"]:
                 self.send_json(
