@@ -569,6 +569,55 @@
       .asset-search-result-meta{justify-items:start}
     }
 
+  
+    /* ThesisOS dynamic stock / ETF analysis */
+    #etfAnalysisPanel{display:none}
+    #analysis.stock-mode #etfAnalysisPanel{display:none!important}
+    #analysis.etf-mode #etfAnalysisPanel{display:block}
+    #analysis.etf-mode #realMarketDataCard ~ *:not(#etfAnalysisPanel){display:none!important}
+    #analysis.analysis-neutral #realMarketDataCard ~ *{display:none!important}
+    .etf-analysis-grid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:12px;
+      margin-top:14px;
+    }
+    .etf-analysis-grid .card{min-height:112px}
+    .etf-data-grid{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:12px;
+      margin-top:14px;
+    }
+    .etf-data-item{
+      padding:15px;
+      border:1px solid var(--border);
+      border-radius:15px;
+      background:var(--panel-2);
+    }
+    .etf-data-item span{
+      display:block;
+      margin-bottom:7px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .etf-data-item strong{display:block;line-height:1.35}
+    .etf-pending{
+      margin-top:14px;
+      padding:14px 15px;
+      border:1px dashed var(--border);
+      border-radius:15px;
+      color:var(--muted);
+      line-height:1.55;
+    }
+    @media (max-width:900px){
+      .etf-analysis-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .etf-data-grid{grid-template-columns:1fr}
+    }
+    @media (max-width:560px){
+      .etf-analysis-grid{grid-template-columns:1fr}
+    }
+
   </style>
 </head>
 <body>
@@ -992,6 +1041,71 @@
           A análise fundamental e a decisão continuam demonstrativas.
         </div>
       </div>
+
+      <section class="card" id="etfAnalysisPanel" style="margin-bottom:16px">
+        <div class="section-head" style="margin:0 0 10px">
+          <div>
+            <h2>Estrutura de análise do ETF</h2>
+            <p class="sub">Ações e ETFs usam critérios diferentes. Aqui não são mostradas receitas, ROIC ou dívida da empresa.</p>
+          </div>
+          <span class="pill glow-success" id="etfAssetBadge">ETF identificado</span>
+        </div>
+
+        <div class="etf-analysis-grid">
+          <div class="card">
+            <div class="metric-label">Ticker</div>
+            <div class="metric" id="etfTicker">—</div>
+            <div class="sub" id="etfIdentifier">Identificador indisponível</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Listagem</div>
+            <div class="metric" id="etfExchange">—</div>
+            <div class="sub" id="etfCountry">País indisponível</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Moeda</div>
+            <div class="metric" id="etfCurrency">—</div>
+            <div class="sub">Moeda desta listagem</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Fonte da cotação</div>
+            <div class="metric" id="etfQuoteProvider">—</div>
+            <div class="sub" id="etfQuoteType">Tipo de cotação indisponível</div>
+          </div>
+        </div>
+
+        <div class="etf-data-grid">
+          <div class="etf-data-item">
+            <span>Índice ou benchmark</span>
+            <strong id="etfBenchmark">Dados ainda não ligados</strong>
+          </div>
+          <div class="etf-data-item">
+            <span>TER / custos correntes</span>
+            <strong id="etfTer">Dados ainda não ligados</strong>
+          </div>
+          <div class="etf-data-item">
+            <span>Política de distribuição</span>
+            <strong id="etfDistribution">Dados ainda não ligados</strong>
+          </div>
+          <div class="etf-data-item">
+            <span>Método de replicação</span>
+            <strong id="etfReplication">Dados ainda não ligados</strong>
+          </div>
+          <div class="etf-data-item">
+            <span>Dimensão do fundo / AUM</span>
+            <strong id="etfAum">Dados ainda não ligados</strong>
+          </div>
+          <div class="etf-data-item">
+            <span>Holdings e concentração</span>
+            <strong id="etfHoldings">Dados ainda não ligados</strong>
+          </div>
+        </div>
+
+        <div class="etf-pending">
+          <strong>Estado atual:</strong> a identificação, a bolsa, a moeda e a cotação disponível são reais. TER, benchmark, distribuição, replicação, dimensão e holdings permanecem explicitamente indisponíveis até existir uma fonte API adequada.
+        </div>
+      </section>
+
       <div class="grid g4">
         <div class="card"><div class="metric-label">Receitas YoY</div><div class="metric">+14,8%</div><div class="delta">acima do setor</div></div>
         <div class="card"><div class="metric-label">Margem operacional</div><div class="metric">8,9%</div><div class="delta">+0,7 p.p.</div></div>
@@ -1436,7 +1550,72 @@
     return `${currency || ""} ${formatNumber(millions)} M`.trim();
   }
 
+  function setAnalysisMode(mode, asset={}){
+    const analysis=$("#analysis");
+
+    if(!analysis) return;
+
+    analysis.classList.remove(
+      "stock-mode",
+      "etf-mode",
+      "analysis-neutral"
+    );
+
+    if(mode==="neutral"){
+      analysis.classList.add("analysis-neutral");
+      return;
+    }
+
+    const isEtf=mode==="etf";
+    analysis.classList.add(isEtf ? "etf-mode" : "stock-mode");
+
+    const tabs=$$("#analysis .tabs .tab");
+    const labels=isEtf
+      ? ["Resumo","Estrutura","Custos","Exposição","Fontes"]
+      : ["Resumo","Financeiro","Valuation","Riscos","Fontes"];
+
+    tabs.forEach((tab,index)=>{
+      if(labels[index]) tab.textContent=labels[index];
+    });
+
+    if(!isEtf) return;
+
+    const symbol=asset.symbol || asset.ticker || "—";
+    const exchange=asset.exchange || asset.exchange_code || "—";
+    const country=asset.country || "País indisponível";
+    const currency=asset.currency || "—";
+    const identifier=asset.isin || asset.figi || "Identificador indisponível";
+
+    let provider="OpenFIGI";
+    let quoteType="Identificação do instrumento";
+
+    if(asset.quote_provider==="EODHD"){
+      provider="EODHD";
+      quoteType="Último fecho disponível";
+    }else if(String(asset.source || "").includes("Finnhub")){
+      provider="Finnhub";
+      quoteType="Cotação intradiária disponível";
+    }
+
+    if($("#etfTicker")) $("#etfTicker").textContent=symbol;
+    if($("#etfIdentifier")) $("#etfIdentifier").textContent=identifier;
+    if($("#etfExchange")) $("#etfExchange").textContent=exchange;
+    if($("#etfCountry")) $("#etfCountry").textContent=country;
+    if($("#etfCurrency")) $("#etfCurrency").textContent=currency;
+    if($("#etfQuoteProvider")) $("#etfQuoteProvider").textContent=provider;
+    if($("#etfQuoteType")) $("#etfQuoteType").textContent=quoteType;
+  }
+
+  function applyAssetAnalysisMode(asset){
+    setAnalysisMode(
+      asset?.asset_type==="etf" ? "etf" : "stock",
+      asset || {}
+    );
+  }
+
   function resetRealAssetView(symbol, state){
+    setAnalysisMode("neutral");
+
     const isError=state==="error";
     const isLoading=state==="loading";
     const safeSymbol=symbol || "?";
@@ -1532,6 +1711,8 @@
         );
       }
 
+      applyAssetAnalysisMode(data);
+
       const logo=$("#assetLogo");
 
       if(data.logo){
@@ -1617,7 +1798,9 @@
       status.textContent="Preço e perfil reais carregados";
 
       detail.textContent=
-        "Os dados do cabeçalho são reais. Receitas, margens, ROIC, dívida, valuation e decisão abaixo continuam demonstrativos nesta fase.";
+        data.asset_type==="etf"
+          ? "A identificação e a cotação disponível são reais. A página mudou para critérios próprios de ETF; os restantes fundamentos aparecem como não ligados."
+          : "Os dados do cabeçalho são reais. Receitas, margens, ROIC, dívida, valuation e decisão abaixo continuam demonstrativos nesta fase.";
 
       updated.textContent=
         `Atualizado ${formatAssetDate(data.updated_at)}`;
@@ -1681,6 +1864,7 @@
     closeAssetSearchResults();
     openPage("analysis");
     clearObservedMarketFields();
+    applyAssetAnalysisMode(result);
 
     const symbol=result.ticker || "—";
     const currency=result.currency || "";
