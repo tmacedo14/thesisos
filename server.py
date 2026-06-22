@@ -1059,6 +1059,526 @@ def identify_us_symbol(symbol: str) -> dict | None:
     return normalize_figi_match(matches[0])
 
 
+def build_us_asset_snapshot(symbol: str) -> dict | None:
+    clean_symbol = symbol.strip().upper()
+
+    profile = fetch_finnhub(
+        "stock/profile2",
+        {"symbol": clean_symbol},
+    )
+
+    quote_data = fetch_finnhub(
+        "quote",
+        {"symbol": clean_symbol},
+    )
+
+    figi_asset = None
+
+    try:
+        figi_asset = identify_us_symbol(clean_symbol)
+    except Exception:
+        # A cotação pode continuar disponível mesmo que a
+        # identificação OpenFIGI esteja temporariamente indisponível.
+        figi_asset = None
+
+    has_profile = bool(profile.get("name"))
+    has_quote = quote_data.get("c") not in (None, 0)
+
+    if not has_profile and not has_quote and not figi_asset:
+        return None
+
+    quote_timestamp = quote_data.get("t")
+    updated_at = None
+
+    if quote_timestamp:
+        updated_at = datetime.fromtimestamp(
+            quote_timestamp,
+            tz=timezone.utc,
+        ).isoformat()
+
+    asset_type = (
+        figi_asset.get("asset_type")
+        if figi_asset
+        else "stock"
+    )
+
+    exchange = (
+        profile.get("exchange")
+        or (
+            figi_asset.get("exchange_code")
+            if figi_asset
+            else None
+        )
+    )
+
+    exchange_code = (
+        figi_asset.get("exchange_code")
+        if figi_asset
+        else None
+    )
+
+    is_us_listing = str(exchange_code or "").upper() in {
+        "US",
+        "UN",
+        "UW",
+        "UR",
+    }
+
+    return {
+        "symbol": profile.get("ticker") or clean_symbol,
+        "name": (
+            profile.get("name")
+            or (
+                figi_asset.get("name")
+                if figi_asset
+                else None
+            )
+            or clean_symbol
+        ),
+        "asset_type": asset_type,
+
+        "price": quote_data.get("c"),
+        "change": quote_data.get("d"),
+        "change_percentage": quote_data.get("dp"),
+
+        "open": quote_data.get("o"),
+        "high": quote_data.get("h"),
+        "low": quote_data.get("l"),
+        "previous_close": quote_data.get("pc"),
+        "quote_type": "intraday_or_latest",
+        "quote_date": (
+            updated_at[:10]
+            if updated_at
+            else None
+        ),
+
+        "currency": (
+            profile.get("currency")
+            or ("USD" if is_us_listing else None)
+        ),
+        "exchange": exchange,
+        "exchange_code": exchange_code,
+        "country": (
+            profile.get("country")
+            or ("US" if is_us_listing else None)
+        ),
+
+        "sector": None,
+        "industry": (
+            profile.get("finnhubIndustry")
+            if asset_type == "stock"
+            else None
+        ),
+
+        "figi": (
+            figi_asset.get("figi")
+            if figi_asset
+            else None
+        ),
+        "security_type": (
+            figi_asset.get("security_type")
+            if figi_asset
+            else None
+        ),
+        "security_type_2": (
+            figi_asset.get("security_type_2")
+            if figi_asset
+            else None
+        ),
+
+        "isin": None,
+        "ipo_date": profile.get("ipo"),
+        "market_cap_millions": profile.get(
+            "marketCapitalization"
+        ),
+        "shares_outstanding_millions": profile.get(
+            "shareOutstanding"
+        ),
+
+        "website": profile.get("weburl"),
+        "logo": profile.get("logo"),
+
+        "updated_at": updated_at,
+        "source": "Finnhub + OpenFIGI",
+        "market_provider": "Finnhub",
+        "identification_provider": (
+            "OpenFIGI"
+            if figi_asset
+            else "Finnhub"
+        ),
+    }
+
+
+def select_analysis_listing(
+    search_result: dict,
+    exchange: str | None,
+    ticker: str | None,
+) -> dict | None:
+    results = search_result.get("results", [])
+
+    if not results:
+        return None
+
+    clean_exchange = (
+        exchange.strip().upper()
+        if exchange
+        else None
+    )
+
+    clean_ticker = (
+        ticker.strip().upper()
+        if ticker
+        else None
+    )
+
+    candidates = results
+
+    if clean_exchange:
+        candidates = [
+            item
+            for item in candidates
+            if str(
+                item.get("exchange_code") or ""
+            ).upper() == clean_exchange
+        ]
+
+    if clean_ticker:
+        candidates = [
+            item
+            for item in candidates
+            if str(
+                item.get("ticker") or ""
+            ).upper() == clean_ticker
+        ]
+
+    if not candidates:
+        return None
+
+    if len(results) > 1 and not clean_exchange and not clean_ticker:
+        return None
+
+    return candidates[0]
+
+
+def build_eodhd_asset_snapshot(
+    identifier: str,
+    exchange: str | None,
+    ticker: str | None,
+) -> tuple[dict | None, dict]:
+    search_result = search_assets(identifier)
+
+    selected = select_analysis_listing(
+        search_result,
+        exchange,
+        ticker,
+    )
+
+    if not selected:
+        return None, search_result
+
+    price = selected.get("previous_close")
+    quote_date = selected.get("previous_close_date")
+
+    return {
+        "symbol": selected.get("ticker"),
+        "name": selected.get("name"),
+        "asset_type": selected.get("asset_type"),
+
+        "price": price,
+        "change": None,
+        "change_percentage": None,
+
+        "open": None,
+        "high": None,
+        "low": None,
+        "previous_close": price,
+        "quote_type": "previous_close",
+        "quote_date": quote_date,
+
+        "currency": selected.get("currency"),
+        "exchange": selected.get("exchange_code"),
+        "exchange_code": selected.get("exchange_code"),
+        "country": selected.get("country"),
+
+        "sector": None,
+        "industry": None,
+
+        "figi": selected.get("figi"),
+        "security_type": selected.get("security_type"),
+        "security_type_2": selected.get("security_type_2"),
+
+        "isin": (
+            selected.get("isin")
+            or identifier.strip().upper()
+        ),
+        "ipo_date": None,
+        "market_cap_millions": None,
+        "shares_outstanding_millions": None,
+
+        "website": None,
+        "logo": None,
+
+        "updated_at": quote_date,
+        "source": "OpenFIGI + EODHD",
+        "market_provider": "EODHD",
+        "identification_provider": "OpenFIGI + EODHD",
+    }, search_result
+
+
+def analysis_source(
+    provider: str,
+    status: str,
+    **details,
+) -> dict:
+    return {
+        "provider": provider,
+        "status": status,
+        **details,
+    }
+
+
+def build_analysis_payload(
+    identifier: str,
+    base_currency: str = "EUR",
+    exchange: str | None = None,
+    ticker: str | None = None,
+) -> tuple[dict, int]:
+    clean_identifier = identifier.strip().upper()
+    clean_base_currency = base_currency.strip().upper()
+
+    if not re.fullmatch(r"[A-Z]{3}", clean_base_currency):
+        raise ValueError("Moeda-base inválida.")
+
+    is_isin = bool(
+        re.fullmatch(
+            r"[A-Z]{2}[A-Z0-9]{9}[0-9]",
+            clean_identifier,
+        )
+    )
+
+    warnings = []
+    sources = {}
+
+    if is_isin:
+        asset, search_result = build_eodhd_asset_snapshot(
+            clean_identifier,
+            exchange,
+            ticker,
+        )
+
+        if not asset:
+            return {
+                "error": (
+                    "A pesquisa devolveu várias listagens. "
+                    "Escolhe uma bolsa ou um ticker."
+                ),
+                "query": clean_identifier,
+                "requires_selection": True,
+                "selection_options": search_result.get(
+                    "results",
+                    [],
+                ),
+                "source": search_result.get("source"),
+            }, 409
+
+        sources["identification"] = analysis_source(
+            asset["identification_provider"],
+            "ok",
+            isin=asset.get("isin"),
+            exchange=asset.get("exchange"),
+        )
+
+        sources["market"] = analysis_source(
+            "EODHD",
+            (
+                "ok"
+                if asset.get("price") is not None
+                else "unavailable"
+            ),
+            quote_type=asset.get("quote_type"),
+            quote_date=asset.get("quote_date"),
+        )
+
+    else:
+        asset = build_us_asset_snapshot(clean_identifier)
+
+        if not asset:
+            return {
+                "error": "Ativo não encontrado.",
+                "query": clean_identifier,
+            }, 404
+
+        sources["identification"] = analysis_source(
+            asset["identification_provider"],
+            "ok",
+            figi=asset.get("figi"),
+            exchange=asset.get("exchange"),
+        )
+
+        sources["market"] = analysis_source(
+            "Finnhub",
+            (
+                "ok"
+                if asset.get("price") is not None
+                else "unavailable"
+            ),
+            quote_type=asset.get("quote_type"),
+            quote_date=asset.get("quote_date"),
+        )
+
+    fundamentals = None
+
+    if asset.get("asset_type") == "stock":
+        try:
+            fundamentals = get_sec_fundamentals(
+                asset["symbol"]
+            )
+
+            if fundamentals:
+                sources["fundamentals"] = analysis_source(
+                    "SEC EDGAR",
+                    "ok",
+                    latest_period=(
+                        fundamentals.get("latest_period")
+                    ),
+                )
+            else:
+                sources["fundamentals"] = analysis_source(
+                    "SEC EDGAR",
+                    "unavailable",
+                )
+                warnings.append(
+                    "A SEC não devolveu fundamentais "
+                    "para este ticker."
+                )
+
+        except Exception as error:
+            sources["fundamentals"] = analysis_source(
+                "SEC EDGAR",
+                "unavailable",
+                detail=str(error),
+            )
+            warnings.append(
+                "Os fundamentais oficiais estão "
+                "temporariamente indisponíveis."
+            )
+
+    else:
+        sources["fundamentals"] = analysis_source(
+            "SEC EDGAR",
+            "not_applicable",
+            reason="O ativo não é uma ação.",
+        )
+
+    fx = None
+    price = asset.get("price")
+    currency = asset.get("currency")
+
+    if (
+        isinstance(price, (int, float))
+        and currency
+    ):
+        try:
+            fx = convert_currency(
+                float(price),
+                currency,
+                clean_base_currency,
+            )
+
+            sources["fx"] = analysis_source(
+                "ECB Data Portal",
+                "ok",
+                rate_date=fx.get("rate_date"),
+                base_currency=clean_base_currency,
+            )
+
+        except Exception as error:
+            sources["fx"] = analysis_source(
+                "ECB Data Portal",
+                "unavailable",
+                detail=str(error),
+            )
+            warnings.append(
+                "A conversão cambial está "
+                "temporariamente indisponível."
+            )
+
+    else:
+        sources["fx"] = analysis_source(
+            "ECB Data Portal",
+            "unavailable",
+            reason=(
+                "Preço ou moeda do ativo indisponível."
+            ),
+        )
+
+    required_source_keys = [
+        "identification",
+        "market",
+        "fx",
+    ]
+
+    if asset.get("asset_type") == "stock":
+        required_source_keys.append("fundamentals")
+
+    available_count = sum(
+        1
+        for key in required_source_keys
+        if sources.get(key, {}).get("status") == "ok"
+    )
+
+    completeness_percentage = round(
+        (
+            available_count
+            / len(required_source_keys)
+        ) * 100
+    )
+
+    payload = {
+        "query": clean_identifier,
+        "generated_at": datetime.now(
+            timezone.utc
+        ).isoformat(),
+        "base_currency": clean_base_currency,
+        "asset": asset,
+        "market": {
+            "price": asset.get("price"),
+            "currency": asset.get("currency"),
+            "change": asset.get("change"),
+            "change_percentage": (
+                asset.get("change_percentage")
+            ),
+            "open": asset.get("open"),
+            "high": asset.get("high"),
+            "low": asset.get("low"),
+            "previous_close": (
+                asset.get("previous_close")
+            ),
+            "quote_type": asset.get("quote_type"),
+            "quote_date": asset.get("quote_date"),
+            "provider": asset.get("market_provider"),
+        },
+        "fundamentals": fundamentals,
+        "fx": fx,
+        "sources": sources,
+        "data_quality": {
+            "completeness_percentage": (
+                completeness_percentage
+            ),
+            "available_sources": available_count,
+            "required_sources": len(
+                required_source_keys
+            ),
+            "ready_for_rule_engine": (
+                completeness_percentage == 100
+            ),
+        },
+        "warnings": warnings,
+    }
+
+    return payload, 200
+
+
 class ThesisOSHandler(SimpleHTTPRequestHandler):
     def send_json(self, payload: dict, status: int = 200) -> None:
         body = json.dumps(
@@ -1099,6 +1619,10 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             )
             return
 
+        if parsed_url.path.startswith("/api/analysis/"):
+            self.handle_analysis_request(parsed_url)
+            return
+
         if parsed_url.path.startswith("/api/fx/"):
             self.handle_fx_request(parsed_url)
             return
@@ -1116,6 +1640,91 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             return
 
         super().do_GET()
+
+    def handle_analysis_request(self, parsed_url) -> None:
+        identifier = unquote(
+            parsed_url.path.removeprefix("/api/analysis/")
+        ).strip()
+
+        if not identifier or len(identifier) > 64:
+            self.send_json(
+                {"error": "Identificador inválido."},
+                status=400,
+            )
+            return
+
+        query = parse_qs(parsed_url.query)
+
+        base_currency = query.get(
+            "base_currency",
+            ["EUR"],
+        )[0]
+
+        exchange = query.get(
+            "exchange",
+            [None],
+        )[0]
+
+        ticker = query.get(
+            "ticker",
+            [None],
+        )[0]
+
+        try:
+            payload, status = build_analysis_payload(
+                identifier,
+                base_currency=base_currency,
+                exchange=exchange,
+                ticker=ticker,
+            )
+
+            self.send_json(
+                payload,
+                status=status,
+            )
+
+        except HTTPError as error:
+            detail = error.read().decode(
+                "utf-8",
+                errors="replace",
+            )
+
+            self.send_json(
+                {
+                    "error": "Um fornecedor recusou o pedido.",
+                    "status": error.code,
+                    "detail": detail[:500],
+                },
+                status=502,
+            )
+
+        except URLError:
+            self.send_json(
+                {
+                    "error": (
+                        "Não foi possível contactar "
+                        "um dos fornecedores."
+                    ),
+                },
+                status=502,
+            )
+
+        except ValueError as error:
+            self.send_json(
+                {
+                    "error": str(error),
+                },
+                status=400,
+            )
+
+        except Exception as error:
+            self.send_json(
+                {
+                    "error": "Erro ao agregar a análise.",
+                    "detail": str(error),
+                },
+                status=500,
+            )
 
     def handle_fx_request(self, parsed_url) -> None:
         route = parsed_url.path.removeprefix("/api/fx/")
