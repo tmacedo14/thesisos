@@ -796,12 +796,12 @@
 <section id="analysis" class="page">
       <div class="analysis-head">
         <div>
-          <div class="ticker"><div class="ticker-logo">PWR</div><div class="ticker-meta"><h1 style="margin:0">Quanta Services</h1><small>NYSE · Infraestrutura elétrica · USD</small></div></div>
+          <div class="ticker"><div class="ticker-logo" id="assetLogo">PWR</div><div class="ticker-meta"><h1 id="assetName" style="margin:0">Quanta Services</h1><small id="assetMeta">NYSE · Infraestrutura elétrica · USD</small></div></div>
         </div>
         <div style="text-align:right">
-      <div class="price">$421,80</div>
-      <div class="delta">+1,24% hoje</div>
-      <div class="fx-note">≈ €388,06 a EUR/USD 1,087 · ativo cotado em USD, sujeito a risco cambial.</div>
+      <div class="price" id="assetPrice">$421,80</div>
+      <div class="delta" id="assetChange">+1,24% hoje</div>
+      <div class="fx-note" id="assetFx">Dados demonstrativos até ser ligada a conversão cambial.</div>
     </div>
       </div>
       <div class="tabs"><button class="tab active">Resumo</button><button class="tab">Financeiro</button><button class="tab">Valuation</button><button class="tab">Riscos</button><button class="tab">Fontes</button></div>
@@ -811,7 +811,7 @@
         <span class="chip">Interpretação assistida por IA</span>
       </div>
 
-      <div class="status-banner" style="margin-bottom:14px"><div><strong>Estado dos dados: completo</strong><div class="sub" style="font-size:12px">Resultados, balanço, cash flow, preço e documentos oficiais disponíveis.</div></div><span class="freshness">Q1 2026 · atual</span></div>
+      <div class="status-banner" style="margin-bottom:14px"><div><strong id="assetDataStatus">Estado dos dados: demonstrativo</strong><div class="sub" id="assetDataDetail" style="font-size:12px">Pesquisa um ticker para carregar preço e perfil reais. As métricas fundamentais abaixo continuam demonstrativas.</div></div><span class="freshness" id="assetUpdated">A aguardar pesquisa</span></div>
       <div class="grid g4">
         <div class="card"><div class="metric-label">Receitas YoY</div><div class="metric">+14,8%</div><div class="delta">acima do setor</div></div>
         <div class="card"><div class="metric-label">Margem operacional</div><div class="metric">8,9%</div><div class="delta">+0,7 p.p.</div></div>
@@ -1185,16 +1185,121 @@
   $$(".analyze-btn").forEach(button=>button.addEventListener("click",()=>openPage("analysis")));
 
   const search=$("#globalSearch");
+
+  function formatNumber(value, maximumFractionDigits=2){
+    if(value===null || value===undefined || Number.isNaN(Number(value))) return "—";
+    return new Intl.NumberFormat("pt-PT",{maximumFractionDigits}).format(Number(value));
+  }
+
+  function formatAssetDate(value){
+    if(!value) return "Sem timestamp";
+    const date=new Date(value);
+    if(Number.isNaN(date.getTime())) return "Sem timestamp";
+    return new Intl.DateTimeFormat("pt-PT",{
+      dateStyle:"short",
+      timeStyle:"short"
+    }).format(date);
+  }
+
+  async function loadAsset(symbol){
+    const cleanSymbol=symbol.trim().toUpperCase();
+
+    if(!cleanSymbol){
+      showToast("Escreve um ticker, por exemplo MCD.");
+      return;
+    }
+
+    const status=$("#assetDataStatus");
+    const detail=$("#assetDataDetail");
+    const updated=$("#assetUpdated");
+
+    status.textContent="A carregar dados reais…";
+    detail.textContent=`A consultar ${cleanSymbol} através do backend seguro do ThesisOS.`;
+    updated.textContent="A atualizar";
+    openPage("analysis");
+
+    try{
+      const response=await fetch(`/api/asset/${encodeURIComponent(cleanSymbol)}`);
+      const data=await response.json();
+
+      if(!response.ok){
+        throw new Error(
+          data.detail || data.error || "Não foi possível carregar o ativo."
+        );
+      }
+
+      const logo=$("#assetLogo");
+
+      if(data.logo){
+        logo.innerHTML=`
+          <img
+            src="${data.logo}"
+            alt="${data.symbol}"
+            style="width:100%;height:100%;object-fit:contain;border-radius:11px;background:white;padding:4px"
+          >
+        `;
+      }else{
+        logo.textContent=data.symbol;
+      }
+
+      $("#assetName").textContent=data.name || data.symbol;
+
+      $("#assetMeta").textContent=[
+        data.exchange,
+        data.industry,
+        data.currency
+      ].filter(Boolean).join(" · ");
+
+      $("#assetPrice").textContent=
+        data.price!==null && data.price!==undefined
+          ? `${data.currency || ""} ${formatNumber(data.price)}`.trim()
+          : "Preço indisponível";
+
+      const change=Number(data.change_percentage);
+
+      $("#assetChange").textContent=
+        Number.isFinite(change)
+          ? `${change>=0?"+":""}${formatNumber(change)}% hoje`
+          : "Variação indisponível";
+
+      $("#assetFx").textContent=
+        `Fonte: ${data.source}. Conversão cambial ainda não ligada.`;
+
+      status.textContent="Preço e perfil reais carregados";
+
+      detail.textContent=
+        "Os dados do cabeçalho são reais. Receitas, margens, ROIC, dívida, valuation e decisão abaixo continuam demonstrativos nesta fase.";
+
+      updated.textContent=
+        `Atualizado ${formatAssetDate(data.updated_at)}`;
+
+      showToast(`${data.symbol} carregado com dados reais.`);
+    }catch(error){
+      status.textContent="Não foi possível carregar o ativo";
+      detail.textContent=error.message;
+      updated.textContent="Erro da API";
+      showToast("Erro ao consultar o ticker.");
+    }
+  }
+
   search?.addEventListener("input",()=>{
     const term=search.value.toLowerCase().trim();
+
     $$(".opportunity").forEach(card=>{
-      const matches=!term || (card.dataset.name||"").toLowerCase().includes(term);
+      const matches=
+        !term ||
+        (card.dataset.name||"").toLowerCase().includes(term);
+
       card.dataset.searchVisible=matches ? "true" : "false";
     });
+
     applyRadarFilters();
   });
+
   search?.addEventListener("keydown",event=>{
-    if(event.key==="Enter"){openPage("radar");showToast("Pesquisa atualizada.");}
+    if(event.key==="Enter"){
+      loadAsset(search.value);
+    }
   });
 
   $$(".help").forEach(help=>{
