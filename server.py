@@ -1337,6 +1337,1019 @@ def analysis_source(
     }
 
 
+
+FRAMEWORK_ENGINE_VERSION = "0.1"
+
+
+def fact_value(fact):
+    if not isinstance(fact, dict):
+        return None
+
+    value = fact.get("value")
+
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    return None
+
+
+def rule_result(
+    rule_id: str,
+    area: str,
+    label: str,
+    value,
+    unit: str,
+    points: int,
+    max_points: int,
+    status: str,
+    interpretation: str,
+    source: str,
+) -> dict:
+    return {
+        "id": rule_id,
+        "area": area,
+        "label": label,
+        "value": value,
+        "unit": unit,
+        "points": points,
+        "max_points": max_points,
+        "status": status,
+        "interpretation": interpretation,
+        "source": source,
+    }
+
+
+def unavailable_rule(
+    rule_id: str,
+    area: str,
+    label: str,
+    unit: str,
+    max_points: int,
+    source: str,
+) -> dict:
+    return rule_result(
+        rule_id=rule_id,
+        area=area,
+        label=label,
+        value=None,
+        unit=unit,
+        points=0,
+        max_points=max_points,
+        status="unavailable",
+        interpretation="Dados ainda não disponíveis.",
+        source=source,
+    )
+
+
+def evaluate_revenue_growth(value):
+    if value is None:
+        return unavailable_rule(
+            "revenue_growth_yoy",
+            "growth",
+            "Crescimento homólogo das receitas",
+            "%",
+            15,
+            "SEC EDGAR",
+        )
+
+    if value >= 15:
+        points, status, text = 15, "strong", "Crescimento forte das receitas."
+    elif value >= 8:
+        points, status, text = 12, "positive", "Crescimento saudável das receitas."
+    elif value >= 3:
+        points, status, text = 8, "neutral", "Crescimento moderado das receitas."
+    elif value >= 0:
+        points, status, text = 5, "watch", "Receitas praticamente estáveis."
+    else:
+        points, status, text = 0, "warning", "As receitas estão em contração."
+
+    return rule_result(
+        "revenue_growth_yoy",
+        "growth",
+        "Crescimento homólogo das receitas",
+        value,
+        "%",
+        points,
+        15,
+        status,
+        text,
+        "SEC EDGAR",
+    )
+
+
+def evaluate_income_growth(rule_id, label, value):
+    if value is None:
+        return unavailable_rule(
+            rule_id,
+            "growth",
+            label,
+            "%",
+            12,
+            "SEC EDGAR",
+        )
+
+    if value >= 15:
+        points, status, text = 12, "strong", "Crescimento forte do resultado."
+    elif value >= 5:
+        points, status, text = 9, "positive", "Crescimento positivo do resultado."
+    elif value >= 0:
+        points, status, text = 6, "neutral", "Resultado estável ou com crescimento reduzido."
+    else:
+        points, status, text = 0, "warning", "O resultado está em contração."
+
+    return rule_result(
+        rule_id,
+        "growth",
+        label,
+        value,
+        "%",
+        points,
+        12,
+        status,
+        text,
+        "SEC EDGAR",
+    )
+
+
+def evaluate_margin(rule_id, label, value, operating=False):
+    max_points = 15 if operating else 12
+
+    if value is None:
+        return unavailable_rule(
+            rule_id,
+            "profitability",
+            label,
+            "%",
+            max_points,
+            "SEC EDGAR + ThesisOS calculation",
+        )
+
+    if operating:
+        if value >= 25:
+            points, status, text = 15, "strong", "Margem operacional elevada."
+        elif value >= 15:
+            points, status, text = 12, "positive", "Margem operacional saudável."
+        elif value >= 8:
+            points, status, text = 8, "neutral", "Margem operacional moderada."
+        elif value >= 0:
+            points, status, text = 4, "watch", "Margem operacional reduzida."
+        else:
+            points, status, text = 0, "warning", "Resultado operacional negativo."
+    else:
+        if value >= 20:
+            points, status, text = 12, "strong", "Margem líquida elevada."
+        elif value >= 10:
+            points, status, text = 10, "positive", "Margem líquida saudável."
+        elif value >= 5:
+            points, status, text = 7, "neutral", "Margem líquida moderada."
+        elif value >= 0:
+            points, status, text = 4, "watch", "Margem líquida reduzida."
+        else:
+            points, status, text = 0, "warning", "A empresa apresenta prejuízo líquido."
+
+    return rule_result(
+        rule_id,
+        "profitability",
+        label,
+        value,
+        "%",
+        points,
+        max_points,
+        status,
+        text,
+        "SEC EDGAR + ThesisOS calculation",
+    )
+
+
+def evaluate_dilution(value):
+    if value is None:
+        return unavailable_rule(
+            "diluted_shares_yoy",
+            "dilution",
+            "Variação homóloga das ações diluídas",
+            "%",
+            10,
+            "SEC EDGAR",
+        )
+
+    if value <= -1:
+        points, status, text = 10, "strong", "O número diluído de ações diminuiu."
+    elif value <= 0:
+        points, status, text = 8, "positive", "Não existe diluição observável no período."
+    elif value <= 2:
+        points, status, text = 5, "neutral", "Diluição baixa, mas deve ser acompanhada."
+    elif value <= 5:
+        points, status, text = 2, "watch", "Diluição material no período."
+    else:
+        points, status, text = 0, "warning", "Diluição elevada no período."
+
+    return rule_result(
+        "diluted_shares_yoy",
+        "dilution",
+        "Variação homóloga das ações diluídas",
+        value,
+        "%",
+        points,
+        10,
+        status,
+        text,
+        "SEC EDGAR",
+    )
+
+
+def evaluate_liabilities(value):
+    if value is None:
+        return unavailable_rule(
+            "liabilities_to_assets",
+            "balance_sheet",
+            "Passivos em percentagem dos ativos",
+            "%",
+            14,
+            "SEC EDGAR + ThesisOS calculation",
+        )
+
+    if value <= 50:
+        points, status, text = 14, "strong", "Estrutura de balanço conservadora neste indicador."
+    elif value <= 65:
+        points, status, text = 11, "positive", "Nível de passivos controlado neste indicador."
+    elif value <= 80:
+        points, status, text = 6, "watch", "Peso elevado dos passivos; exige análise da dívida."
+    else:
+        points, status, text = 1, "warning", "Peso muito elevado dos passivos."
+
+    return rule_result(
+        "liabilities_to_assets",
+        "balance_sheet",
+        "Passivos em percentagem dos ativos",
+        value,
+        "%",
+        points,
+        14,
+        status,
+        text,
+        "SEC EDGAR + ThesisOS calculation",
+    )
+
+
+def evaluate_cash_to_assets(value):
+    if value is None:
+        return unavailable_rule(
+            "cash_to_assets",
+            "balance_sheet",
+            "Caixa em percentagem dos ativos",
+            "%",
+            10,
+            "SEC EDGAR + ThesisOS calculation",
+        )
+
+    if value >= 15:
+        points, status, text = 10, "strong", "Reserva de caixa elevada relativamente aos ativos."
+    elif value >= 8:
+        points, status, text = 8, "positive", "Reserva de caixa relevante."
+    elif value >= 3:
+        points, status, text = 5, "neutral", "Reserva de caixa moderada."
+    elif value >= 1:
+        points, status, text = 2, "watch", "Reserva de caixa reduzida."
+    else:
+        points, status, text = 0, "warning", "Caixa muito reduzida neste indicador."
+
+    return rule_result(
+        "cash_to_assets",
+        "balance_sheet",
+        "Caixa em percentagem dos ativos",
+        value,
+        "%",
+        points,
+        10,
+        status,
+        text,
+        "SEC EDGAR + ThesisOS calculation",
+    )
+
+
+def framework_item(
+    item_id: str,
+    label: str,
+    status: str,
+    available_data: list,
+    missing_data: list,
+) -> dict:
+    return {
+        "id": item_id,
+        "label": label,
+        "status": status,
+        "available_data": available_data,
+        "missing_data": missing_data,
+    }
+
+
+def classify_quantitative_score(score):
+    if score is None:
+        return {
+            "code": "insufficient_data",
+            "label": "Dados insuficientes",
+        }
+
+    if score >= 80:
+        return {"code": "strong", "label": "Forte"}
+
+    if score >= 65:
+        return {"code": "positive", "label": "Positiva"}
+
+    if score >= 45:
+        return {"code": "mixed", "label": "Mista"}
+
+    return {"code": "weak", "label": "Fraca"}
+
+
+def build_stock_framework_engine(
+    asset: dict,
+    fundamentals: dict | None,
+    sources: dict,
+    data_quality: dict,
+) -> dict:
+    duration = (fundamentals or {}).get("duration_metrics", {})
+    instant = (fundamentals or {}).get("instant_metrics", {})
+    derived = (fundamentals or {}).get("derived_metrics", {})
+
+    revenue = duration.get("revenue", {})
+    net_income = duration.get("net_income", {})
+    operating_income = duration.get("operating_income", {})
+    diluted_shares = duration.get("diluted_shares", {})
+
+    assets_value = fact_value(instant.get("assets"))
+    cash_value = fact_value(instant.get("cash"))
+
+    cash_to_assets = None
+
+    if assets_value not in (None, 0) and cash_value is not None:
+        cash_to_assets = round((cash_value / assets_value) * 100, 2)
+
+    rules = [
+        evaluate_revenue_growth(
+            revenue.get("quarter_yoy_percentage")
+        ),
+        evaluate_income_growth(
+            "net_income_growth_yoy",
+            "Crescimento homólogo do lucro líquido",
+            net_income.get("quarter_yoy_percentage"),
+        ),
+        evaluate_income_growth(
+            "operating_income_growth_yoy",
+            "Crescimento homólogo do resultado operacional",
+            operating_income.get("quarter_yoy_percentage"),
+        ),
+        evaluate_margin(
+            "operating_margin",
+            "Margem operacional trimestral",
+            derived.get("operating_margin_quarter_percentage"),
+            operating=True,
+        ),
+        evaluate_margin(
+            "net_margin",
+            "Margem líquida trimestral",
+            derived.get("net_margin_quarter_percentage"),
+            operating=False,
+        ),
+        evaluate_dilution(
+            diluted_shares.get("quarter_yoy_percentage")
+        ),
+        evaluate_liabilities(
+            derived.get("liabilities_to_assets_percentage")
+        ),
+        evaluate_cash_to_assets(cash_to_assets),
+    ]
+
+    available_rules = [
+        rule
+        for rule in rules
+        if rule["status"] != "unavailable"
+    ]
+
+    achieved_points = sum(
+        rule["points"]
+        for rule in available_rules
+    )
+
+    available_max_points = sum(
+        rule["max_points"]
+        for rule in available_rules
+    )
+
+    total_max_points = sum(
+        rule["max_points"]
+        for rule in rules
+    )
+
+    quantitative_score = None
+
+    if available_max_points:
+        quantitative_score = round(
+            (achieved_points / available_max_points) * 100
+        )
+
+    quantitative_coverage = round(
+        (available_max_points / total_max_points) * 100
+    ) if total_max_points else 0
+
+    classification = classify_quantitative_score(
+        quantitative_score
+    )
+
+    positive_signals = [
+        {
+            "rule_id": rule["id"],
+            "label": rule["label"],
+            "value": rule["value"],
+            "unit": rule["unit"],
+            "interpretation": rule["interpretation"],
+        }
+        for rule in rules
+        if rule["status"] in {"strong", "positive"}
+    ]
+
+    warning_signals = [
+        {
+            "rule_id": rule["id"],
+            "label": rule["label"],
+            "value": rule["value"],
+            "unit": rule["unit"],
+            "interpretation": rule["interpretation"],
+        }
+        for rule in rules
+        if rule["status"] in {"watch", "warning"}
+    ]
+
+    checklist = [
+        framework_item(
+            "asset_identity",
+            "O que estamos realmente a comprar?",
+            "partial",
+            [
+                "tipo de ativo",
+                "ticker",
+                "bolsa",
+                "moeda",
+                "indústria",
+            ],
+            [
+                "papel na carteira",
+                "horizonte",
+                "condições da tese",
+                "sinais de invalidação",
+            ],
+        ),
+        framework_item(
+            "official_documentation",
+            "Documentação e fontes oficiais",
+            "partial",
+            [
+                "Company Facts SEC",
+                "10-Q/10-K quantitativos",
+                "identificação OpenFIGI",
+                "cotação de mercado",
+            ],
+            [
+                "notas às contas",
+                "8-K",
+                "conference call",
+                "guidance",
+                "notícias materiais",
+            ],
+        ),
+        framework_item(
+            "growth",
+            "Crescimento",
+            "partial",
+            [
+                "receitas YoY",
+                "lucro líquido YoY",
+                "resultado operacional YoY",
+            ],
+            [
+                "crescimento orgânico",
+                "backlog",
+                "guidance",
+                "crescimento de FCF",
+                "mercado endereçável",
+            ],
+        ),
+        framework_item(
+            "profitability_quality",
+            "Rentabilidade e qualidade dos lucros",
+            "partial",
+            [
+                "margem operacional",
+                "margem líquida",
+            ],
+            [
+                "margem bruta",
+                "free cash flow",
+                "conversão de lucro em caixa",
+                "ROIC",
+                "ROE",
+                "contas a receber e inventários",
+            ],
+        ),
+        framework_item(
+            "balance_sheet",
+            "Balanço e dívida",
+            "partial",
+            [
+                "ativos",
+                "passivos",
+                "capital próprio",
+                "caixa",
+            ],
+            [
+                "dívida líquida/EBITDA",
+                "cobertura de juros",
+                "taxas e maturidades",
+                "covenants",
+                "leases e pensões",
+            ],
+        ),
+        framework_item(
+            "dilution",
+            "Diluição e valor por ação",
+            "partial",
+            [
+                "variação das ações diluídas",
+            ],
+            [
+                "stock-based compensation",
+                "opções",
+                "RSUs",
+                "convertíveis",
+                "warrants",
+            ],
+        ),
+        framework_item(
+            "business_quality",
+            "Qualidade do negócio e management",
+            "missing",
+            [],
+            [
+                "moat",
+                "pricing power",
+                "concentração de clientes",
+                "fornecedores",
+                "management",
+                "alocação de capital",
+                "insiders",
+                "concorrência",
+            ],
+        ),
+        framework_item(
+            "valuation",
+            "Valuation e cenários",
+            "missing",
+            [],
+            [
+                "múltiplos atuais e históricos",
+                "comparáveis",
+                "reverse DCF",
+                "bear/base/bull",
+                "retorno esperado",
+            ],
+        ),
+        framework_item(
+            "technical",
+            "Pullback e análise técnica",
+            "missing",
+            [],
+            [
+                "máximos",
+                "médias móveis",
+                "RSI",
+                "volume",
+                "suportes e resistências",
+                "força relativa",
+            ],
+        ),
+        framework_item(
+            "portfolio_fit",
+            "Encaixe na carteira",
+            "missing",
+            [],
+            [
+                "peso atual",
+                "limite por empresa",
+                "setor e geografia",
+                "correlação",
+                "liquidez futura",
+            ],
+        ),
+        framework_item(
+            "decision_monitoring",
+            "Decisão e monitorização",
+            "blocked",
+            [],
+            [
+                "comprar/manter/evitar/vender",
+                "zona de entrada",
+                "tamanho da posição",
+                "plano de reforços",
+                "catalisadores",
+                "quebra da tese",
+                "próxima revisão",
+                "alertas",
+            ],
+        ),
+    ]
+
+    framework_sections_available = sum(
+        1
+        for item in checklist
+        if item["status"] in {"available", "partial"}
+    )
+
+    framework_coverage = round(
+        (framework_sections_available / len(checklist)) * 100
+    )
+
+    if framework_coverage >= 70:
+        confidence = "high"
+    elif framework_coverage >= 40:
+        confidence = "moderate"
+    else:
+        confidence = "low"
+
+    next_required_data = [
+        "free cash flow e conversão de lucro em caixa",
+        "ROIC e margem bruta",
+        "dívida detalhada e maturidades",
+        "crescimento orgânico, backlog e guidance",
+        "moat, concorrência e qualidade da administração",
+        "valuation, reverse DCF e cenários",
+        "análise técnica e pullback",
+        "peso e encaixe na carteira",
+    ]
+
+    return {
+        "version": FRAMEWORK_ENGINE_VERSION,
+        "asset_type": "stock",
+        "status": "partial_assessment",
+        "scope": (
+            "Snapshot quantitativo baseado nos dados atualmente "
+            "ligados. Não representa ainda uma análise integral."
+        ),
+        "frameworks_applied": [
+            {
+                "id": "analysis",
+                "name": "Framework de análise",
+                "status": "partial",
+            },
+            {
+                "id": "documentation",
+                "name": "Framework de documentação",
+                "status": "partial",
+                "official_sources_used": [
+                    source.get("provider")
+                    for source in sources.values()
+                    if source.get("status") == "ok"
+                ],
+            },
+            {
+                "id": "decision_monitoring",
+                "name": "Framework de decisão e monitorização",
+                "status": "blocked",
+                "reason": (
+                    "Valuation, contexto da carteira, análise "
+                    "qualitativa e momento de entrada ainda ausentes."
+                ),
+            },
+        ],
+        "quantitative_snapshot": {
+            "score": quantitative_score,
+            "classification": classification,
+            "achieved_points": achieved_points,
+            "available_max_points": available_max_points,
+            "total_max_points": total_max_points,
+            "coverage_percentage": quantitative_coverage,
+            "rules": rules,
+            "positive_signals": positive_signals,
+            "warning_signals": warning_signals,
+            "methodology_note": (
+                "Limiares genéricos e transparentes. Devem ser "
+                "ajustados posteriormente ao setor e modelo de negócio."
+            ),
+        },
+        "framework_checklist": {
+            "coverage_percentage": framework_coverage,
+            "confidence": confidence,
+            "items": checklist,
+        },
+        "data_quality": data_quality,
+        "next_required_data": next_required_data,
+        "decision": {
+            "status": "awaiting_full_assessment",
+            "action": "monitor",
+            "label": "Aguardar valuation e revisão qualitativa",
+            "buy_hold_avoid_sell": None,
+            "entry_zone": None,
+            "position_size": None,
+            "reinforcement_plan": None,
+            "catalysts": [],
+            "thesis_break_signals": [],
+            "next_review": "Após novo filing ou dado material",
+            "reason": (
+                "Os frameworks não permitem uma recomendação final "
+                "apenas com o snapshot quantitativo disponível."
+            ),
+        },
+    }
+
+
+def build_etf_framework_engine(
+    asset: dict,
+    sources: dict,
+    data_quality: dict,
+) -> dict:
+    checklist = [
+        framework_item(
+            "asset_identity",
+            "O que estamos realmente a comprar?",
+            "partial",
+            [
+                "tipo ETF",
+                "ticker/ISIN",
+                "listagem",
+                "moeda",
+                "país",
+            ],
+            [
+                "papel na carteira",
+                "horizonte",
+                "tese e invalidadores",
+            ],
+        ),
+        framework_item(
+            "official_documentation",
+            "Documentação e fontes",
+            "partial",
+            [
+                "identificação OpenFIGI",
+                "cotação Finnhub/EODHD",
+                "câmbio BCE",
+            ],
+            [
+                "factsheet oficial",
+                "KID/KIID",
+                "relatório anual do fundo",
+            ],
+        ),
+        framework_item(
+            "index_methodology",
+            "Índice e metodologia",
+            "missing",
+            [],
+            [
+                "índice seguido",
+                "metodologia",
+                "regras de inclusão",
+                "rebalanceamento",
+            ],
+        ),
+        framework_item(
+            "holdings_exposure",
+            "Holdings e exposição real",
+            "missing",
+            [],
+            [
+                "número de posições",
+                "top holdings",
+                "setores",
+                "geografias",
+                "moedas",
+                "concentração",
+                "overlap",
+            ],
+        ),
+        framework_item(
+            "costs_implementation",
+            "Custos e implementação",
+            "missing",
+            [],
+            [
+                "TER",
+                "tracking difference",
+                "tracking error",
+                "spread",
+                "AUM",
+                "liquidez",
+                "replicação",
+                "domicílio",
+                "fiscalidade",
+                "distribuição/acumulação",
+            ],
+        ),
+        framework_item(
+            "aggregate_valuation",
+            "Valuation agregado",
+            "missing",
+            [],
+            [
+                "P/E agregado",
+                "crescimento dos lucros",
+                "valuation histórico",
+                "comparação com benchmark",
+            ],
+        ),
+        framework_item(
+            "technical",
+            "Pullback e momento de entrada",
+            "missing",
+            [],
+            [
+                "pullback",
+                "médias móveis",
+                "suportes",
+                "RSI",
+                "força relativa",
+            ],
+        ),
+        framework_item(
+            "portfolio_fit",
+            "Encaixe na carteira",
+            "missing",
+            [],
+            [
+                "overlap com ETFs existentes",
+                "peso",
+                "correlação",
+                "concentração escondida",
+                "risco cambial",
+            ],
+        ),
+        framework_item(
+            "decision_monitoring",
+            "Decisão e monitorização",
+            "blocked",
+            [],
+            [
+                "comprar/manter/evitar/vender",
+                "zona de entrada",
+                "tamanho",
+                "reforços",
+                "alertas",
+                "próxima revisão",
+            ],
+        ),
+    ]
+
+    framework_sections_available = sum(
+        1
+        for item in checklist
+        if item["status"] in {"available", "partial"}
+    )
+
+    framework_coverage = round(
+        (framework_sections_available / len(checklist)) * 100
+    )
+
+    return {
+        "version": FRAMEWORK_ENGINE_VERSION,
+        "asset_type": "etf",
+        "status": "insufficient_etf_fundamentals",
+        "scope": (
+            "Identificação, preço e moeda já estão ligados. "
+            "A análise estrutural do ETF ainda necessita de dados "
+            "oficiais sobre custos, índice, holdings e tracking."
+        ),
+        "frameworks_applied": [
+            {
+                "id": "analysis",
+                "name": "Framework de análise",
+                "status": "partial",
+            },
+            {
+                "id": "documentation",
+                "name": "Framework de documentação",
+                "status": "partial",
+                "official_sources_used": [
+                    source.get("provider")
+                    for source in sources.values()
+                    if source.get("status") == "ok"
+                ],
+            },
+            {
+                "id": "decision_monitoring",
+                "name": "Framework de decisão e monitorização",
+                "status": "blocked",
+                "reason": (
+                    "TER, holdings, metodologia, overlap, valuation "
+                    "agregado e carteira ainda ausentes."
+                ),
+            },
+        ],
+        "quantitative_snapshot": {
+            "score": None,
+            "classification": {
+                "code": "insufficient_data",
+                "label": "Dados insuficientes",
+            },
+            "coverage_percentage": 0,
+            "rules": [],
+            "positive_signals": [],
+            "warning_signals": [],
+            "methodology_note": (
+                "O ThesisOS não atribui um score empresarial a ETFs."
+            ),
+        },
+        "framework_checklist": {
+            "coverage_percentage": framework_coverage,
+            "confidence": "low",
+            "items": checklist,
+        },
+        "data_quality": data_quality,
+        "next_required_data": [
+            "factsheet/KID oficial",
+            "índice e metodologia",
+            "TER e tracking difference",
+            "AUM, liquidez e spread",
+            "holdings, setores, geografias e moedas",
+            "overlap com a carteira",
+            "valuation agregado",
+            "análise técnica e zona de reforço",
+        ],
+        "decision": {
+            "status": "awaiting_etf_fundamentals",
+            "action": "monitor",
+            "label": "Aguardar dados estruturais do ETF",
+            "buy_hold_avoid_sell": None,
+            "entry_zone": None,
+            "position_size": None,
+            "reinforcement_plan": None,
+            "catalysts": [],
+            "thesis_break_signals": [],
+            "next_review": "Após integração do factsheet oficial",
+            "reason": (
+                "A identificação e a cotação não bastam para avaliar "
+                "a qualidade e o encaixe de um ETF."
+            ),
+        },
+    }
+
+
+def build_framework_engine(
+    asset: dict,
+    fundamentals: dict | None,
+    sources: dict,
+    data_quality: dict,
+) -> dict:
+    asset_type = asset.get("asset_type")
+
+    if asset_type == "stock":
+        return build_stock_framework_engine(
+            asset,
+            fundamentals,
+            sources,
+            data_quality,
+        )
+
+    if asset_type == "etf":
+        return build_etf_framework_engine(
+            asset,
+            sources,
+            data_quality,
+        )
+
+    return {
+        "version": FRAMEWORK_ENGINE_VERSION,
+        "asset_type": asset_type,
+        "status": "unsupported_asset_type",
+        "scope": (
+            "Este tipo de ativo ainda não tem um motor específico."
+        ),
+        "frameworks_applied": [],
+        "quantitative_snapshot": {
+            "score": None,
+            "classification": {
+                "code": "not_available",
+                "label": "Não disponível",
+            },
+            "coverage_percentage": 0,
+            "rules": [],
+            "positive_signals": [],
+            "warning_signals": [],
+        },
+        "framework_checklist": {
+            "coverage_percentage": 0,
+            "confidence": "low",
+            "items": [],
+        },
+        "data_quality": data_quality,
+        "next_required_data": [],
+        "decision": {
+            "status": "unsupported",
+            "action": "none",
+            "label": "Motor ainda não disponível",
+            "buy_hold_avoid_sell": None,
+        },
+    }
+
+
 def build_analysis_payload(
     identifier: str,
     base_currency: str = "EUR",
@@ -1575,6 +2588,13 @@ def build_analysis_payload(
         },
         "warnings": warnings,
     }
+
+    payload["framework_engine"] = build_framework_engine(
+        asset=asset,
+        fundamentals=fundamentals,
+        sources=sources,
+        data_quality=payload["data_quality"],
+    )
 
     return payload, 200
 

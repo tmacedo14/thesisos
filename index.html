@@ -786,6 +786,160 @@
       .analysis-source-grid{grid-template-columns:1fr}
     }
 
+  
+    /* ThesisOS Framework Engine UI */
+    #frameworkEngineCard{display:none;margin-bottom:16px}
+    #analysis.stock-mode #frameworkEngineCard,
+    #analysis.etf-mode #frameworkEngineCard{display:block}
+    #analysis.analysis-neutral #frameworkEngineCard{display:none!important}
+    .framework-engine-top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:18px;
+      margin-bottom:14px;
+    }
+    .framework-engine-score{
+      display:flex;
+      align-items:baseline;
+      gap:6px;
+      white-space:nowrap;
+    }
+    .framework-engine-score strong{
+      font-size:34px;
+      line-height:1;
+    }
+    .framework-summary-grid{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:12px;
+    }
+    .framework-summary-item{
+      min-height:112px;
+      padding:14px;
+      border:1px solid var(--border);
+      border-radius:15px;
+      background:var(--panel-2);
+    }
+    .framework-summary-item span{
+      display:block;
+      margin-bottom:7px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .framework-summary-item strong{
+      display:block;
+      line-height:1.35;
+    }
+    .framework-engine-columns{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:14px;
+      margin-top:14px;
+    }
+    .framework-engine-block{
+      padding:15px;
+      border:1px solid var(--border);
+      border-radius:15px;
+      background:var(--panel-2);
+    }
+    .framework-engine-block h3{margin:0 0 10px}
+    .framework-signal-list,
+    .framework-next-list{
+      display:grid;
+      gap:8px;
+      margin:0;
+      padding:0;
+      list-style:none;
+    }
+    .framework-signal-item,
+    .framework-next-item{
+      padding:10px 11px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:var(--panel);
+      line-height:1.4;
+    }
+    .framework-signal-item strong{
+      display:block;
+      margin-bottom:3px;
+      font-size:13px;
+    }
+    .framework-signal-item small,
+    .framework-next-item{
+      color:var(--muted);
+      font-size:12px;
+    }
+    .framework-checklist{
+      display:grid;
+      gap:8px;
+      margin-top:14px;
+    }
+    .framework-check-row{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:12px;
+      align-items:center;
+      padding:11px 12px;
+      border:1px solid var(--border);
+      border-radius:13px;
+      background:var(--panel-2);
+    }
+    .framework-check-row strong{
+      display:block;
+      margin-bottom:4px;
+      font-size:13px;
+    }
+    .framework-check-row small{
+      display:block;
+      color:var(--muted);
+      line-height:1.35;
+    }
+    .framework-status-pill{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:86px;
+      padding:5px 8px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.03em;
+      text-transform:uppercase;
+    }
+    .framework-check-row[data-status="available"] .framework-status-pill,
+    .framework-check-row[data-status="partial"] .framework-status-pill{
+      border-color:rgba(66,211,146,.45);
+    }
+    .framework-check-row[data-status="missing"] .framework-status-pill{
+      border-color:rgba(255,183,77,.45);
+    }
+    .framework-check-row[data-status="blocked"] .framework-status-pill{
+      border-color:rgba(255,95,109,.45);
+    }
+    .framework-engine-note{
+      margin-top:14px;
+      padding:13px 14px;
+      border:1px dashed var(--border);
+      border-radius:14px;
+      color:var(--muted);
+      line-height:1.5;
+      font-size:12px;
+    }
+    @media (max-width:900px){
+      .framework-summary-grid{grid-template-columns:1fr}
+      .framework-engine-columns{grid-template-columns:1fr}
+    }
+    @media (max-width:560px){
+      .framework-engine-top{
+        flex-direction:column;
+        align-items:flex-start;
+      }
+      .framework-check-row{grid-template-columns:1fr}
+      .framework-status-pill{justify-self:start}
+    }
+
   </style>
 </head>
 <body>
@@ -1203,6 +1357,78 @@
 
         <div class="analysis-quality-warning" id="analysisWarnings"></div>
       </section>
+
+      <section class="card" id="frameworkEngineCard">
+        <div class="framework-engine-top">
+          <div>
+            <h2 style="margin:0 0 6px">Framework Engine</h2>
+            <p class="sub" id="frameworkEngineScope" style="margin:0">
+              Pesquisa um ativo para aplicar automaticamente os frameworks.
+            </p>
+          </div>
+          <div style="text-align:right">
+            <div class="framework-engine-score">
+              <strong id="frameworkScore">—</strong>
+              <span class="sub" id="frameworkScoreSuffix">score</span>
+            </div>
+            <span class="pill" id="frameworkClassification">A aguardar</span>
+          </div>
+        </div>
+
+        <div class="framework-summary-grid">
+          <div class="framework-summary-item">
+            <span>Cobertura dos frameworks</span>
+            <strong id="frameworkCoverage">—</strong>
+            <small class="sub" id="frameworkConfidence">Confiança por calcular</small>
+          </div>
+          <div class="framework-summary-item">
+            <span>Estado da avaliação</span>
+            <strong id="frameworkAssessmentStatus">A aguardar pesquisa</strong>
+            <small class="sub" id="frameworkVersion">Motor ainda não carregado</small>
+          </div>
+          <div class="framework-summary-item">
+            <span>Conclusão atual</span>
+            <strong id="frameworkDecision">Ainda sem conclusão</strong>
+            <small class="sub" id="frameworkDecisionReason">Os dados ainda não foram avaliados.</small>
+          </div>
+        </div>
+
+        <div class="framework-engine-columns">
+          <div class="framework-engine-block">
+            <h3>Sinais identificados</h3>
+            <div class="grid g2" style="gap:10px">
+              <div>
+                <div class="metric-label" style="margin-bottom:7px">Positivos</div>
+                <ul class="framework-signal-list" id="frameworkPositiveSignals"></ul>
+              </div>
+              <div>
+                <div class="metric-label" style="margin-bottom:7px">A monitorizar</div>
+                <ul class="framework-signal-list" id="frameworkWarningSignals"></ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="framework-engine-block">
+            <h3>Próximos dados necessários</h3>
+            <ul class="framework-next-list" id="frameworkNextData"></ul>
+          </div>
+        </div>
+
+        <div class="section-head" style="margin:16px 0 8px">
+          <div>
+            <h3 style="margin:0">Checklist dos frameworks</h3>
+            <p class="sub" style="margin:4px 0 0">
+              Mostra o que já foi avaliado e o que ainda bloqueia uma decisão completa.
+            </p>
+          </div>
+        </div>
+        <div class="framework-checklist" id="frameworkChecklist"></div>
+
+        <div class="framework-engine-note" id="frameworkMethodologyNote">
+          O Framework Engine separa factos, cálculos e campos em falta. Um score parcial não equivale a uma recomendação de compra ou venda.
+        </div>
+      </section>
+
       <div class="card" id="realMarketDataCard" style="margin-bottom:16px">
         <div class="section-head" style="margin:0 0 12px">
           <div>
@@ -2541,6 +2767,311 @@
     }
   }
 
+  function frameworkStatusLabel(status){
+    const labels={
+      available:"Disponível",
+      partial:"Parcial",
+      missing:"Em falta",
+      blocked:"Bloqueado",
+      loading:"A carregar",
+      waiting:"A aguardar"
+    };
+
+    return labels[status] || status || "Desconhecido";
+  }
+
+  function frameworkConfidenceLabel(confidence){
+    const labels={
+      high:"Alta",
+      moderate:"Moderada",
+      low:"Baixa"
+    };
+
+    return labels[confidence] || "Por calcular";
+  }
+
+  function frameworkAssessmentLabel(status){
+    const labels={
+      partial_assessment:"Avaliação parcial",
+      insufficient_etf_fundamentals:"Dados estruturais insuficientes",
+      unsupported_asset_type:"Tipo de ativo ainda não suportado"
+    };
+
+    return labels[status] || status || "Estado desconhecido";
+  }
+
+  function clearFrameworkList(selector, emptyMessage){
+    const list=$(selector);
+
+    if(!list) return;
+
+    list.replaceChildren();
+
+    const item=document.createElement("li");
+    item.className="framework-next-item";
+    item.textContent=emptyMessage;
+    list.append(item);
+  }
+
+  function resetFrameworkEngine(state="waiting"){
+    const loading=state==="loading";
+
+    if($("#frameworkScore")){
+      $("#frameworkScore").textContent=loading ? "…" : "—";
+    }
+
+    if($("#frameworkScoreSuffix")){
+      $("#frameworkScoreSuffix").textContent="score";
+    }
+
+    if($("#frameworkClassification")){
+      $("#frameworkClassification").textContent=
+        loading ? "A avaliar" : "A aguardar";
+    }
+
+    if($("#frameworkEngineScope")){
+      $("#frameworkEngineScope").textContent=
+        loading
+          ? "A aplicar os critérios disponíveis dos três frameworks."
+          : "Pesquisa um ativo para aplicar automaticamente os frameworks.";
+    }
+
+    if($("#frameworkCoverage")){
+      $("#frameworkCoverage").textContent="—";
+    }
+
+    if($("#frameworkConfidence")){
+      $("#frameworkConfidence").textContent="Confiança por calcular";
+    }
+
+    if($("#frameworkAssessmentStatus")){
+      $("#frameworkAssessmentStatus").textContent=
+        loading ? "A avaliar dados" : "A aguardar pesquisa";
+    }
+
+    if($("#frameworkVersion")){
+      $("#frameworkVersion").textContent="Motor ainda não carregado";
+    }
+
+    if($("#frameworkDecision")){
+      $("#frameworkDecision").textContent="Ainda sem conclusão";
+    }
+
+    if($("#frameworkDecisionReason")){
+      $("#frameworkDecisionReason").textContent=
+        loading
+          ? "A validar se existem dados suficientes para uma conclusão."
+          : "Os dados ainda não foram avaliados.";
+    }
+
+    clearFrameworkList(
+      "#frameworkPositiveSignals",
+      loading ? "A avaliar sinais positivos…" : "Nenhum sinal carregado."
+    );
+    clearFrameworkList(
+      "#frameworkWarningSignals",
+      loading ? "A avaliar pontos de atenção…" : "Nenhum alerta carregado."
+    );
+    clearFrameworkList(
+      "#frameworkNextData",
+      loading ? "A identificar dados em falta…" : "Nenhum requisito carregado."
+    );
+
+    const checklist=$("#frameworkChecklist");
+    if(checklist) checklist.replaceChildren();
+
+    if($("#frameworkMethodologyNote")){
+      $("#frameworkMethodologyNote").textContent=
+        "O Framework Engine separa factos, cálculos e campos em falta. Um score parcial não equivale a uma recomendação de compra ou venda.";
+    }
+  }
+
+  function renderFrameworkSignals(selector, items, emptyMessage){
+    const list=$(selector);
+
+    if(!list) return;
+
+    list.replaceChildren();
+
+    if(!Array.isArray(items) || items.length===0){
+      const empty=document.createElement("li");
+      empty.className="framework-next-item";
+      empty.textContent=emptyMessage;
+      list.append(empty);
+      return;
+    }
+
+    items.forEach(signal=>{
+      const item=document.createElement("li");
+      item.className="framework-signal-item";
+
+      const title=document.createElement("strong");
+      const value=(signal.value===null || signal.value===undefined)
+        ? ""
+        : ` · ${formatNumber(signal.value)}${signal.unit || ""}`;
+      title.textContent=`${signal.label || "Sinal"}${value}`;
+
+      const detail=document.createElement("small");
+      detail.textContent=signal.interpretation || "Sem interpretação adicional.";
+
+      item.append(title,detail);
+      list.append(item);
+    });
+  }
+
+  function renderFrameworkNextData(items){
+    const list=$("#frameworkNextData");
+
+    if(!list) return;
+
+    list.replaceChildren();
+
+    if(!Array.isArray(items) || items.length===0){
+      const empty=document.createElement("li");
+      empty.className="framework-next-item";
+      empty.textContent="Não foram identificados requisitos adicionais.";
+      list.append(empty);
+      return;
+    }
+
+    items.slice(0,8).forEach(text=>{
+      const item=document.createElement("li");
+      item.className="framework-next-item";
+      item.textContent=text;
+      list.append(item);
+    });
+  }
+
+  function renderFrameworkChecklist(items){
+    const container=$("#frameworkChecklist");
+
+    if(!container) return;
+
+    container.replaceChildren();
+
+    if(!Array.isArray(items) || items.length===0){
+      const empty=document.createElement("div");
+      empty.className="framework-check-row";
+      empty.textContent="Checklist indisponível.";
+      container.append(empty);
+      return;
+    }
+
+    items.forEach(item=>{
+      const row=document.createElement("div");
+      row.className="framework-check-row";
+      row.dataset.status=item.status || "missing";
+
+      const content=document.createElement("div");
+      const title=document.createElement("strong");
+      title.textContent=item.label || item.id || "Critério";
+
+      const detail=document.createElement("small");
+      const available=Array.isArray(item.available_fields)
+        ? item.available_fields.length
+        : 0;
+      const missing=Array.isArray(item.missing_fields)
+        ? item.missing_fields.length
+        : 0;
+      detail.textContent=
+        `${available} campo${available===1 ? "" : "s"} disponível${available===1 ? "" : "is"} · ${missing} em falta`;
+
+      const pill=document.createElement("span");
+      pill.className="framework-status-pill";
+      pill.textContent=frameworkStatusLabel(item.status);
+
+      content.append(title,detail);
+      row.append(content,pill);
+      container.append(row);
+    });
+  }
+
+  function renderFrameworkEngine(engine){
+    if(!engine){
+      resetFrameworkEngine();
+      return;
+    }
+
+    const snapshot=engine.quantitative_snapshot || {};
+    const checklist=engine.framework_checklist || {};
+    const decision=engine.decision || {};
+    const score=Number(snapshot.score);
+    const coverage=Number(checklist.coverage_percentage);
+
+    if($("#frameworkScore")){
+      $("#frameworkScore").textContent=
+        Number.isFinite(score) ? `${formatNumber(score)}` : "—";
+    }
+
+    if($("#frameworkScoreSuffix")){
+      $("#frameworkScoreSuffix").textContent=
+        Number.isFinite(score) ? "/100" : "sem score empresarial";
+    }
+
+    if($("#frameworkClassification")){
+      $("#frameworkClassification").textContent=
+        snapshot.classification?.label || "Sem classificação";
+    }
+
+    if($("#frameworkEngineScope")){
+      $("#frameworkEngineScope").textContent=
+        engine.scope || "Avaliação parcial baseada nos dados ligados.";
+    }
+
+    if($("#frameworkCoverage")){
+      $("#frameworkCoverage").textContent=
+        Number.isFinite(coverage) ? `${formatNumber(coverage)}%` : "—";
+    }
+
+    if($("#frameworkConfidence")){
+      $("#frameworkConfidence").textContent=
+        `Confiança ${frameworkConfidenceLabel(checklist.confidence)}`;
+    }
+
+    if($("#frameworkAssessmentStatus")){
+      $("#frameworkAssessmentStatus").textContent=
+        frameworkAssessmentLabel(engine.status);
+    }
+
+    if($("#frameworkVersion")){
+      $("#frameworkVersion").textContent=
+        `Versão ${engine.version || "—"} · ${engine.asset_type || "ativo"}`;
+    }
+
+    if($("#frameworkDecision")){
+      $("#frameworkDecision").textContent=
+        decision.label || "Conclusão indisponível";
+    }
+
+    if($("#frameworkDecisionReason")){
+      $("#frameworkDecisionReason").textContent=
+        decision.reason || "Sem justificação disponível.";
+    }
+
+    renderFrameworkSignals(
+      "#frameworkPositiveSignals",
+      snapshot.positive_signals,
+      engine.asset_type==="etf"
+        ? "O ThesisOS não aplica sinais empresariais a ETFs."
+        : "Nenhum sinal positivo identificado com os dados atuais."
+    );
+
+    renderFrameworkSignals(
+      "#frameworkWarningSignals",
+      snapshot.warning_signals,
+      "Nenhum ponto de atenção quantitativo identificado."
+    );
+
+    renderFrameworkNextData(engine.next_required_data);
+    renderFrameworkChecklist(checklist.items);
+
+    if($("#frameworkMethodologyNote")){
+      $("#frameworkMethodologyNote").textContent=
+        snapshot.methodology_note ||
+        "Avaliação parcial: os campos em falta impedem uma recomendação final.";
+    }
+  }
+
   function renderUnifiedAnalysis(payload){
     const asset=payload.asset || {};
     const market=payload.market || {};
@@ -2648,6 +3179,7 @@
       `Atualizado ${formatAssetDate(payload.generated_at)}`;
 
     renderAnalysisQuality(payload);
+    renderFrameworkEngine(payload.framework_engine);
 
     showToast(
       `${asset.symbol || payload.query} carregado através da API agregada.`
@@ -2671,6 +3203,7 @@
 
     resetRealAssetView(cleanIdentifier, "loading");
     resetAnalysisQuality("loading");
+    resetFrameworkEngine("loading");
 
     status.textContent="A construir análise agregada…";
     detail.textContent=
@@ -2740,6 +3273,7 @@
 
       resetRealAssetView(cleanIdentifier, "error");
       resetAnalysisQuality();
+      resetFrameworkEngine();
       status.textContent="Não foi possível carregar a análise";
       detail.textContent=error.message;
       updated.textContent="Erro da API";
