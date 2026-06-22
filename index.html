@@ -1099,14 +1099,23 @@
             <strong id="realIpoDate">—</strong>
           </div>
           <div class="impact-item">
+            <span>Valor aproximado em EUR</span>
+            <strong id="realPriceEur">—</strong>
+          </div>
+          <div class="impact-item">
+            <span>Taxa cambial de referência</span>
+            <strong id="realFxRate">—</strong>
+          </div>
+          <div class="impact-item">
             <span>Website oficial</span>
             <a id="realWebsite" class="link-btn" target="_blank" rel="noopener noreferrer">Indisponível</a>
           </div>
         </div>
 
         <div class="source-note">
-          Nesta fase, apenas esta secção e o cabeçalho usam dados reais.
-          A análise fundamental e a decisão continuam demonstrativas.
+          Preços e perfis usam Finnhub, OpenFIGI ou EODHD. A conversão
+          para euros usa a taxa oficial de referência do BCE. Para ações
+          dos EUA, os fundamentais oficiais são apresentados abaixo.
         </div>
       </div>
 
@@ -2087,9 +2096,107 @@
     );
   }
 
+  let assetFxRequestId=0;
+
+  function resetAssetFx(message="Conversão cambial não carregada."){
+    assetFxRequestId+=1;
+
+    const fxNote=$("#assetFx");
+    const eurValue=$("#realPriceEur");
+    const fxRate=$("#realFxRate");
+
+    if(fxNote) fxNote.textContent=message;
+    if(eurValue) eurValue.textContent="—";
+    if(fxRate) fxRate.textContent="—";
+  }
+
+  async function loadAssetFx(amount, currency, marketSource){
+    const numericAmount=Number(amount);
+    const sourceCurrency=String(currency || "").toUpperCase();
+    const requestId=++assetFxRequestId;
+
+    if(!Number.isFinite(numericAmount) || !sourceCurrency){
+      resetAssetFx(
+        `Fonte: ${marketSource || "mercado"}. Moeda ou preço indisponível para conversão.`
+      );
+      return;
+    }
+
+    const fxNote=$("#assetFx");
+    const eurValue=$("#realPriceEur");
+    const fxRate=$("#realFxRate");
+
+    if(fxNote){
+      fxNote.textContent=
+        `Fonte: ${marketSource || "mercado"}. A converter ${sourceCurrency} para EUR através do BCE…`;
+    }
+
+    try{
+      const response=await fetch(
+        `/api/fx/${encodeURIComponent(sourceCurrency)}/EUR?amount=${encodeURIComponent(numericAmount)}`
+      );
+
+      const data=await response.json();
+
+      if(requestId!==assetFxRequestId){
+        return;
+      }
+
+      if(!response.ok){
+        throw new Error(
+          data.detail ||
+          data.error ||
+          "Conversão cambial indisponível."
+        );
+      }
+
+      const converted=Number(data.converted_amount);
+      const reference=Number(data.source_reference_rate);
+
+      if(eurValue){
+        eurValue.textContent=Number.isFinite(converted)
+          ? `EUR ${formatNumber(converted)}`
+          : "—";
+      }
+
+      if(fxRate){
+        fxRate.textContent=
+          sourceCurrency==="EUR"
+            ? "Moeda-base EUR · taxa 1,00"
+            : Number.isFinite(reference)
+              ? `1 EUR = ${formatNumber(reference)} ${sourceCurrency}`
+              : "Taxa indisponível";
+      }
+
+      if(fxNote){
+        fxNote.textContent=
+          sourceCurrency==="EUR"
+            ? `Fonte: ${marketSource || "mercado"}. Valor já denominado em EUR.`
+            : `Fonte: ${marketSource || "mercado"}. ≈ EUR ${formatNumber(converted)} · BCE ${data.rate_date || "data indisponível"} · taxa oficial de referência.`;
+      }
+    }catch(error){
+      if(requestId!==assetFxRequestId){
+        return;
+      }
+
+      if(eurValue) eurValue.textContent="—";
+      if(fxRate) fxRate.textContent="Indisponível";
+
+      if(fxNote){
+        fxNote.textContent=
+          `Fonte: ${marketSource || "mercado"}. ${error.message || "Conversão cambial indisponível."}`;
+      }
+    }
+  }
+
   function resetRealAssetView(symbol, state){
     setAnalysisMode("neutral");
     resetStockFundamentals();
+    resetAssetFx(
+      state==="error"
+        ? "Não foram carregados dados reais."
+        : "A aguardar resposta das APIs."
+    );
 
     const isError=state==="error";
     const isLoading=state==="loading";
@@ -2117,13 +2224,6 @@
     if($("#assetPrice")) $("#assetPrice").textContent="—";
     if($("#assetChange")) $("#assetChange").textContent="—";
 
-    if($("#assetFx")){
-      $("#assetFx").textContent=
-        isError
-          ? "Não foram carregados dados reais."
-          : "A aguardar resposta da API.";
-    }
-
     [
       "#realOpen",
       "#realHigh",
@@ -2132,7 +2232,9 @@
       "#realMarketCap",
       "#realShares",
       "#realCountry",
-      "#realIpoDate"
+      "#realIpoDate",
+      "#realPriceEur",
+      "#realFxRate"
     ].forEach(selector=>{
       const element=$(selector);
       if(element) element.textContent="—";
@@ -2228,8 +2330,11 @@
           ? `${change>=0?"+":""}${formatNumber(change)}% hoje`
           : "Variação indisponível";
 
-      $("#assetFx").textContent=
-        `Fonte: ${data.source}. Conversão cambial ainda não ligada.`;
+      void loadAssetFx(
+        data.price,
+        data.currency,
+        data.source
+      );
 
       const currency=data.currency || "";
 
@@ -2327,7 +2432,9 @@
       "#realMarketCap",
       "#realShares",
       "#realCountry",
-      "#realIpoDate"
+      "#realIpoDate",
+      "#realPriceEur",
+      "#realFxRate"
     ].forEach(selector=>{
       const element=$(selector);
       if(element) element.textContent="—";
@@ -2388,11 +2495,16 @@
           : "Listagem identificada";
     }
 
-    if($("#assetFx")){
-      $("#assetFx").textContent=
-        hasEodhdClose
-          ? "Fonte: EODHD. Último fecho disponível; não é uma cotação intradiária."
-          : "Fonte: OpenFIGI. Esta bolsa ainda não está ligada ao fornecedor de preços.";
+    if(hasEodhdClose){
+      void loadAssetFx(
+        previousClose,
+        currency,
+        "EODHD · último fecho"
+      );
+    }else{
+      resetAssetFx(
+        "Fonte: OpenFIGI. Esta bolsa ainda não está ligada ao fornecedor de preços."
+      );
     }
 
     if($("#assetDataStatus")){

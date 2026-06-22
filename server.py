@@ -1,4 +1,6 @@
+import csv
 import gzip
+import io
 import json
 import os
 import re
@@ -7,7 +9,7 @@ import zlib
 from datetime import date, datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, unquote, urlencode, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 
@@ -17,6 +19,11 @@ PORT = 3000
 FINNHUB_BASE_URL = "https://finnhub.io/api/v1"
 OPENFIGI_MAPPING_URL = "https://api.openfigi.com/v3/mapping"
 EODHD_SEARCH_URL = "https://eodhd.com/api/search"
+ECB_DATA_URL = (
+    "https://data-api.ecb.europa.eu/service/data/"
+    "EXR/D.{currency}.EUR.SP00.A"
+    "?lastNObservations=1&format=csvdata"
+)
 SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 SEC_COMPANY_FACTS_URL = (
     "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
@@ -25,9 +32,11 @@ SEC_COMPANY_FACTS_URL = (
 OPENFIGI_CACHE_TTL_SECONDS = 24 * 60 * 60
 EODHD_CACHE_TTL_SECONDS = 24 * 60 * 60
 SEC_CACHE_TTL_SECONDS = 24 * 60 * 60
+ECB_CACHE_TTL_SECONDS = 12 * 60 * 60
 OPENFIGI_CACHE = {}
 EODHD_CACHE = {}
 SEC_CACHE = {}
+ECB_CACHE = {}
 
 
 def fetch_json(request: Request, timeout: int = 20):
@@ -646,6 +655,152 @@ def get_sec_fundamentals(ticker: str):
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
+
+def decode_http_body(response) -> bytes:
+    raw = response.read()
+    encoding = (
+        response.headers.get("Content-Encoding", "")
+        .strip()
+        .lower()
+    )
+
+    if encoding == "gzip":
+        return gzip.decompress(raw)
+
+    if encoding == "deflate":
+        try:
+            return zlib.decompress(raw)
+        except zlib.error:
+            return zlib.decompress(raw, -zlib.MAX_WBITS)
+
+    return raw
+
+
+def fetch_ecb_reference_rate(currency: str) -> dict:
+    clean_currency = currency.strip().upper()
+
+    if clean_currency == "EUR":
+        return {
+            "currency": "EUR",
+            "eur_reference_rate": 1.0,
+            "date": None,
+        }
+
+    if not re.fullmatch(r"[A-Z]{3}", clean_currency):
+        raise ValueError("Código de moeda inválido.")
+
+    cached = ECB_CACHE.get(clean_currency)
+
+    if cached:
+        age = time.time() - cached["created_at"]
+
+        if age < ECB_CACHE_TTL_SECONDS:
+            return cached["data"]
+
+    url = ECB_DATA_URL.format(currency=clean_currency)
+
+    request = Request(
+        url,
+        headers={
+            "Accept": "text/csv",
+            "Accept-Encoding": "gzip, deflate",
+            "User-Agent": "ThesisOS/0.8",
+        },
+    )
+
+    with urlopen(request, timeout=25) as response:
+        body = decode_http_body(response).decode("utf-8-sig")
+
+    reader = csv.DictReader(io.StringIO(body))
+    selected = None
+
+    for row in reader:
+        row_currency = (
+            row.get("CURRENCY")
+            or row.get("currency")
+        )
+
+        value = (
+            row.get("OBS_VALUE")
+            or row.get("obs_value")
+        )
+
+        period = (
+            row.get("TIME_PERIOD")
+            or row.get("time_period")
+        )
+
+        if not row_currency or not value:
+            continue
+
+        if row_currency.upper() != clean_currency:
+            continue
+
+        selected = {
+            "currency": clean_currency,
+            "eur_reference_rate": float(value),
+            "date": period,
+        }
+
+    if not selected:
+        raise ValueError(
+            f"Não foi encontrada uma taxa ECB para {clean_currency}."
+        )
+
+    ECB_CACHE[clean_currency] = {
+        "created_at": time.time(),
+        "data": selected,
+    }
+
+    return selected
+
+
+def convert_currency(
+    amount: float,
+    from_currency: str,
+    to_currency: str,
+) -> dict:
+    source = from_currency.strip().upper()
+    target = to_currency.strip().upper()
+
+    if not re.fullmatch(r"[A-Z]{3}", source):
+        raise ValueError("Moeda de origem inválida.")
+
+    if not re.fullmatch(r"[A-Z]{3}", target):
+        raise ValueError("Moeda de destino inválida.")
+
+    source_rate = fetch_ecb_reference_rate(source)
+    target_rate = fetch_ecb_reference_rate(target)
+
+    source_reference = source_rate["eur_reference_rate"]
+    target_reference = target_rate["eur_reference_rate"]
+
+    conversion_rate = target_reference / source_reference
+    converted_amount = amount * conversion_rate
+
+    rate_date = (
+        source_rate.get("date")
+        or target_rate.get("date")
+    )
+
+    return {
+        "from_currency": source,
+        "to_currency": target,
+        "amount": amount,
+        "conversion_rate": conversion_rate,
+        "converted_amount": converted_amount,
+        "rate_date": rate_date,
+        "source_reference_rate": source_reference,
+        "target_reference_rate": target_reference,
+        "source": "ECB Data Portal",
+        "rate_type": "official_reference_rate",
+        "note": (
+            "Taxa de referência oficial. "
+            "Não representa necessariamente o câmbio executável "
+            "por uma corretora ou banco."
+        ),
+    }
+
 def classify_figi_asset(item: dict) -> str:
     security_type = str(item.get("securityType") or "").lower()
     security_type_2 = str(item.get("securityType2") or "").lower()
@@ -938,9 +1093,14 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
                         "OpenFIGI",
                         "EODHD",
                         "SEC EDGAR",
+                        "ECB Data Portal",
                     ],
                 }
             )
+            return
+
+        if parsed_url.path.startswith("/api/fx/"):
+            self.handle_fx_request(parsed_url)
             return
 
         if parsed_url.path.startswith("/api/search/"):
@@ -956,6 +1116,97 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             return
 
         super().do_GET()
+
+    def handle_fx_request(self, parsed_url) -> None:
+        route = parsed_url.path.removeprefix("/api/fx/")
+        parts = [
+            unquote(part).strip().upper()
+            for part in route.split("/")
+            if part.strip()
+        ]
+
+        if len(parts) != 2:
+            self.send_json(
+                {
+                    "error": (
+                        "Usa o formato "
+                        "/api/fx/MOEDA_ORIGEM/MOEDA_DESTINO."
+                    )
+                },
+                status=400,
+            )
+            return
+
+        from_currency, to_currency = parts
+        query = parse_qs(parsed_url.query)
+
+        raw_amount = query.get("amount", ["1"])[0]
+
+        try:
+            amount = float(raw_amount)
+
+        except (TypeError, ValueError):
+            self.send_json(
+                {"error": "O montante é inválido."},
+                status=400,
+            )
+            return
+
+        if amount < 0 or amount > 1_000_000_000_000:
+            self.send_json(
+                {"error": "O montante está fora do intervalo permitido."},
+                status=400,
+            )
+            return
+
+        try:
+            result = convert_currency(
+                amount,
+                from_currency,
+                to_currency,
+            )
+
+            self.send_json(result)
+
+        except HTTPError as error:
+            detail = error.read().decode(
+                "utf-8",
+                errors="replace",
+            )
+
+            self.send_json(
+                {
+                    "error": "O BCE recusou o pedido.",
+                    "status": error.code,
+                    "detail": detail[:500],
+                },
+                status=502,
+            )
+
+        except URLError:
+            self.send_json(
+                {
+                    "error": "Não foi possível contactar o BCE.",
+                },
+                status=502,
+            )
+
+        except ValueError as error:
+            self.send_json(
+                {
+                    "error": str(error),
+                },
+                status=404,
+            )
+
+        except Exception as error:
+            self.send_json(
+                {
+                    "error": "Erro ao converter a moeda.",
+                    "detail": str(error),
+                },
+                status=500,
+            )
 
     def handle_search_request(self, path: str) -> None:
         query = unquote(
