@@ -575,7 +575,7 @@
     #etfAnalysisPanel{display:none}
     #analysis.stock-mode #stockFundamentalsPanel{display:block}
     #analysis.stock-mode #etfAnalysisPanel{display:none!important}
-    #analysis.stock-mode #realMarketDataCard ~ *:not(#stockFundamentalsPanel){display:none!important}
+    #analysis.stock-mode #realMarketDataCard ~ *:not(#stockFundamentalsPanel):not(#stockCashFlowPanel){display:none!important}
     #analysis.etf-mode #stockFundamentalsPanel{display:none!important}
     #analysis.etf-mode #etfAnalysisPanel{display:block}
     #analysis.etf-mode #realMarketDataCard ~ *:not(#etfAnalysisPanel){display:none!important}
@@ -938,6 +938,77 @@
       }
       .framework-check-row{grid-template-columns:1fr}
       .framework-status-pill{justify-self:start}
+    }
+
+  
+    /* ThesisOS cash flow, debt and capital allocation */
+    #stockCashFlowPanel{display:none;margin-bottom:16px}
+    #analysis.stock-mode #stockCashFlowPanel{display:block}
+    #analysis.etf-mode #stockCashFlowPanel,
+    #analysis.analysis-neutral #stockCashFlowPanel{
+      display:none!important
+    }
+    .cashflow-summary-grid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:12px;
+    }
+    .cashflow-detail-grid{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:10px;
+      margin-top:12px;
+    }
+    .cashflow-detail-item{
+      min-height:106px;
+      padding:13px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:var(--panel-2);
+    }
+    .cashflow-detail-item span{
+      display:block;
+      margin-bottom:7px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .cashflow-detail-item strong{
+      display:block;
+      line-height:1.3;
+    }
+    .cashflow-detail-item small{
+      display:block;
+      margin-top:6px;
+      color:var(--muted);
+      line-height:1.35;
+    }
+    .cashflow-footer{
+      display:flex;
+      justify-content:space-between;
+      gap:14px;
+      align-items:flex-start;
+      margin-top:13px;
+      padding:13px 14px;
+      border:1px dashed var(--border);
+      border-radius:14px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.5;
+    }
+    @media (max-width:1050px){
+      .cashflow-summary-grid{
+        grid-template-columns:repeat(2,minmax(0,1fr))
+      }
+      .cashflow-detail-grid{
+        grid-template-columns:repeat(2,minmax(0,1fr))
+      }
+    }
+    @media (max-width:620px){
+      .cashflow-summary-grid,
+      .cashflow-detail-grid{
+        grid-template-columns:1fr
+      }
+      .cashflow-footer{flex-direction:column}
     }
 
   </style>
@@ -1433,45 +1504,45 @@
         <div class="section-head" style="margin:0 0 12px">
           <div>
             <h2>Dados de mercado reais</h2>
-            <p class="sub">Cotação e perfil devolvidos pela API. Não são estimativas do ThesisOS.</p>
+            <p class="sub" id="realMarketDataDescription">Cotação e perfil devolvidos pela API. Não são estimativas do ThesisOS.</p>
           </div>
           <span class="freshness" id="realDataBadge">A aguardar pesquisa</span>
         </div>
 
         <div class="grid g4">
           <div class="card">
-            <div class="metric-label">Abertura</div>
+            <div class="metric-label" id="realOpenLabel">Abertura</div>
             <div class="metric" id="realOpen">—</div>
           </div>
           <div class="card">
-            <div class="metric-label">Máximo do dia</div>
+            <div class="metric-label" id="realHighLabel">Máximo do dia</div>
             <div class="metric" id="realHigh">—</div>
           </div>
           <div class="card">
-            <div class="metric-label">Mínimo do dia</div>
+            <div class="metric-label" id="realLowLabel">Mínimo do dia</div>
             <div class="metric" id="realLow">—</div>
           </div>
           <div class="card">
-            <div class="metric-label">Fecho anterior</div>
+            <div class="metric-label" id="realPreviousCloseLabel">Fecho anterior</div>
             <div class="metric" id="realPreviousClose">—</div>
           </div>
         </div>
 
         <div class="impact-list" style="margin-top:12px">
           <div class="impact-item">
-            <span>Capitalização bolsista</span>
+            <span id="realMarketCapLabel">Capitalização bolsista</span>
             <strong id="realMarketCap">—</strong>
           </div>
           <div class="impact-item">
-            <span>Ações em circulação</span>
+            <span id="realSharesLabel">Ações em circulação</span>
             <strong id="realShares">—</strong>
           </div>
           <div class="impact-item">
-            <span>País</span>
+            <span id="realCountryLabel">País</span>
             <strong id="realCountry">—</strong>
           </div>
           <div class="impact-item">
-            <span>Data de entrada em bolsa</span>
+            <span id="realIpoDateLabel">Data de entrada em bolsa</span>
             <strong id="realIpoDate">—</strong>
           </div>
           <div class="impact-item">
@@ -1590,6 +1661,102 @@
             target="_blank"
             rel="noopener noreferrer"
           >Abrir empresa na SEC</a>
+        </div>
+      </section>
+
+      <section class="card" id="stockCashFlowPanel">
+        <div class="section-head" style="margin:0 0 10px">
+          <div>
+            <h2>Cash flow, dívida e alocação de capital</h2>
+            <p class="sub" id="stockCashFlowPeriod">
+              Dados acumulados do período mais recente disponível.
+            </p>
+          </div>
+          <span class="pill" id="stockCashFlowBadge">A aguardar</span>
+        </div>
+
+        <div class="cashflow-summary-grid">
+          <div class="card">
+            <div class="metric-label">Free cash flow</div>
+            <div class="metric" id="stockFreeCashFlow">—</div>
+            <div class="sub" id="stockFcfMargin">Margem FCF indisponível</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Conversão do lucro em caixa</div>
+            <div class="metric" id="stockCashConversion">—</div>
+            <div class="sub">Fluxo operacional / lucro líquido</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Dívida líquida</div>
+            <div class="metric" id="stockNetDebt">—</div>
+            <div class="sub" id="stockNetDebtToFcf">Dívida / FCF indisponível</div>
+          </div>
+          <div class="card">
+            <div class="metric-label">Retorno aos acionistas</div>
+            <div class="metric" id="stockCapitalReturns">—</div>
+            <div class="sub" id="stockCapitalReturnsToFcf">
+              Dividendos e recompras / FCF
+            </div>
+          </div>
+        </div>
+
+        <div class="cashflow-detail-grid">
+          <div class="cashflow-detail-item">
+            <span>Fluxo de caixa operacional</span>
+            <strong id="stockOperatingCashFlow">—</strong>
+            <small>Valor acumulado no período.</small>
+          </div>
+          <div class="cashflow-detail-item">
+            <span>Capital expenditure</span>
+            <strong id="stockCapex">—</strong>
+            <small id="stockCapexToOcf">Capex / fluxo operacional indisponível</small>
+          </div>
+          <div class="cashflow-detail-item">
+            <span>FCF do último ano fiscal</span>
+            <strong id="stockAnnualFreeCashFlow">—</strong>
+            <small>Referência usada na cobertura da dívida.</small>
+          </div>
+          <div class="cashflow-detail-item">
+            <span>Dívida total reportada</span>
+            <strong id="stockTotalDebt">—</strong>
+            <small>Soma dos componentes sem sobreposição conhecida.</small>
+          </div>
+          <div class="cashflow-detail-item">
+            <span>Stock-based compensation</span>
+            <strong id="stockSbc">—</strong>
+            <small id="stockSbcToRevenue">SBC / receitas indisponível</small>
+          </div>
+          <div class="cashflow-detail-item">
+            <span>Recompras de ações</span>
+            <strong id="stockBuybacks">—</strong>
+            <small>A atratividade depende também do valuation.</small>
+          </div>
+          <div class="cashflow-detail-item">
+            <span>Dividendos pagos</span>
+            <strong id="stockDividends">—</strong>
+            <small>Pagamentos reportados no mesmo período.</small>
+          </div>
+          <div class="cashflow-detail-item">
+            <span>Caixa disponível</span>
+            <strong id="stockCashFlowCash">—</strong>
+            <small>Caixa e equivalentes do último balanço.</small>
+          </div>
+          <div class="cashflow-detail-item">
+            <span>Qualidade da cobertura</span>
+            <strong id="stockCapitalReturnsCompleteness">—</strong>
+            <small>Verifica se dividendos e recompras foram encontrados.</small>
+          </div>
+        </div>
+
+        <div class="cashflow-footer">
+          <div>
+            <strong id="stockCashFlowStatus">Dados ainda não carregados.</strong>
+            <div id="stockCashFlowSource">Fonte pendente.</div>
+          </div>
+          <div id="stockCashFlowMethod">
+            FCF = fluxo operacional − capex. A análise de dívida ainda não
+            inclui maturidades, juros, covenants, leases ou pensões.
+          </div>
         </div>
       </section>
 
@@ -2086,9 +2253,11 @@
   }
 
   function formatMarketCap(value, currency){
+    if(value===null || value===undefined || value==="") return "—";
+
     const millions=Number(value);
 
-    if(!Number.isFinite(millions)) return "—";
+    if(!Number.isFinite(millions) || millions<=0) return "—";
 
     if(millions>=1000000){
       return `${currency || ""} ${formatNumber(millions/1000000)} T`.trim();
@@ -2099,6 +2268,99 @@
     }
 
     return `${currency || ""} ${formatNumber(millions)} M`.trim();
+  }
+
+  function missingMarketValue(assetType, provider, field){
+    const isEtf=assetType==="etf";
+    const isEndOfDay=provider==="EODHD";
+
+    if(
+      isEtf &&
+      isEndOfDay &&
+      ["open","high","low"].includes(field)
+    ){
+      return "Não disponível no fecho EOD";
+    }
+
+    if(
+      isEtf &&
+      ["market_cap","shares","country","ipo","website"].includes(field)
+    ){
+      return "Ainda não ligado";
+    }
+
+    return "—";
+  }
+
+  function applyMarketDataPresentation(asset){
+    const isEtf=asset?.asset_type==="etf";
+    const provider=
+      asset?.quote_provider ||
+      asset?.market_provider ||
+      (
+        String(asset?.source || "").includes("EODHD")
+          ? "EODHD"
+          : ""
+      );
+    const isEndOfDay=provider==="EODHD";
+
+    const text=(selector,value)=>{
+      const element=$(selector);
+      if(element) element.textContent=value;
+    };
+
+    text("#realOpenLabel","Abertura");
+    text("#realHighLabel","Máximo do dia");
+    text("#realLowLabel","Mínimo do dia");
+    text(
+      "#realPreviousCloseLabel",
+      isEtf && isEndOfDay
+        ? "Último fecho disponível"
+        : "Fecho anterior"
+    );
+
+    text(
+      "#realMarketCapLabel",
+      isEtf
+        ? "AUM / dimensão do fundo"
+        : "Capitalização bolsista"
+    );
+    text(
+      "#realSharesLabel",
+      isEtf
+        ? "Unidades em circulação"
+        : "Ações em circulação"
+    );
+    text(
+      "#realCountryLabel",
+      isEtf
+        ? "Domicílio / país"
+        : "País"
+    );
+    text(
+      "#realIpoDateLabel",
+      isEtf
+        ? "Data de lançamento"
+        : "Data de entrada em bolsa"
+    );
+
+    text(
+      "#realMarketDataDescription",
+      isEtf && isEndOfDay
+        ? (
+            "A EODHD fornece nesta integração o último fecho diário. " +
+            "Abertura, máximo e mínimo intradiários ainda não estão ligados."
+          )
+        : isEtf
+          ? (
+              "Cotação do ETF devolvida pela API. " +
+              "Os dados estruturais do fundo são apresentados separadamente."
+            )
+          : (
+              "Cotação e perfil devolvidos pela API. " +
+              "Não são estimativas do ThesisOS."
+            )
+    );
   }
 
   let stockFundamentalsRequestId=0;
@@ -2243,9 +2505,10 @@
     if(source) source.textContent="Fonte pendente.";
   }
 
-  function resetStockFundamentals(){
+  function resetStockFundamentals(state="idle"){
     stockFundamentalsRequestId+=1;
-    setStockFundamentalsState("idle");
+    setStockFundamentalsState(state);
+    resetStockCashFlow(state);
   }
 
   async function loadStockFundamentals(symbol){
@@ -2470,6 +2733,7 @@
       asset?.asset_type==="etf" ? "etf" : "stock",
       asset || {}
     );
+    applyMarketDataPresentation(asset || {});
   }
 
   let unifiedAnalysisRequestId=0;
@@ -2672,9 +2936,218 @@
     }
   }
 
+  function formatUsdDerived(value){
+    const number=Number(value);
+
+    if(!Number.isFinite(number)) return "—";
+
+    return formatFinancialFact({
+      value:number,
+      unit:"USD"
+    });
+  }
+
+  function formatAbsolutePercent(value){
+    const number=Number(value);
+
+    if(!Number.isFinite(number)) return "—";
+
+    return `${formatNumber(number)}%`;
+  }
+
+  function resetStockCashFlow(state="idle"){
+    [
+      "#stockFreeCashFlow",
+      "#stockCashConversion",
+      "#stockNetDebt",
+      "#stockCapitalReturns",
+      "#stockOperatingCashFlow",
+      "#stockCapex",
+      "#stockAnnualFreeCashFlow",
+      "#stockTotalDebt",
+      "#stockSbc",
+      "#stockBuybacks",
+      "#stockDividends",
+      "#stockCashFlowCash"
+    ].forEach(selector=>{
+      const element=$(selector);
+      if(element) element.textContent="—";
+    });
+
+    if($("#stockFcfMargin")){
+      $("#stockFcfMargin").textContent="Margem FCF indisponível";
+    }
+
+    if($("#stockNetDebtToFcf")){
+      $("#stockNetDebtToFcf").textContent="Dívida / FCF indisponível";
+    }
+
+    if($("#stockCapitalReturnsToFcf")){
+      $("#stockCapitalReturnsToFcf").textContent=
+        "Dividendos e recompras / FCF indisponível";
+    }
+
+    if($("#stockCapexToOcf")){
+      $("#stockCapexToOcf").textContent=
+        "Capex / fluxo operacional indisponível";
+    }
+
+    if($("#stockSbcToRevenue")){
+      $("#stockSbcToRevenue").textContent=
+        "SBC / receitas indisponível";
+    }
+
+    if($("#stockCapitalReturnsCompleteness")){
+      $("#stockCapitalReturnsCompleteness").textContent="—";
+    }
+
+    if($("#stockCashFlowPeriod")){
+      $("#stockCashFlowPeriod").textContent=
+        state==="loading"
+          ? "A consultar o período mais recente na SEC."
+          : "Dados acumulados do período mais recente disponível.";
+    }
+
+    if($("#stockCashFlowBadge")){
+      $("#stockCashFlowBadge").textContent=
+        state==="loading"
+          ? "A carregar"
+          : state==="error"
+            ? "Indisponível"
+            : "A aguardar";
+    }
+
+    if($("#stockCashFlowStatus")){
+      $("#stockCashFlowStatus").textContent=
+        state==="loading"
+          ? "A calcular cash flow, dívida e alocação de capital."
+          : state==="error"
+            ? "Não foi possível carregar estes indicadores."
+            : "Dados ainda não carregados.";
+    }
+
+    if($("#stockCashFlowSource")){
+      $("#stockCashFlowSource").textContent=
+        state==="loading"
+          ? "Fonte: SEC EDGAR + cálculos ThesisOS."
+          : "Fonte pendente.";
+    }
+  }
+
+  function renderStockCashFlow(data){
+    const derived=data?.derived_metrics || {};
+    const flows=data?.cash_flow_and_allocation || {};
+    const instant=data?.instant_metrics || {};
+    const period=flows.operating_cash_flow || {};
+    const componentsComplete=Boolean(
+      derived.capital_returns_components_complete
+    );
+
+    $("#stockFreeCashFlow").textContent=
+      formatUsdDerived(derived.free_cash_flow);
+
+    $("#stockFcfMargin").textContent=
+      `Margem FCF ${formatAbsolutePercent(
+        derived.free_cash_flow_margin_percentage
+      )}`;
+
+    $("#stockCashConversion").textContent=
+      formatAbsolutePercent(
+        derived.operating_cash_flow_to_net_income_percentage
+      );
+
+    $("#stockNetDebt").textContent=
+      formatUsdDerived(derived.net_debt);
+
+    const debtToFcf=Number(
+      derived.net_debt_to_annual_free_cash_flow
+    );
+
+    $("#stockNetDebtToFcf").textContent=
+      Number.isFinite(debtToFcf)
+        ? `${formatNumber(debtToFcf)}x o FCF anual`
+        : "Dívida / FCF indisponível";
+
+    $("#stockCapitalReturns").textContent=
+      formatUsdDerived(derived.capital_returns);
+
+    const returnsToFcf=Number(
+      derived.capital_returns_to_free_cash_flow_percentage
+    );
+
+    $("#stockCapitalReturnsToFcf").textContent=
+      Number.isFinite(returnsToFcf)
+        ? `${formatNumber(returnsToFcf)}% do FCF`
+        : "Dividendos e recompras / FCF indisponível";
+
+    $("#stockOperatingCashFlow").textContent=
+      formatFinancialFact(flows.operating_cash_flow);
+
+    $("#stockCapex").textContent=
+      formatFinancialFact(flows.capital_expenditure);
+
+    $("#stockAnnualFreeCashFlow").textContent=
+      formatUsdDerived(derived.annual_free_cash_flow);
+
+    $("#stockTotalDebt").textContent=
+      formatUsdDerived(derived.total_reported_debt);
+
+    $("#stockSbc").textContent=
+      formatFinancialFact(flows.stock_based_compensation);
+
+    $("#stockBuybacks").textContent=
+      formatFinancialFact(flows.share_repurchases);
+
+    $("#stockDividends").textContent=
+      formatFinancialFact(flows.dividends_paid);
+
+    $("#stockCashFlowCash").textContent=
+      formatFinancialFact(instant.cash);
+
+    $("#stockCapexToOcf").textContent=
+      `Capex / fluxo operacional ${formatAbsolutePercent(
+        derived.capital_expenditure_to_operating_cash_flow_percentage
+      )}`;
+
+    $("#stockSbcToRevenue").textContent=
+      `SBC / receitas ${formatAbsolutePercent(
+        derived.stock_based_compensation_to_revenue_percentage
+      )}`;
+
+    $("#stockCapitalReturnsCompleteness").textContent=
+      componentsComplete
+        ? "Completa"
+        : "Parcial";
+
+    if($("#stockCashFlowPeriod")){
+      $("#stockCashFlowPeriod").textContent=
+        period.start && period.end
+          ? `Período acumulado: ${period.start} a ${period.end}`
+          : "Período acumulado indisponível.";
+    }
+
+    if($("#stockCashFlowBadge")){
+      $("#stockCashFlowBadge").textContent="SEC + cálculo";
+    }
+
+    if($("#stockCashFlowStatus")){
+      $("#stockCashFlowStatus").textContent=
+        componentsComplete
+          ? "Cash flow, dívida, dividendos e recompras validados."
+          : "Alguns componentes de alocação de capital estão em falta.";
+    }
+
+    if($("#stockCashFlowSource")){
+      $("#stockCashFlowSource").textContent=
+        `Fonte: ${data.source || "SEC EDGAR Company Facts"}. ` +
+        "Valores reportados e métricas derivadas pelo ThesisOS.";
+    }
+  }
+
   function renderUnifiedFundamentals(data){
     if(!data){
       resetStockFundamentals("error");
+      resetStockCashFlow("error");
       return;
     }
 
@@ -2765,6 +3238,8 @@
       link.style.pointerEvents="";
       link.style.opacity="";
     }
+
+    renderStockCashFlow(data);
   }
 
   function frameworkStatusLabel(status){
@@ -3080,7 +3555,8 @@
 
     applyAssetAnalysisMode({
       ...asset,
-      quote_provider:market.provider
+      quote_provider:market.provider,
+      quote_type:market.quote_type
     });
 
     if(asset.asset_type==="stock"){
@@ -3135,29 +3611,77 @@
     $("#realOpen").textContent=
       market.open!==null && market.open!==undefined
         ? `${currency} ${formatNumber(market.open)}`.trim()
-        : "—";
+        : missingMarketValue(
+            asset.asset_type,
+            market.provider,
+            "open"
+          );
     $("#realHigh").textContent=
       market.high!==null && market.high!==undefined
         ? `${currency} ${formatNumber(market.high)}`.trim()
-        : "—";
+        : missingMarketValue(
+            asset.asset_type,
+            market.provider,
+            "high"
+          );
     $("#realLow").textContent=
       market.low!==null && market.low!==undefined
         ? `${currency} ${formatNumber(market.low)}`.trim()
-        : "—";
+        : missingMarketValue(
+            asset.asset_type,
+            market.provider,
+            "low"
+          );
     $("#realPreviousClose").textContent=
       market.previous_close!==null && market.previous_close!==undefined
         ? `${currency} ${formatNumber(market.previous_close)}`.trim()
         : "—";
 
+    const marketCap=formatMarketCap(
+      asset.market_cap_millions,
+      currency
+    );
+
     $("#realMarketCap").textContent=
-      formatMarketCap(asset.market_cap_millions, currency);
+      asset.asset_type==="etf"
+        ? missingMarketValue(
+            asset.asset_type,
+            market.provider,
+            "market_cap"
+          )
+        : marketCap;
+
     $("#realShares").textContent=
-      asset.shares_outstanding_millions!==null &&
-      asset.shares_outstanding_millions!==undefined
-        ? `${formatNumber(asset.shares_outstanding_millions)} M`
-        : "—";
-    $("#realCountry").textContent=asset.country || "—";
-    $("#realIpoDate").textContent=asset.ipo_date || "—";
+      asset.asset_type==="etf"
+        ? missingMarketValue(
+            asset.asset_type,
+            market.provider,
+            "shares"
+          )
+        : (
+            asset.shares_outstanding_millions!==null &&
+            asset.shares_outstanding_millions!==undefined &&
+            Number(asset.shares_outstanding_millions)>0
+              ? `${formatNumber(asset.shares_outstanding_millions)} M`
+              : "—"
+          );
+
+    $("#realCountry").textContent=
+      asset.country ||
+      missingMarketValue(
+        asset.asset_type,
+        market.provider,
+        "country"
+      );
+
+    $("#realIpoDate").textContent=
+      asset.asset_type==="etf"
+        ? missingMarketValue(
+            asset.asset_type,
+            market.provider,
+            "ipo"
+          )
+        : (asset.ipo_date || "—");
     $("#realDataBadge").textContent=
       `Fonte: ${market.provider || asset.source || "APIs"}`;
 
@@ -3168,7 +3692,12 @@
       website.textContent="Abrir site oficial";
     }else{
       website.removeAttribute("href");
-      website.textContent="Indisponível";
+      website.textContent=
+        missingMarketValue(
+          asset.asset_type,
+          market.provider,
+          "website"
+        );
     }
 
     $("#assetDataStatus").textContent=
@@ -3246,7 +3775,7 @@
 
         status.textContent="Escolhe uma listagem";
         detail.textContent=
-          "O ISIN tem várias listagens. Seleciona a bolsa e a moeda pretendidas.";
+          "A pesquisa tem várias listagens. Seleciona a bolsa e a moeda pretendidas.";
         updated.textContent="Seleção necessária";
 
         openAssetSearchResults({
@@ -3475,7 +4004,10 @@
         );
       }
 
-      applyAssetAnalysisMode(data);
+      applyAssetAnalysisMode({
+        ...data,
+        quote_provider:data.source
+      });
 
       if(data.asset_type==="stock"){
         void loadStockFundamentals(data.symbol);
@@ -3545,17 +4077,51 @@
           ? `${currency} ${formatNumber(data.previous_close)}`.trim()
           : "—";
 
+      const legacyMarketCap=formatMarketCap(
+        data.market_cap_millions,
+        currency
+      );
+
       $("#realMarketCap").textContent=
-        formatMarketCap(data.market_cap_millions, currency);
+        data.asset_type==="etf"
+          ? missingMarketValue(
+              data.asset_type,
+              data.source,
+              "market_cap"
+            )
+          : legacyMarketCap;
 
       $("#realShares").textContent=
-        data.shares_outstanding_millions!==null &&
-        data.shares_outstanding_millions!==undefined
-          ? `${formatNumber(data.shares_outstanding_millions)} M`
-          : "—";
+        data.asset_type==="etf"
+          ? missingMarketValue(
+              data.asset_type,
+              data.source,
+              "shares"
+            )
+          : (
+              data.shares_outstanding_millions!==null &&
+              data.shares_outstanding_millions!==undefined &&
+              Number(data.shares_outstanding_millions)>0
+                ? `${formatNumber(data.shares_outstanding_millions)} M`
+                : "—"
+            );
 
-      $("#realCountry").textContent=data.country || "—";
-      $("#realIpoDate").textContent=data.ipo_date || "—";
+      $("#realCountry").textContent=
+        data.country ||
+        missingMarketValue(
+          data.asset_type,
+          data.source,
+          "country"
+        );
+
+      $("#realIpoDate").textContent=
+        data.asset_type==="etf"
+          ? missingMarketValue(
+              data.asset_type,
+              data.source,
+              "ipo"
+            )
+          : (data.ipo_date || "—");
       $("#realDataBadge").textContent=`Fonte: ${data.source}`;
 
       const website=$("#realWebsite");

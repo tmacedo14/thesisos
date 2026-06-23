@@ -1411,6 +1411,37 @@ def search_assets(query: str) -> dict:
         "openfigi_total_results": figi_result["total_results"],
     }
 
+def search_eodhd_ticker_listings(query: str) -> dict:
+    clean_query = query.strip().upper()
+    eodhd_matches = fetch_eodhd_search(clean_query)
+
+    exact_matches = [
+        item
+        for item in eodhd_matches
+        if str(item.get("Code") or "").upper() == clean_query
+    ]
+
+    exact_matches.sort(
+        key=rank_eodhd_match,
+        reverse=True,
+    )
+
+    normalized = [
+        normalize_eodhd_match(item)
+        for item in exact_matches[:20]
+    ]
+
+    return {
+        "query": clean_query,
+        "query_type": "ticker",
+        "total_results": len(exact_matches),
+        "returned_results": len(normalized),
+        "requires_selection": len(normalized) > 1,
+        "results": normalized,
+        "source": "EODHD",
+    }
+
+
 def identify_us_symbol(symbol: str) -> dict | None:
     matches = fetch_openfigi_mapping(
         {
@@ -1637,7 +1668,19 @@ def build_eodhd_asset_snapshot(
     exchange: str | None,
     ticker: str | None,
 ) -> tuple[dict | None, dict]:
-    search_result = search_assets(identifier)
+    clean_identifier = identifier.strip().upper()
+    is_isin = bool(
+        re.fullmatch(
+            r"[A-Z]{2}[A-Z0-9]{9}[0-9]",
+            clean_identifier,
+        )
+    )
+
+    search_result = (
+        search_assets(clean_identifier)
+        if is_isin
+        else search_eodhd_ticker_listings(clean_identifier)
+    )
 
     selected = select_analysis_listing(
         search_result,
@@ -3037,28 +3080,72 @@ def build_analysis_payload(
         asset = build_us_asset_snapshot(clean_identifier)
 
         if not asset:
-            return {
-                "error": "Ativo não encontrado.",
-                "query": clean_identifier,
-            }, 404
+            asset, search_result = build_eodhd_asset_snapshot(
+                clean_identifier,
+                exchange,
+                ticker,
+            )
 
-        sources["identification"] = analysis_source(
-            asset["identification_provider"],
-            "ok",
-            figi=asset.get("figi"),
-            exchange=asset.get("exchange"),
-        )
+            if not asset:
+                selection_options = search_result.get(
+                    "results",
+                    [],
+                )
 
-        sources["market"] = analysis_source(
-            "Finnhub",
-            (
-                "ok"
-                if asset.get("price") is not None
-                else "unavailable"
-            ),
-            quote_type=asset.get("quote_type"),
-            quote_date=asset.get("quote_date"),
-        )
+                if selection_options:
+                    return {
+                        "error": (
+                            "A pesquisa devolveu várias listagens. "
+                            "Escolhe uma bolsa ou um ticker."
+                        ),
+                        "query": clean_identifier,
+                        "requires_selection": True,
+                        "selection_options": selection_options,
+                        "source": search_result.get("source"),
+                    }, 409
+
+                return {
+                    "error": "Ativo não encontrado.",
+                    "query": clean_identifier,
+                }, 404
+
+        if asset.get("market_provider") == "EODHD":
+            sources["identification"] = analysis_source(
+                asset["identification_provider"],
+                "ok",
+                isin=asset.get("isin"),
+                exchange=asset.get("exchange"),
+            )
+
+            sources["market"] = analysis_source(
+                "EODHD",
+                (
+                    "ok"
+                    if asset.get("price") is not None
+                    else "unavailable"
+                ),
+                quote_type=asset.get("quote_type"),
+                quote_date=asset.get("quote_date"),
+            )
+
+        else:
+            sources["identification"] = analysis_source(
+                asset["identification_provider"],
+                "ok",
+                figi=asset.get("figi"),
+                exchange=asset.get("exchange"),
+            )
+
+            sources["market"] = analysis_source(
+                "Finnhub",
+                (
+                    "ok"
+                    if asset.get("price") is not None
+                    else "unavailable"
+                ),
+                quote_type=asset.get("quote_type"),
+                quote_date=asset.get("quote_date"),
+            )
 
     fundamentals = None
 
