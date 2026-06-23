@@ -217,6 +217,50 @@ SEC_INSTANT_METRICS = {
 }
 
 
+SEC_CASHFLOW_METRICS = {
+    "operating_cash_flow": [
+        "NetCashProvidedByUsedInOperatingActivities",
+    ],
+    "capital_expenditure": [
+        "PaymentsToAcquirePropertyPlantAndEquipment",
+        "PaymentsForAdditionsToPropertyPlantAndEquipment",
+        "PaymentsToAcquireProductiveAssets",
+    ],
+    "share_repurchases": [
+        "PaymentsForRepurchaseOfCommonStock",
+        "PaymentsForRepurchaseOfCommonAndPreferredStock",
+    ],
+    "dividends_paid": [
+        "PaymentsOfDividendsCommonStock",
+        "PaymentsOfDividends",
+        "PaymentsOfOrdinaryDividends",
+    ],
+    "stock_based_compensation": [
+        "ShareBasedCompensation",
+        (
+            "ShareBasedCompensationArrangementByShareBasedPayment"
+            "AwardEquityInstrumentsOtherThanOptionsGrantsInPeriodTotal"
+        ),
+    ],
+}
+
+SEC_DEBT_METRICS = {
+    "short_term_borrowings": [
+        "ShortTermBorrowings",
+        "CommercialPaper",
+        "ShortTermDebtCurrent",
+    ],
+    "current_long_term_debt": [
+        "LongTermDebtCurrent",
+        "LongTermDebtAndFinanceLeaseObligationsCurrent",
+    ],
+    "noncurrent_long_term_debt": [
+        "LongTermDebtNoncurrent",
+        "LongTermDebtAndFinanceLeaseObligationsNoncurrent",
+    ],
+}
+
+
 def fetch_sec_json(url: str):
     user_agent = os.getenv("SEC_USER_AGENT")
 
@@ -328,7 +372,7 @@ def sec_concept_entries(company_facts, concepts):
 
     collected = []
 
-    for concept in concepts:
+    for concept_priority, concept in enumerate(concepts):
         fact = us_gaap.get(concept)
 
         if not fact:
@@ -347,6 +391,7 @@ def sec_concept_entries(company_facts, concepts):
 
                 entry = dict(original)
                 entry["_unit"] = unit_name
+                entry["_concept_priority"] = concept_priority
 
                 collected.append(
                     {
@@ -355,9 +400,6 @@ def sec_concept_entries(company_facts, concepts):
                         "entry": entry,
                     }
                 )
-
-        if collected:
-            break
 
     return collected
 
@@ -405,6 +447,7 @@ def select_sec_latest_instant(company_facts, concepts):
         key=lambda item: (
             item["entry"].get("end", ""),
             item["entry"].get("filed", ""),
+            -item["entry"].get("_concept_priority", 999),
         ),
         reverse=True,
     )
@@ -434,6 +477,9 @@ def select_sec_latest_duration(company_facts, concepts, mode):
         elif mode == "ytd" and 121 <= days <= 300:
             valid.append(item)
 
+        elif mode == "interim" and 70 <= days <= 300:
+            valid.append(item)
+
         elif mode == "annual" and 300 <= days <= 430:
             valid.append(item)
 
@@ -445,7 +491,59 @@ def select_sec_latest_duration(company_facts, concepts, mode):
     valid.sort(
         key=lambda item: (
             item["entry"].get("end", ""),
+            sec_duration_days(item["entry"]) or 0,
             item["entry"].get("filed", ""),
+            -item["entry"].get("_concept_priority", 999),
+        ),
+        reverse=True,
+    )
+
+    selected = valid[0]
+
+    return normalize_sec_fact(
+        selected["concept"],
+        selected["fact"],
+        selected["entry"],
+    )
+
+
+def select_sec_matching_duration(
+    company_facts,
+    concepts,
+    target_fact,
+):
+    if not target_fact:
+        return None
+
+    target_end = target_fact.get("end")
+    target_days = target_fact.get("duration_days")
+
+    if not target_end or target_days is None:
+        return None
+
+    valid = []
+
+    for item in sec_concept_entries(company_facts, concepts):
+        entry = item["entry"]
+        days = sec_duration_days(entry)
+
+        if entry.get("end") != target_end:
+            continue
+
+        if days is None or abs(days - target_days) > 15:
+            continue
+
+        valid.append(item)
+
+    valid = unique_sec_entries(valid)
+
+    if not valid:
+        return None
+
+    valid.sort(
+        key=lambda item: (
+            item["entry"].get("filed", ""),
+            -item["entry"].get("_concept_priority", 999),
         ),
         reverse=True,
     )
@@ -502,6 +600,7 @@ def select_sec_prior_comparable(
         key=lambda item: (
             item["entry"].get("end", ""),
             item["entry"].get("filed", ""),
+            -item["entry"].get("_concept_priority", 999),
         ),
         reverse=True,
     )
@@ -539,6 +638,70 @@ def safe_ratio(numerator, denominator):
         return None
 
     return round((numerator / denominator) * 100, 2)
+
+
+def safe_multiple(numerator, denominator):
+    if not isinstance(numerator, (int, float)):
+        return None
+
+    if not isinstance(denominator, (int, float)) or denominator == 0:
+        return None
+
+    return round(numerator / denominator, 2)
+
+
+def safe_sum(*values):
+    numeric = [
+        value
+        for value in values
+        if isinstance(value, (int, float))
+    ]
+
+    if not numeric:
+        return None
+
+    return sum(numeric)
+
+
+def sec_fact_value(fact):
+    if not isinstance(fact, dict):
+        return None
+
+    value = fact.get("value")
+
+    if isinstance(value, (int, float)):
+        return value
+
+    return None
+
+
+def sec_fact_age_days(fact, reference_end):
+    if not fact or not reference_end:
+        return None
+
+    fact_end = parse_sec_date(fact.get("end"))
+    reference = parse_sec_date(reference_end)
+
+    if not fact_end or not reference:
+        return None
+
+    return (reference - fact_end).days
+
+
+def discard_stale_sec_fact(
+    fact,
+    reference_end,
+    max_age_days=550,
+):
+    age = sec_fact_age_days(fact, reference_end)
+
+    if age is None:
+        return fact
+
+    if age > max_age_days:
+        return None
+
+    return fact
 
 
 def get_sec_fundamentals(ticker: str):
@@ -629,6 +792,211 @@ def get_sec_fundamentals(ticker: str):
             latest_period = metric["end"]
             break
 
+    operating_cash_flow = select_sec_latest_duration(
+        company_facts,
+        SEC_CASHFLOW_METRICS["operating_cash_flow"],
+        "interim",
+    )
+
+    cash_flow_and_allocation = {
+        "operating_cash_flow": operating_cash_flow,
+        "capital_expenditure": select_sec_matching_duration(
+            company_facts,
+            SEC_CASHFLOW_METRICS["capital_expenditure"],
+            operating_cash_flow,
+        ),
+        "revenue": select_sec_matching_duration(
+            company_facts,
+            SEC_DURATION_METRICS["revenue"],
+            operating_cash_flow,
+        ),
+        "net_income": select_sec_matching_duration(
+            company_facts,
+            SEC_DURATION_METRICS["net_income"],
+            operating_cash_flow,
+        ),
+        "share_repurchases": select_sec_matching_duration(
+            company_facts,
+            SEC_CASHFLOW_METRICS["share_repurchases"],
+            operating_cash_flow,
+        ),
+        "dividends_paid": select_sec_matching_duration(
+            company_facts,
+            SEC_CASHFLOW_METRICS["dividends_paid"],
+            operating_cash_flow,
+        ),
+        "stock_based_compensation": select_sec_matching_duration(
+            company_facts,
+            SEC_CASHFLOW_METRICS["stock_based_compensation"],
+            operating_cash_flow,
+        ),
+    }
+
+    cash_flow_reference_end = (
+        operating_cash_flow.get("end")
+        if operating_cash_flow
+        else latest_period
+    )
+
+    annual_cash_flow = {
+        metric_name: discard_stale_sec_fact(
+            select_sec_latest_duration(
+                company_facts,
+                concepts,
+                "annual",
+            ),
+            cash_flow_reference_end,
+        )
+        for metric_name, concepts in SEC_CASHFLOW_METRICS.items()
+        if metric_name in {
+            "operating_cash_flow",
+            "capital_expenditure",
+            "share_repurchases",
+            "dividends_paid",
+        }
+    }
+
+    debt_components = {
+        metric_name: select_sec_latest_instant(
+            company_facts,
+            concepts,
+        )
+        for metric_name, concepts in SEC_DEBT_METRICS.items()
+    }
+
+    ocf_value = sec_fact_value(
+        cash_flow_and_allocation["operating_cash_flow"]
+    )
+
+    capex_raw = sec_fact_value(
+        cash_flow_and_allocation["capital_expenditure"]
+    )
+
+    capex_value = (
+        abs(capex_raw)
+        if capex_raw is not None
+        else None
+    )
+
+    cash_flow_revenue = sec_fact_value(
+        cash_flow_and_allocation["revenue"]
+    )
+
+    cash_flow_net_income = sec_fact_value(
+        cash_flow_and_allocation["net_income"]
+    )
+
+    buybacks_value = sec_fact_value(
+        cash_flow_and_allocation["share_repurchases"]
+    )
+
+    dividends_value = sec_fact_value(
+        cash_flow_and_allocation["dividends_paid"]
+    )
+
+    sbc_value = sec_fact_value(
+        cash_flow_and_allocation["stock_based_compensation"]
+    )
+
+    free_cash_flow = (
+        ocf_value - capex_value
+        if ocf_value is not None and capex_value is not None
+        else None
+    )
+
+    short_term_debt = sec_fact_value(
+        debt_components["short_term_borrowings"]
+    )
+
+    current_long_term_debt = sec_fact_value(
+        debt_components["current_long_term_debt"]
+    )
+
+    noncurrent_long_term_debt = sec_fact_value(
+        debt_components["noncurrent_long_term_debt"]
+    )
+
+    total_reported_debt = safe_sum(
+        short_term_debt,
+        current_long_term_debt,
+        noncurrent_long_term_debt,
+    )
+
+    current_cash = sec_fact_value(instant_metrics.get("cash"))
+
+    net_debt = (
+        total_reported_debt - current_cash
+        if (
+            total_reported_debt is not None
+            and current_cash is not None
+        )
+        else None
+    )
+
+    capital_returns = safe_sum(
+        buybacks_value,
+        dividends_value,
+    )
+
+    capital_returns_complete = (
+        buybacks_value is not None
+        and dividends_value is not None
+    )
+
+    annual_ocf = sec_fact_value(
+        annual_cash_flow.get("operating_cash_flow")
+    )
+
+    annual_capex_raw = sec_fact_value(
+        annual_cash_flow.get("capital_expenditure")
+    )
+
+    annual_capex = (
+        abs(annual_capex_raw)
+        if annual_capex_raw is not None
+        else None
+    )
+
+    annual_free_cash_flow = (
+        annual_ocf - annual_capex
+        if annual_ocf is not None and annual_capex is not None
+        else None
+    )
+
+    cash_flow_derived = {
+        "free_cash_flow": free_cash_flow,
+        "free_cash_flow_margin_percentage": safe_ratio(
+            free_cash_flow,
+            cash_flow_revenue,
+        ),
+        "operating_cash_flow_to_net_income_percentage": safe_ratio(
+            ocf_value,
+            cash_flow_net_income,
+        ),
+        "capital_expenditure_to_operating_cash_flow_percentage": (
+            safe_ratio(capex_value, ocf_value)
+        ),
+        "stock_based_compensation_to_revenue_percentage": safe_ratio(
+            sbc_value,
+            cash_flow_revenue,
+        ),
+        "total_reported_debt": total_reported_debt,
+        "net_debt": net_debt,
+        "annual_free_cash_flow": annual_free_cash_flow,
+        "net_debt_to_annual_free_cash_flow": safe_multiple(
+            net_debt,
+            annual_free_cash_flow,
+        ),
+        "capital_returns": capital_returns,
+        "capital_returns_components_complete": (
+            capital_returns_complete
+        ),
+        "capital_returns_to_free_cash_flow_percentage": safe_ratio(
+            capital_returns,
+            free_cash_flow,
+        ),
+    }
+
     return {
         "ticker": company["ticker"],
         "name": company["name"],
@@ -650,7 +1018,11 @@ def get_sec_fundamentals(ticker: str):
                 liabilities,
                 assets,
             ),
+            **cash_flow_derived,
         },
+        "cash_flow_and_allocation": cash_flow_and_allocation,
+        "annual_cash_flow_reference": annual_cash_flow,
+        "debt_components": debt_components,
         "source": "SEC EDGAR Company Facts",
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -1338,7 +1710,7 @@ def analysis_source(
 
 
 
-FRAMEWORK_ENGINE_VERSION = "0.1"
+FRAMEWORK_ENGINE_VERSION = "0.2"
 
 
 def fact_value(fact):
@@ -1627,6 +1999,195 @@ def evaluate_cash_to_assets(value):
     )
 
 
+def evaluate_fcf_margin(value):
+    if value is None:
+        return unavailable_rule(
+            "free_cash_flow_margin",
+            "cash_flow_quality",
+            "Margem de free cash flow",
+            "%",
+            12,
+            "SEC EDGAR + ThesisOS calculation",
+        )
+
+    if value >= 20:
+        points, status, text = 12, "strong", "Margem de free cash flow elevada."
+    elif value >= 10:
+        points, status, text = 10, "positive", "Margem de free cash flow saudável."
+    elif value >= 5:
+        points, status, text = 7, "neutral", "Margem de free cash flow moderada."
+    elif value >= 0:
+        points, status, text = 3, "watch", "Conversão em free cash flow reduzida."
+    else:
+        points, status, text = 0, "warning", "Free cash flow negativo."
+
+    return rule_result(
+        "free_cash_flow_margin",
+        "cash_flow_quality",
+        "Margem de free cash flow",
+        value,
+        "%",
+        points,
+        12,
+        status,
+        text,
+        "SEC EDGAR + ThesisOS calculation",
+    )
+
+
+def evaluate_cash_conversion(value):
+    if value is None:
+        return unavailable_rule(
+            "cash_conversion",
+            "cash_flow_quality",
+            "Fluxo operacional / lucro líquido",
+            "%",
+            12,
+            "SEC EDGAR + ThesisOS calculation",
+        )
+
+    if 80 <= value <= 150:
+        points, status, text = 12, "strong", "Conversão do lucro em caixa muito sólida."
+    elif 60 <= value <= 200:
+        points, status, text = 9, "positive", "Conversão do lucro em caixa positiva."
+    elif value >= 40:
+        points, status, text = 6, "neutral", "Conversão em caixa moderada."
+    elif value >= 0:
+        points, status, text = 3, "watch", "Conversão do lucro em caixa fraca."
+    else:
+        points, status, text = 0, "warning", "Fluxo operacional negativo."
+
+    return rule_result(
+        "cash_conversion",
+        "cash_flow_quality",
+        "Fluxo operacional / lucro líquido",
+        value,
+        "%",
+        points,
+        12,
+        status,
+        text,
+        "SEC EDGAR + ThesisOS calculation",
+    )
+
+
+def evaluate_sbc_intensity(value):
+    if value is None:
+        return unavailable_rule(
+            "sbc_to_revenue",
+            "dilution",
+            "Stock-based compensation / receitas",
+            "%",
+            8,
+            "SEC EDGAR + ThesisOS calculation",
+        )
+
+    if value <= 1:
+        points, status, text = 8, "strong", "Stock-based compensation muito reduzida."
+    elif value <= 3:
+        points, status, text = 7, "positive", "Stock-based compensation controlada."
+    elif value <= 5:
+        points, status, text = 5, "neutral", "Stock-based compensation material, mas moderada."
+    elif value <= 10:
+        points, status, text = 2, "watch", "Stock-based compensation elevada."
+    else:
+        points, status, text = 0, "warning", "Stock-based compensation muito elevada."
+
+    return rule_result(
+        "sbc_to_revenue",
+        "dilution",
+        "Stock-based compensation / receitas",
+        value,
+        "%",
+        points,
+        8,
+        status,
+        text,
+        "SEC EDGAR + ThesisOS calculation",
+    )
+
+
+def evaluate_net_debt_to_fcf(value):
+    if value is None:
+        return unavailable_rule(
+            "net_debt_to_annual_fcf",
+            "balance_sheet",
+            "Dívida líquida / FCF anual",
+            "x",
+            12,
+            "SEC EDGAR + ThesisOS calculation",
+        )
+
+    if value <= 0:
+        points, status, text = 12, "strong", "A empresa apresenta caixa líquido."
+    elif value <= 1:
+        points, status, text = 11, "positive", "Dívida líquida facilmente coberta pelo FCF anual."
+    elif value <= 2:
+        points, status, text = 9, "positive", "Cobertura da dívida por FCF confortável."
+    elif value <= 3:
+        points, status, text = 6, "neutral", "Alavancagem moderada face ao FCF."
+    elif value <= 5:
+        points, status, text = 2, "watch", "Alavancagem elevada face ao FCF."
+    else:
+        points, status, text = 0, "warning", "Dívida líquida muito elevada face ao FCF."
+
+    return rule_result(
+        "net_debt_to_annual_fcf",
+        "balance_sheet",
+        "Dívida líquida / FCF anual",
+        value,
+        "x",
+        points,
+        12,
+        status,
+        text,
+        "SEC EDGAR + ThesisOS calculation",
+    )
+
+
+def evaluate_capital_returns(value, components_complete):
+    if value is None or not components_complete:
+        return unavailable_rule(
+            "capital_returns_to_fcf",
+            "capital_allocation",
+            "Dividendos e recompras / FCF",
+            "%",
+            6,
+            "SEC EDGAR + ThesisOS calculation",
+        )
+
+    if 50 <= value <= 100:
+        points, status, text = 6, "strong", (
+            "Retorno aos acionistas coberto pelo FCF; "
+            "a qualidade das recompras depende do valuation."
+        )
+    elif 0 <= value < 50:
+        points, status, text = 5, "positive", (
+            "Retorno aos acionistas conservador face ao FCF."
+        )
+    elif value <= 125:
+        points, status, text = 3, "watch", (
+            "Retorno aos acionistas próximo ou acima do FCF."
+        )
+    else:
+        points, status, text = 0, "warning", (
+            "Dividendos e recompras excedem claramente o FCF."
+        )
+
+    return rule_result(
+        "capital_returns_to_fcf",
+        "capital_allocation",
+        "Dividendos e recompras / FCF",
+        value,
+        "%",
+        points,
+        6,
+        status,
+        text,
+        "SEC EDGAR + ThesisOS calculation",
+    )
+
+
 def framework_item(
     item_id: str,
     label: str,
@@ -1676,6 +2237,14 @@ def build_stock_framework_engine(
     net_income = duration.get("net_income", {})
     operating_income = duration.get("operating_income", {})
     diluted_shares = duration.get("diluted_shares", {})
+    cash_flow = (fundamentals or {}).get(
+        "cash_flow_and_allocation",
+        {},
+    )
+    debt_components = (fundamentals or {}).get(
+        "debt_components",
+        {},
+    )
 
     assets_value = fact_value(instant.get("assets"))
     cash_value = fact_value(instant.get("cash"))
@@ -1718,6 +2287,30 @@ def build_stock_framework_engine(
             derived.get("liabilities_to_assets_percentage")
         ),
         evaluate_cash_to_assets(cash_to_assets),
+        evaluate_fcf_margin(
+            derived.get("free_cash_flow_margin_percentage")
+        ),
+        evaluate_cash_conversion(
+            derived.get(
+                "operating_cash_flow_to_net_income_percentage"
+            )
+        ),
+        evaluate_sbc_intensity(
+            derived.get(
+                "stock_based_compensation_to_revenue_percentage"
+            )
+        ),
+        evaluate_net_debt_to_fcf(
+            derived.get("net_debt_to_annual_free_cash_flow")
+        ),
+        evaluate_capital_returns(
+            derived.get(
+                "capital_returns_to_free_cash_flow_percentage"
+            ),
+            derived.get(
+                "capital_returns_components_complete"
+            ),
+        ),
     ]
 
     available_rules = [
@@ -1841,14 +2434,17 @@ def build_stock_framework_engine(
             [
                 "margem operacional",
                 "margem líquida",
+                "free cash flow",
+                "margem de free cash flow",
+                "conversão de lucro em caixa",
+                "capex",
             ],
             [
                 "margem bruta",
-                "free cash flow",
-                "conversão de lucro em caixa",
                 "ROIC",
                 "ROE",
                 "contas a receber e inventários",
+                "normalização de itens não recorrentes",
             ],
         ),
         framework_item(
@@ -1860,6 +2456,9 @@ def build_stock_framework_engine(
                 "passivos",
                 "capital próprio",
                 "caixa",
+                "dívida reportada",
+                "dívida líquida",
+                "dívida líquida / FCF anual",
             ],
             [
                 "dívida líquida/EBITDA",
@@ -1875,13 +2474,32 @@ def build_stock_framework_engine(
             "partial",
             [
                 "variação das ações diluídas",
+                "stock-based compensation / receitas",
+                "recompras reportadas",
             ],
             [
-                "stock-based compensation",
                 "opções",
                 "RSUs",
                 "convertíveis",
                 "warrants",
+                "preço médio das recompras",
+            ],
+        ),
+        framework_item(
+            "capital_allocation",
+            "Alocação de capital",
+            "partial",
+            [
+                "capex",
+                "dividendos",
+                "recompras",
+                "retorno aos acionistas / FCF",
+            ],
+            [
+                "retorno sobre reinvestimento",
+                "aquisições e desinvestimentos",
+                "valuation das recompras",
+                "consistência histórica da política",
             ],
         ),
         framework_item(
@@ -1976,11 +2594,12 @@ def build_stock_framework_engine(
         confidence = "low"
 
     next_required_data = [
-        "free cash flow e conversão de lucro em caixa",
-        "ROIC e margem bruta",
-        "dívida detalhada e maturidades",
+        "ROIC, ROE e margem bruta",
+        "receivables, inventários e itens não recorrentes",
+        "cobertura de juros, maturidades, leases e covenants",
         "crescimento orgânico, backlog e guidance",
         "moat, concorrência e qualidade da administração",
+        "retorno sobre reinvestimento e valuation das recompras",
         "valuation, reverse DCF e cenários",
         "análise técnica e pullback",
         "peso e encaixe na carteira",
@@ -1991,8 +2610,9 @@ def build_stock_framework_engine(
         "asset_type": "stock",
         "status": "partial_assessment",
         "scope": (
-            "Snapshot quantitativo baseado nos dados atualmente "
-            "ligados. Não representa ainda uma análise integral."
+            "Snapshot quantitativo baseado em crescimento, margens, "
+            "cash flow, dívida, diluição e alocação de capital. "
+            "Não representa ainda uma análise integral."
         ),
         "frameworks_applied": [
             {
@@ -2031,8 +2651,9 @@ def build_stock_framework_engine(
             "positive_signals": positive_signals,
             "warning_signals": warning_signals,
             "methodology_note": (
-                "Limiares genéricos e transparentes. Devem ser "
-                "ajustados posteriormente ao setor e modelo de negócio."
+                "Limiares genéricos e transparentes aplicados a "
+                "dados reportados. Devem ser ajustados posteriormente "
+                "ao setor, modelo de negócio e ciclo económico."
             ),
         },
         "framework_checklist": {
