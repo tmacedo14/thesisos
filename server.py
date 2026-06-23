@@ -7,9 +7,17 @@ import re
 import time
 import zlib
 from datetime import date, datetime, timezone
+from html.parser import HTMLParser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
+from urllib.parse import (
+    parse_qs,
+    quote,
+    unquote,
+    urlencode,
+    urljoin,
+    urlparse,
+)
 from urllib.request import Request, urlopen
 
 
@@ -33,10 +41,22 @@ OPENFIGI_CACHE_TTL_SECONDS = 24 * 60 * 60
 EODHD_CACHE_TTL_SECONDS = 24 * 60 * 60
 SEC_CACHE_TTL_SECONDS = 24 * 60 * 60
 ECB_CACHE_TTL_SECONDS = 12 * 60 * 60
+ETF_PROFILE_CACHE_TTL_SECONDS = 24 * 60 * 60
 OPENFIGI_CACHE = {}
 EODHD_CACHE = {}
 SEC_CACHE = {}
 ECB_CACHE = {}
+ETF_PROFILE_CACHE = {}
+
+ETF_OFFICIAL_PROFILE_REGISTRY = {
+    "IE00BK5BQT80": {
+        "issuer": "Vanguard",
+        "source_url": (
+            "https://www.vanguard.co.uk/professional/product/etf/"
+            "equity/9679/ftse-all-world-ucits-etf-usd-accumulating"
+        ),
+    },
+}
 
 
 def fetch_json(request: Request, timeout: int = 20):
@@ -1173,6 +1193,331 @@ def convert_currency(
         ),
     }
 
+
+class OfficialEtfPageParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.tokens = []
+        self.links = []
+        self._skip_depth = 0
+        self._current_link = None
+        self._current_link_text = []
+
+    def handle_starttag(self, tag, attrs):
+        clean_tag = tag.lower()
+
+        if clean_tag in {"script", "style", "noscript", "svg"}:
+            self._skip_depth += 1
+            return
+
+        if self._skip_depth:
+            return
+
+        if clean_tag == "a":
+            attributes = dict(attrs)
+            self._current_link = attributes.get("href")
+            self._current_link_text = []
+
+    def handle_endtag(self, tag):
+        clean_tag = tag.lower()
+
+        if clean_tag in {"script", "style", "noscript", "svg"}:
+            if self._skip_depth:
+                self._skip_depth -= 1
+            return
+
+        if self._skip_depth:
+            return
+
+        if clean_tag == "a" and self._current_link:
+            text = clean_official_text(
+                " ".join(self._current_link_text)
+            )
+            self.links.append(
+                {
+                    "text": text,
+                    "href": self._current_link,
+                }
+            )
+            self._current_link = None
+            self._current_link_text = []
+
+    def handle_data(self, data):
+        if self._skip_depth:
+            return
+
+        value = clean_official_text(data)
+
+        if not value:
+            return
+
+        self.tokens.append(value)
+
+        if self._current_link is not None:
+            self._current_link_text.append(value)
+
+
+def clean_official_text(value):
+    value = str(value or "").replace("\xa0", " ")
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def normalize_official_text(value):
+    value = clean_official_text(value).casefold()
+    value = value.replace("’", "'")
+    return value.rstrip(":'")
+
+
+def fetch_official_html(url: str) -> str:
+    request = Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/149.0 Safari/537.36 ThesisOS/0.3"
+            ),
+            "Accept": (
+                "text/html,application/xhtml+xml,"
+                "application/xml;q=0.9,*/*;q=0.8"
+            ),
+            "Accept-Language": "en-GB,en;q=0.9",
+            "Cache-Control": "no-cache",
+        },
+    )
+
+    with urlopen(request, timeout=45) as response:
+        raw = response.read()
+        charset = (
+            response.headers.get_content_charset()
+            or "utf-8"
+        )
+        return raw.decode(charset, errors="replace")
+
+
+def find_official_value(tokens, labels, max_distance=5):
+    normalized_tokens = [
+        normalize_official_text(token)
+        for token in tokens
+    ]
+    normalized_labels = [
+        normalize_official_text(label)
+        for label in labels
+    ]
+
+    for index, token in enumerate(normalized_tokens):
+        if token not in normalized_labels:
+            continue
+
+        for candidate_index in range(
+            index + 1,
+            min(index + 1 + max_distance, len(tokens)),
+        ):
+            candidate = clean_official_text(
+                tokens[candidate_index]
+            )
+            normalized_candidate = normalize_official_text(
+                candidate
+            )
+
+            if not candidate:
+                continue
+
+            if normalized_candidate in normalized_labels:
+                continue
+
+            if candidate in {"—", "-", "–"}:
+                return None
+
+            return candidate
+
+    return None
+
+
+def find_official_document_link(
+    links,
+    page_url,
+    wanted_text,
+):
+    wanted = normalize_official_text(wanted_text)
+
+    for link in links:
+        if wanted in normalize_official_text(
+            link.get("text")
+        ):
+            href = link.get("href")
+
+            if href:
+                return urljoin(page_url, href)
+
+    return None
+
+
+def build_vanguard_etf_profile(
+    asset: dict,
+    source_url: str,
+) -> dict:
+    page_html = fetch_official_html(source_url)
+    parser = OfficialEtfPageParser()
+    parser.feed(page_html)
+    tokens = parser.tokens
+
+    profile = {
+        "issuer": "Vanguard",
+        "name": asset.get("name"),
+        "symbol": asset.get("symbol"),
+        "isin": asset.get("isin"),
+        "share_class_inception": find_official_value(
+            tokens,
+            ["Share class inception"],
+        ),
+        "listing_date": find_official_value(
+            tokens,
+            ["Listing date"],
+        ),
+        "investment_structure": find_official_value(
+            tokens,
+            ["Investment structure"],
+        ),
+        "share_class_assets": find_official_value(
+            tokens,
+            ["Share Class Assets", "Share Class Assets'"],
+        ),
+        "total_assets": find_official_value(
+            tokens,
+            ["Total Assets"],
+        ),
+        "risk_indicator": find_official_value(
+            tokens,
+            ["Risk indicator"],
+        ),
+        "strategy": find_official_value(
+            tokens,
+            ["Strategy"],
+        ),
+        "asset_class": find_official_value(
+            tokens,
+            ["Asset Class"],
+        ),
+        "investment_method": find_official_value(
+            tokens,
+            ["Investment method"],
+        ),
+        "index_ticker": find_official_value(
+            tokens,
+            ["Index ticker"],
+        ),
+        "benchmark": find_official_value(
+            tokens,
+            ["Benchmark"],
+        ),
+        "dividend_schedule": find_official_value(
+            tokens,
+            ["Dividend schedule"],
+        ),
+        "tax_status": find_official_value(
+            tokens,
+            ["Tax status"],
+        ),
+        "domicile": find_official_value(
+            tokens,
+            ["Domicile"],
+        ),
+        "legal_entity": find_official_value(
+            tokens,
+            ["Legal entity"],
+        ),
+        "investment_manager": find_official_value(
+            tokens,
+            ["Investment manager"],
+        ),
+        "ocf_ter": find_official_value(
+            tokens,
+            ["OCF/TER", "OCF", "TER"],
+        ),
+        "number_of_stocks": find_official_value(
+            tokens,
+            ["Number of stocks"],
+        ),
+        "distribution_policy": (
+            "Accumulating"
+            if "ACCUMULATING" in str(
+                asset.get("name") or ""
+            ).upper()
+            else None
+        ),
+        "factsheet_url": find_official_document_link(
+            parser.links,
+            source_url,
+            "Factsheet",
+        ),
+        "source_url": source_url,
+        "source": "Vanguard official product page",
+    }
+
+    core_fields = [
+        "share_class_inception",
+        "listing_date",
+        "investment_structure",
+        "share_class_assets",
+        "total_assets",
+        "investment_method",
+        "benchmark",
+        "domicile",
+    ]
+
+    available = sum(
+        1
+        for field in core_fields
+        if profile.get(field) not in (None, "", "—")
+    )
+
+    profile["coverage"] = {
+        "available_core_fields": available,
+        "required_core_fields": len(core_fields),
+        "percentage": round(
+            available / len(core_fields) * 100,
+            2,
+        ),
+    }
+
+    return profile
+
+
+def get_official_etf_profile(asset: dict) -> dict | None:
+    isin = str(asset.get("isin") or "").upper()
+    registry_item = ETF_OFFICIAL_PROFILE_REGISTRY.get(isin)
+
+    if not registry_item:
+        return None
+
+    cached = ETF_PROFILE_CACHE.get(isin)
+
+    if cached:
+        age = time.time() - cached["created_at"]
+
+        if age < ETF_PROFILE_CACHE_TTL_SECONDS:
+            return cached["data"]
+
+    issuer = registry_item.get("issuer")
+    source_url = registry_item.get("source_url")
+
+    if issuer == "Vanguard":
+        profile = build_vanguard_etf_profile(
+            asset,
+            source_url,
+        )
+    else:
+        return None
+
+    ETF_PROFILE_CACHE[isin] = {
+        "created_at": time.time(),
+        "data": profile,
+    }
+
+    return profile
+
+
 def classify_figi_asset(item: dict) -> str:
     security_type = str(item.get("securityType") or "").lower()
     security_type_2 = str(item.get("securityType2") or "").lower()
@@ -1753,7 +2098,7 @@ def analysis_source(
 
 
 
-FRAMEWORK_ENGINE_VERSION = "0.2"
+FRAMEWORK_ENGINE_VERSION = "0.3"
 
 
 def fact_value(fact):
@@ -2727,9 +3072,109 @@ def build_stock_framework_engine(
 
 def build_etf_framework_engine(
     asset: dict,
+    etf_profile: dict | None,
     sources: dict,
     data_quality: dict,
 ) -> dict:
+    etf_profile = etf_profile or {}
+
+    official_available = [
+        label
+        for key, label in [
+            ("source_url", "página oficial do emitente"),
+            ("factsheet_url", "factsheet oficial"),
+            ("share_class_inception", "início da classe"),
+            ("listing_date", "data de listagem"),
+        ]
+        if etf_profile.get(key)
+    ]
+
+    official_missing = [
+        label
+        for key, label in [
+            ("source_url", "página oficial do emitente"),
+            ("factsheet_url", "factsheet oficial"),
+            ("share_class_inception", "início da classe"),
+            ("listing_date", "data de listagem"),
+        ]
+        if not etf_profile.get(key)
+    ]
+
+    methodology_available = [
+        label
+        for key, label in [
+            ("benchmark", "índice seguido"),
+            ("investment_method", "método de replicação"),
+            ("investment_structure", "estrutura do fundo"),
+            ("strategy", "estratégia oficial"),
+        ]
+        if etf_profile.get(key)
+    ]
+
+    methodology_missing = [
+        label
+        for key, label in [
+            ("benchmark", "índice seguido"),
+            ("investment_method", "método de replicação"),
+            ("investment_structure", "estrutura do fundo"),
+            ("strategy", "estratégia oficial"),
+        ]
+        if not etf_profile.get(key)
+    ] + [
+        "regras detalhadas de inclusão",
+        "rebalanceamento",
+    ]
+
+    holdings_available = [
+        "número de posições"
+        for key in ["number_of_stocks"]
+        if etf_profile.get(key)
+    ]
+
+    holdings_missing = [
+        "top holdings",
+        "setores",
+        "geografias",
+        "moedas",
+        "concentração",
+        "overlap",
+    ]
+
+    implementation_available = [
+        label
+        for key, label in [
+            ("ocf_ter", "TER/OCF"),
+            ("share_class_assets", "ativos da classe"),
+            ("total_assets", "ativos totais"),
+            ("investment_method", "replicação"),
+            ("domicile", "domicílio"),
+            ("distribution_policy", "política de distribuição"),
+            ("tax_status", "estatuto fiscal"),
+        ]
+        if etf_profile.get(key)
+    ]
+
+    implementation_missing = [
+        label
+        for key, label in [
+            ("ocf_ter", "TER/OCF"),
+            ("share_class_assets", "ativos da classe"),
+            ("total_assets", "ativos totais"),
+            ("investment_method", "replicação"),
+            ("domicile", "domicílio"),
+            ("distribution_policy", "política de distribuição"),
+            ("tax_status", "estatuto fiscal"),
+        ]
+        if not etf_profile.get(key)
+    ] + [
+        "tracking difference",
+        "tracking error",
+        "spread",
+        "liquidez",
+    ]
+
+    profile_available = bool(etf_profile)
+
     checklist = [
         framework_item(
             "asset_identity",
@@ -2753,12 +3198,13 @@ def build_etf_framework_engine(
             "Documentação e fontes",
             "partial",
             [
-                "identificação OpenFIGI",
+                "identificação OpenFIGI/EODHD",
                 "cotação Finnhub/EODHD",
                 "câmbio BCE",
+                *official_available,
             ],
             [
-                "factsheet oficial",
+                *official_missing,
                 "KID/KIID",
                 "relatório anual do fundo",
             ],
@@ -2766,47 +3212,35 @@ def build_etf_framework_engine(
         framework_item(
             "index_methodology",
             "Índice e metodologia",
-            "missing",
-            [],
-            [
-                "índice seguido",
-                "metodologia",
-                "regras de inclusão",
-                "rebalanceamento",
-            ],
+            (
+                "partial"
+                if methodology_available
+                else "missing"
+            ),
+            methodology_available,
+            methodology_missing,
         ),
         framework_item(
             "holdings_exposure",
             "Holdings e exposição real",
-            "missing",
-            [],
-            [
-                "número de posições",
-                "top holdings",
-                "setores",
-                "geografias",
-                "moedas",
-                "concentração",
-                "overlap",
-            ],
+            (
+                "partial"
+                if holdings_available
+                else "missing"
+            ),
+            holdings_available,
+            holdings_missing,
         ),
         framework_item(
             "costs_implementation",
             "Custos e implementação",
-            "missing",
-            [],
-            [
-                "TER",
-                "tracking difference",
-                "tracking error",
-                "spread",
-                "AUM",
-                "liquidez",
-                "replicação",
-                "domicílio",
-                "fiscalidade",
-                "distribuição/acumulação",
-            ],
+            (
+                "partial"
+                if implementation_available
+                else "missing"
+            ),
+            implementation_available,
+            implementation_missing,
         ),
         framework_item(
             "aggregate_valuation",
@@ -2875,11 +3309,24 @@ def build_etf_framework_engine(
     return {
         "version": FRAMEWORK_ENGINE_VERSION,
         "asset_type": "etf",
-        "status": "insufficient_etf_fundamentals",
+        "status": (
+            "partial_etf_fundamentals"
+            if profile_available
+            else "insufficient_etf_fundamentals"
+        ),
         "scope": (
-            "Identificação, preço e moeda já estão ligados. "
-            "A análise estrutural do ETF ainda necessita de dados "
-            "oficiais sobre custos, índice, holdings e tracking."
+            (
+                "Identificação, preço, moeda e parte dos dados "
+                "estruturais oficiais do ETF já estão ligados. "
+                "Holdings detalhadas, tracking, valuation e carteira "
+                "continuam incompletos."
+            )
+            if profile_available
+            else (
+                "Identificação, preço e moeda já estão ligados. "
+                "A análise estrutural do ETF ainda necessita de dados "
+                "oficiais sobre custos, índice, holdings e tracking."
+            )
         ),
         "frameworks_applied": [
             {
@@ -2913,7 +3360,14 @@ def build_etf_framework_engine(
                 "code": "insufficient_data",
                 "label": "Dados insuficientes",
             },
-            "coverage_percentage": 0,
+            "coverage_percentage": (
+                etf_profile.get("coverage", {}).get(
+                    "percentage",
+                    0,
+                )
+                if profile_available
+                else 0
+            ),
             "rules": [],
             "positive_signals": [],
             "warning_signals": [],
@@ -2923,34 +3377,70 @@ def build_etf_framework_engine(
         },
         "framework_checklist": {
             "coverage_percentage": framework_coverage,
-            "confidence": "low",
+            "confidence": (
+                "moderate"
+                if profile_available
+                else "low"
+            ),
             "items": checklist,
         },
         "data_quality": data_quality,
         "next_required_data": [
-            "factsheet/KID oficial",
-            "índice e metodologia",
-            "TER e tracking difference",
-            "AUM, liquidez e spread",
-            "holdings, setores, geografias e moedas",
-            "overlap com a carteira",
-            "valuation agregado",
-            "análise técnica e zona de reforço",
+            item
+            for item in [
+                (
+                    "factsheet/KID oficial"
+                    if not etf_profile.get("factsheet_url")
+                    else None
+                ),
+                (
+                    "TER/OCF"
+                    if not etf_profile.get("ocf_ter")
+                    else None
+                ),
+                "tracking difference e tracking error",
+                "liquidez e spread",
+                "top holdings, setores, geografias e moedas",
+                "overlap com a carteira",
+                "valuation agregado",
+                "análise técnica e zona de reforço",
+            ]
+            if item
         ],
         "decision": {
-            "status": "awaiting_etf_fundamentals",
+            "status": (
+                "awaiting_remaining_etf_assessment"
+                if profile_available
+                else "awaiting_etf_fundamentals"
+            ),
             "action": "monitor",
-            "label": "Aguardar dados estruturais do ETF",
+            "label": (
+                "Aguardar holdings, tracking, valuation e carteira"
+                if profile_available
+                else "Aguardar dados estruturais do ETF"
+            ),
             "buy_hold_avoid_sell": None,
             "entry_zone": None,
             "position_size": None,
             "reinforcement_plan": None,
             "catalysts": [],
             "thesis_break_signals": [],
-            "next_review": "Após integração do factsheet oficial",
+            "next_review": (
+                "Após integração de holdings e tracking"
+                if profile_available
+                else "Após integração do factsheet oficial"
+            ),
             "reason": (
-                "A identificação e a cotação não bastam para avaliar "
-                "a qualidade e o encaixe de um ETF."
+                (
+                    "Os dados oficiais melhoram a análise estrutural, "
+                    "mas ainda não permitem avaliar concentração, "
+                    "tracking, valuation e encaixe na carteira."
+                )
+                if profile_available
+                else (
+                    "A identificação e a cotação não bastam para "
+                    "avaliar a qualidade e o encaixe de um ETF."
+                )
             ),
         },
     }
@@ -2959,6 +3449,7 @@ def build_etf_framework_engine(
 def build_framework_engine(
     asset: dict,
     fundamentals: dict | None,
+    etf_profile: dict | None,
     sources: dict,
     data_quality: dict,
 ) -> dict:
@@ -2975,6 +3466,7 @@ def build_framework_engine(
     if asset_type == "etf":
         return build_etf_framework_engine(
             asset,
+            etf_profile,
             sources,
             data_quality,
         )
@@ -3191,6 +3683,44 @@ def build_analysis_payload(
             reason="O ativo não é uma ação.",
         )
 
+    etf_profile = None
+
+    if asset.get("asset_type") == "etf":
+        try:
+            etf_profile = get_official_etf_profile(asset)
+
+            if etf_profile:
+                sources["etf_structure"] = analysis_source(
+                    etf_profile.get("issuer") or "Official issuer",
+                    "ok",
+                    source_url=etf_profile.get("source_url"),
+                    coverage_percentage=(
+                        etf_profile.get("coverage", {}).get(
+                            "percentage"
+                        )
+                    ),
+                )
+            else:
+                sources["etf_structure"] = analysis_source(
+                    "Official issuer",
+                    "unavailable",
+                    reason=(
+                        "Ainda não existe um adaptador oficial "
+                        "para este ETF."
+                    ),
+                )
+
+        except Exception as error:
+            sources["etf_structure"] = analysis_source(
+                "Official issuer",
+                "unavailable",
+                detail=str(error),
+            )
+            warnings.append(
+                "O perfil estrutural oficial do ETF está "
+                "temporariamente indisponível."
+            )
+
     fx = None
     price = asset.get("price")
     currency = asset.get("currency")
@@ -3242,6 +3772,9 @@ def build_analysis_payload(
     if asset.get("asset_type") == "stock":
         required_source_keys.append("fundamentals")
 
+    if asset.get("asset_type") == "etf":
+        required_source_keys.append("etf_structure")
+
     available_count = sum(
         1
         for key in required_source_keys
@@ -3280,6 +3813,7 @@ def build_analysis_payload(
             "provider": asset.get("market_provider"),
         },
         "fundamentals": fundamentals,
+        "etf_profile": etf_profile,
         "fx": fx,
         "sources": sources,
         "data_quality": {
@@ -3300,6 +3834,7 @@ def build_analysis_payload(
     payload["framework_engine"] = build_framework_engine(
         asset=asset,
         fundamentals=fundamentals,
+        etf_profile=etf_profile,
         sources=sources,
         data_quality=payload["data_quality"],
     )

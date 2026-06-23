@@ -1424,6 +1424,18 @@
             </div>
             <small>ECB Data Portal</small>
           </div>
+          <div
+            class="analysis-source-item"
+            id="analysisSourceEtfStructure"
+            data-status="waiting"
+            style="display:none"
+          >
+            <div class="analysis-source-item-head">
+              <strong>Estrutura do ETF</strong>
+              <span class="analysis-source-status">A aguardar</span>
+            </div>
+            <small>Emitente oficial</small>
+          </div>
         </div>
 
         <div class="analysis-quality-warning" id="analysisWarnings"></div>
@@ -1764,7 +1776,7 @@
         <div class="section-head" style="margin:0 0 10px">
           <div>
             <h2>Estrutura de análise do ETF</h2>
-            <p class="sub">Ações e ETFs usam critérios diferentes. Aqui não são mostradas receitas, ROIC ou dívida da empresa.</p>
+            <p class="sub" id="etfAnalysisDescription">Ações e ETFs usam critérios diferentes. Aqui não são mostradas receitas, ROIC ou dívida da empresa.</p>
           </div>
           <span class="pill glow-success" id="etfAssetBadge">ETF identificado</span>
         </div>
@@ -1817,10 +1829,57 @@
             <span>Holdings e concentração</span>
             <strong id="etfHoldings">Dados ainda não ligados</strong>
           </div>
+          <div class="etf-data-item">
+            <span>Ativos da classe</span>
+            <strong id="etfShareClassAssets">Dados ainda não ligados</strong>
+          </div>
+          <div class="etf-data-item">
+            <span>Estrutura do fundo</span>
+            <strong id="etfStructure">Dados ainda não ligados</strong>
+          </div>
+          <div class="etf-data-item">
+            <span>Domicílio</span>
+            <strong id="etfDomicile">Dados ainda não ligados</strong>
+          </div>
+          <div class="etf-data-item">
+            <span>Início da classe</span>
+            <strong id="etfInception">Dados ainda não ligados</strong>
+          </div>
+          <div class="etf-data-item">
+            <span>Data de listagem</span>
+            <strong id="etfListingDate">Dados ainda não ligados</strong>
+          </div>
+          <div class="etf-data-item">
+            <span>Emitente / gestor</span>
+            <strong id="etfIssuer">Dados ainda não ligados</strong>
+          </div>
         </div>
 
-        <div class="etf-pending">
-          <strong>Estado atual:</strong> a identificação, a bolsa, a moeda e a cotação disponível são reais. TER, benchmark, distribuição, replicação, dimensão e holdings permanecem explicitamente indisponíveis até existir uma fonte API adequada.
+        <div class="cashflow-footer" id="etfOfficialProfileSource">
+          <div>
+            <strong id="etfOfficialSourceStatus">Fonte estrutural ainda não ligada.</strong>
+            <div id="etfOfficialCoverage">Cobertura oficial indisponível.</div>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <a
+              href="#"
+              id="etfOfficialPageLink"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="pointer-events:none;opacity:.55"
+            >Página oficial</a>
+            <a
+              href="#"
+              id="etfFactsheetLink"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="pointer-events:none;opacity:.55"
+            >Factsheet</a>
+          </div>
+        </div>
+
+        <div class="etf-pending" id="etfProfileStatus">
+          <strong>Estado atual:</strong> a identificação, a bolsa, a moeda e a cotação disponível são reais. Os dados estruturais aguardam uma fonte oficial compatível.
         </div>
       </section>
 
@@ -2817,7 +2876,8 @@
       "#analysisSourceIdentification",
       "#analysisSourceMarket",
       "#analysisSourceFundamentals",
-      "#analysisSourceFx"
+      "#analysisSourceFx",
+      "#analysisSourceEtfStructure"
     ].forEach(selector=>{
       updateAnalysisSourceCard(
         selector,
@@ -2877,6 +2937,20 @@
       "#analysisSourceFx",
       sources.fx
     );
+
+    const etfStructureCard=$("#analysisSourceEtfStructure");
+
+    if(etfStructureCard){
+      const isEtf=payload.asset?.asset_type==="etf";
+      etfStructureCard.style.display=isEtf ? "" : "none";
+
+      if(isEtf){
+        updateAnalysisSourceCard(
+          "#analysisSourceEtfStructure",
+          sources.etf_structure
+        );
+      }
+    }
 
     const warnings=$("#analysisWarnings");
     const warningItems=Array.isArray(payload.warnings)
@@ -3547,6 +3621,246 @@
     }
   }
 
+  function setEtfProfileText(selector, value, fallback="Ainda não disponível"){
+    const element=$(selector);
+
+    if(element){
+      element.textContent=
+        value!==null && value!==undefined && value!==""
+          ? value
+          : fallback;
+    }
+  }
+
+  function setEtfProfileLink(selector, url, enabledText){
+    const link=$(selector);
+
+    if(!link) return;
+
+    if(url){
+      link.href=url;
+      link.textContent=enabledText;
+      link.style.pointerEvents="";
+      link.style.opacity="";
+    }else{
+      link.removeAttribute("href");
+      link.style.pointerEvents="none";
+      link.style.opacity=".55";
+    }
+  }
+
+  function resetEtfOfficialProfile(state="idle"){
+    [
+      "#etfBenchmark",
+      "#etfTer",
+      "#etfDistribution",
+      "#etfReplication",
+      "#etfAum",
+      "#etfHoldings",
+      "#etfShareClassAssets",
+      "#etfStructure",
+      "#etfDomicile",
+      "#etfInception",
+      "#etfListingDate",
+      "#etfIssuer"
+    ].forEach(selector=>{
+      setEtfProfileText(
+        selector,
+        null,
+        state==="loading"
+          ? "A carregar…"
+          : "Dados ainda não ligados"
+      );
+    });
+
+    if($("#etfAssetBadge")){
+      $("#etfAssetBadge").textContent=
+        state==="loading"
+          ? "A consultar emitente"
+          : "ETF identificado";
+    }
+
+    if($("#etfAnalysisDescription")){
+      $("#etfAnalysisDescription").textContent=
+        state==="loading"
+          ? "A consultar a documentação oficial do ETF."
+          : "Ações e ETFs usam critérios diferentes. Aqui não são mostradas receitas, ROIC ou dívida da empresa.";
+    }
+
+    if($("#etfOfficialSourceStatus")){
+      $("#etfOfficialSourceStatus").textContent=
+        state==="loading"
+          ? "A consultar a fonte oficial do emitente."
+          : "Fonte estrutural ainda não ligada.";
+    }
+
+    if($("#etfOfficialCoverage")){
+      $("#etfOfficialCoverage").textContent=
+        state==="loading"
+          ? "A validar a cobertura dos campos."
+          : "Cobertura oficial indisponível.";
+    }
+
+    if($("#etfProfileStatus")){
+      $("#etfProfileStatus").innerHTML=
+        state==="loading"
+          ? "<strong>Estado atual:</strong> a consultar a página oficial do emitente."
+          : "<strong>Estado atual:</strong> a identificação e a cotação estão ligadas; os dados estruturais aguardam uma fonte oficial compatível.";
+    }
+
+    setEtfProfileLink(
+      "#etfOfficialPageLink",
+      null,
+      "Abrir página oficial"
+    );
+    setEtfProfileLink(
+      "#etfFactsheetLink",
+      null,
+      "Abrir factsheet"
+    );
+  }
+
+  function renderEtfOfficialProfile(payload){
+    const asset=payload.asset || {};
+    const profile=payload.etf_profile || null;
+    const source=payload.sources?.etf_structure || {};
+
+    if(asset.asset_type!=="etf"){
+      resetEtfOfficialProfile();
+      return;
+    }
+
+    if(!profile){
+      resetEtfOfficialProfile();
+
+      if($("#etfOfficialSourceStatus")){
+        $("#etfOfficialSourceStatus").textContent=
+          source.reason ||
+          "Ainda não existe um adaptador oficial para este ETF.";
+      }
+
+      if($("#etfProfileStatus")){
+        $("#etfProfileStatus").innerHTML=
+          "<strong>Estado atual:</strong> preço e identificação disponíveis; a análise estrutural oficial ainda não está ligada para este emitente.";
+      }
+
+      return;
+    }
+
+    const holdings=profile.number_of_stocks
+      ? `${profile.number_of_stocks} posições`
+      : null;
+
+    const aum=[
+      profile.total_assets
+        ? `${profile.total_assets} no fundo`
+        : null,
+      profile.share_class_assets
+        ? `${profile.share_class_assets} na classe`
+        : null
+    ].filter(Boolean).join(" · ");
+
+    const issuer=[
+      profile.issuer,
+      profile.investment_manager
+    ].filter(Boolean).join(" · ");
+
+    setEtfProfileText("#etfBenchmark", profile.benchmark);
+    setEtfProfileText(
+      "#etfTer",
+      profile.ocf_ter,
+      "Ainda não extraído da fonte oficial"
+    );
+    setEtfProfileText(
+      "#etfDistribution",
+      profile.distribution_policy || profile.dividend_schedule
+    );
+    setEtfProfileText("#etfReplication", profile.investment_method);
+    setEtfProfileText("#etfAum", aum || profile.total_assets);
+    setEtfProfileText("#etfHoldings", holdings);
+    setEtfProfileText(
+      "#etfShareClassAssets",
+      profile.share_class_assets
+    );
+    setEtfProfileText(
+      "#etfStructure",
+      profile.investment_structure
+    );
+    setEtfProfileText("#etfDomicile", profile.domicile);
+    setEtfProfileText(
+      "#etfInception",
+      profile.share_class_inception
+    );
+    setEtfProfileText(
+      "#etfListingDate",
+      profile.listing_date
+    );
+    setEtfProfileText("#etfIssuer", issuer);
+
+    if($("#etfAssetBadge")){
+      $("#etfAssetBadge").textContent=
+        `Fonte oficial: ${profile.issuer || "emitente"}`;
+    }
+
+    if($("#etfAnalysisDescription")){
+      $("#etfAnalysisDescription").textContent=
+        "O perfil estrutural abaixo vem da documentação oficial do emitente; campos ausentes permanecem explicitamente por preencher.";
+    }
+
+    const coverage=Number(profile.coverage?.percentage);
+
+    if($("#etfOfficialSourceStatus")){
+      $("#etfOfficialSourceStatus").textContent=
+        `${profile.source || "Fonte oficial do emitente"} ligada.`;
+    }
+
+    if($("#etfOfficialCoverage")){
+      $("#etfOfficialCoverage").textContent=
+        Number.isFinite(coverage)
+          ? `${formatNumber(coverage)}% dos campos estruturais principais disponíveis.`
+          : "Cobertura estrutural parcial.";
+    }
+
+    if($("#etfProfileStatus")){
+      $("#etfProfileStatus").innerHTML=
+        "<strong>Estado atual:</strong> benchmark, replicação, dimensão, domicílio e datas oficiais estão ligados. TER, holdings detalhadas, tracking, valuation e encaixe na carteira continuam incompletos quando não aparecem acima.";
+    }
+
+    setEtfProfileLink(
+      "#etfOfficialPageLink",
+      profile.source_url,
+      "Abrir página oficial"
+    );
+    setEtfProfileLink(
+      "#etfFactsheetLink",
+      profile.factsheet_url,
+      "Abrir factsheet"
+    );
+
+    if(profile.total_assets || profile.share_class_assets){
+      $("#realMarketCap").textContent=
+        profile.total_assets || profile.share_class_assets;
+    }
+
+    if(profile.domicile){
+      $("#realCountry").textContent=profile.domicile;
+    }
+
+    if(profile.listing_date || profile.share_class_inception){
+      $("#realIpoDate").textContent=
+        profile.listing_date || profile.share_class_inception;
+    }
+
+    const website=$("#realWebsite");
+
+    if(website && profile.source_url){
+      website.href=profile.source_url;
+      website.textContent="Abrir página oficial do ETF";
+      website.style.pointerEvents="";
+      website.style.opacity="";
+    }
+  }
+
   function renderUnifiedAnalysis(payload){
     const asset=payload.asset || {};
     const market=payload.market || {};
@@ -3561,8 +3875,10 @@
 
     if(asset.asset_type==="stock"){
       renderUnifiedFundamentals(payload.fundamentals);
+      resetEtfOfficialProfile();
     }else{
       resetStockFundamentals();
+      renderEtfOfficialProfile(payload);
     }
 
     const logo=$("#assetLogo");
@@ -3733,6 +4049,7 @@
     resetRealAssetView(cleanIdentifier, "loading");
     resetAnalysisQuality("loading");
     resetFrameworkEngine("loading");
+    resetEtfOfficialProfile("loading");
 
     status.textContent="A construir análise agregada…";
     detail.textContent=
