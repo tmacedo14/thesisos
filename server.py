@@ -1353,6 +1353,518 @@ def find_official_document_link(
     return None
 
 
+
+VANGUARD_DATE_PATTERN = r"\d{1,2}\s+[A-Za-z]{3}\s+\d{4}"
+VANGUARD_PERCENT_PATTERN = r"[-+]?\d+(?:\.\d+)?%"
+VANGUARD_NUMBER_PATTERN = r"\d[\d,]*(?:\.\d+)?"
+
+VANGUARD_REGIONS = [
+    "North America",
+    "Emerging Markets",
+    "Pacific",
+    "Europe",
+]
+
+VANGUARD_SECTORS = [
+    "Communication Services",
+    "Consumer Discretionary",
+    "Consumer Staples",
+    "Financials",
+    "Health Care",
+    "Industrials",
+    "Information Technology",
+    "Technology",
+    "Materials",
+    "Real Estate",
+    "Utilities",
+    "Energy",
+]
+
+
+def first_vanguard_match(
+    text,
+    pattern,
+    flags=re.IGNORECASE,
+):
+    match = re.search(pattern, text, flags)
+
+    if not match:
+        return None
+
+    if match.lastindex == 1:
+        return clean_official_text(match.group(1))
+
+    return [
+        clean_official_text(group)
+        for group in match.groups()
+    ]
+
+
+def vanguard_percent_to_number(value):
+    if value is None:
+        return None
+
+    try:
+        return float(
+            value.replace("%", "").replace(",", "")
+        )
+    except ValueError:
+        return None
+
+
+def vanguard_number_to_float(value):
+    if value is None:
+        return None
+
+    try:
+        return float(value.replace(",", ""))
+    except ValueError:
+        return None
+
+
+def parse_vanguard_tracking_error(text):
+    values = first_vanguard_match(
+        text,
+        (
+            r"Annualized Tracking Error\s+"
+            r"1 year\s+("
+            + VANGUARD_PERCENT_PATTERN
+            + r")\s+3 years\s+("
+            + VANGUARD_PERCENT_PATTERN
+            + r")\s+5 years\s+("
+            + VANGUARD_PERCENT_PATTERN
+            + r")"
+        ),
+    )
+
+    if not values:
+        return {
+            "one_year_percentage": None,
+            "three_year_percentage": None,
+            "five_year_percentage": None,
+        }
+
+    return {
+        "one_year_percentage": (
+            vanguard_percent_to_number(values[0])
+        ),
+        "three_year_percentage": (
+            vanguard_percent_to_number(values[1])
+        ),
+        "five_year_percentage": (
+            vanguard_percent_to_number(values[2])
+        ),
+    }
+
+
+def parse_vanguard_characteristics(text):
+    number_of_stocks = first_vanguard_match(
+        text,
+        (
+            r"Number of stocks\s+("
+            + VANGUARD_NUMBER_PATTERN
+            + r")\s+("
+            + VANGUARD_NUMBER_PATTERN
+            + r")\s+("
+            + VANGUARD_DATE_PATTERN
+            + r")"
+        ),
+    )
+
+    price_to_earnings = first_vanguard_match(
+        text,
+        (
+            r"Price earning\s*/\s*ratio\s*\(P/E\)\s+("
+            + VANGUARD_NUMBER_PATTERN
+            + r")\s*x\s+("
+            + VANGUARD_NUMBER_PATTERN
+            + r")\s*x\s+("
+            + VANGUARD_DATE_PATTERN
+            + r")"
+        ),
+    )
+
+    price_to_book = first_vanguard_match(
+        text,
+        (
+            r"Price\s*/\s*accounting ratio\s*\(P/B\)\s+("
+            + VANGUARD_NUMBER_PATTERN
+            + r")\s*x\s+("
+            + VANGUARD_NUMBER_PATTERN
+            + r")\s*x\s+("
+            + VANGUARD_DATE_PATTERN
+            + r")"
+        ),
+    )
+
+    return_on_equity = first_vanguard_match(
+        text,
+        (
+            r"Return on equity\s*\(ROE\)\s+("
+            + VANGUARD_PERCENT_PATTERN
+            + r")\s+("
+            + VANGUARD_PERCENT_PATTERN
+            + r")\s+("
+            + VANGUARD_DATE_PATTERN
+            + r")"
+        ),
+    )
+
+    earnings_growth = first_vanguard_match(
+        text,
+        (
+            r"Earnings growth rate\s+("
+            + VANGUARD_PERCENT_PATTERN
+            + r")\s+("
+            + VANGUARD_PERCENT_PATTERN
+            + r")\s+("
+            + VANGUARD_DATE_PATTERN
+            + r")"
+        ),
+    )
+
+    return {
+        "number_of_stocks": {
+            "fund": (
+                vanguard_number_to_float(
+                    number_of_stocks[0]
+                )
+                if number_of_stocks
+                else None
+            ),
+            "benchmark": (
+                vanguard_number_to_float(
+                    number_of_stocks[1]
+                )
+                if number_of_stocks
+                else None
+            ),
+            "as_of": (
+                number_of_stocks[2]
+                if number_of_stocks
+                else None
+            ),
+        },
+        "price_to_earnings": {
+            "fund": (
+                vanguard_number_to_float(
+                    price_to_earnings[0]
+                )
+                if price_to_earnings
+                else None
+            ),
+            "benchmark": (
+                vanguard_number_to_float(
+                    price_to_earnings[1]
+                )
+                if price_to_earnings
+                else None
+            ),
+            "as_of": (
+                price_to_earnings[2]
+                if price_to_earnings
+                else None
+            ),
+        },
+        "price_to_book": {
+            "fund": (
+                vanguard_number_to_float(
+                    price_to_book[0]
+                )
+                if price_to_book
+                else None
+            ),
+            "benchmark": (
+                vanguard_number_to_float(
+                    price_to_book[1]
+                )
+                if price_to_book
+                else None
+            ),
+            "as_of": (
+                price_to_book[2]
+                if price_to_book
+                else None
+            ),
+        },
+        "return_on_equity_percentage": {
+            "fund": (
+                vanguard_percent_to_number(
+                    return_on_equity[0]
+                )
+                if return_on_equity
+                else None
+            ),
+            "benchmark": (
+                vanguard_percent_to_number(
+                    return_on_equity[1]
+                )
+                if return_on_equity
+                else None
+            ),
+            "as_of": (
+                return_on_equity[2]
+                if return_on_equity
+                else None
+            ),
+        },
+        "earnings_growth_percentage": {
+            "fund": (
+                vanguard_percent_to_number(
+                    earnings_growth[0]
+                )
+                if earnings_growth
+                else None
+            ),
+            "benchmark": (
+                vanguard_percent_to_number(
+                    earnings_growth[1]
+                )
+                if earnings_growth
+                else None
+            ),
+            "as_of": (
+                earnings_growth[2]
+                if earnings_growth
+                else None
+            ),
+        },
+    }
+
+
+def parse_vanguard_market_allocation(text):
+    start = text.find("Market allocation")
+
+    if start < 0:
+        return []
+
+    end = text.find("Holdings details", start)
+    section = text[start:end if end > start else None]
+
+    region_pattern = "|".join(
+        re.escape(region)
+        for region in sorted(
+            VANGUARD_REGIONS,
+            key=len,
+            reverse=True,
+        )
+    )
+
+    row_pattern = re.compile(
+        (
+            r"(?P<country>[A-Za-z][A-Za-z .'-]*?)\s+"
+            r"(?P<region>"
+            + region_pattern
+            + r")\s+"
+            r"(?P<fund>"
+            + VANGUARD_PERCENT_PATTERN
+            + r")\s+"
+            r"(?P<benchmark>"
+            + VANGUARD_PERCENT_PATTERN
+            + r")\s+"
+            r"(?P<variance>"
+            + VANGUARD_PERCENT_PATTERN
+            + r")"
+        )
+    )
+
+    rows = []
+
+    for match in row_pattern.finditer(section):
+        rows.append(
+            {
+                "country": clean_official_text(
+                    match.group("country")
+                ),
+                "region": match.group("region"),
+                "fund_percentage": (
+                    vanguard_percent_to_number(
+                        match.group("fund")
+                    )
+                ),
+                "benchmark_percentage": (
+                    vanguard_percent_to_number(
+                        match.group("benchmark")
+                    )
+                ),
+                "variance_percentage_points": (
+                    vanguard_percent_to_number(
+                        match.group("variance")
+                    )
+                ),
+            }
+        )
+
+    return rows
+
+
+def clean_vanguard_holding_name(value):
+    name = clean_official_text(value)
+
+    header_prefixes = [
+        (
+            "of market value Sector Region "
+            "Market value Shares "
+        ),
+        (
+            "Percentage of market value Sector Region "
+            "Market value Shares "
+        ),
+        (
+            "% of market value Sector Region "
+            "Market value Shares "
+        ),
+    ]
+
+    for prefix in header_prefixes:
+        if name.startswith(prefix):
+            name = name[len(prefix):].strip()
+            break
+
+    name = re.sub(
+        (
+            r"^(?:of market value|percentage of market value)\s+"
+            r"sector\s+region\s+market value\s+shares\s+"
+        ),
+        "",
+        name,
+        flags=re.IGNORECASE,
+    )
+
+    return clean_official_text(name)
+
+
+def parse_vanguard_holdings(text):
+    start = text.find("Holdings details")
+
+    if start < 0:
+        return []
+
+    end = text.find("Total allocation percentages", start)
+    section = text[start:end if end > start else None]
+
+    sector_pattern = "|".join(
+        re.escape(sector)
+        for sector in sorted(
+            VANGUARD_SECTORS,
+            key=len,
+            reverse=True,
+        )
+    )
+
+    row_pattern = re.compile(
+        (
+            r"(?P<name>[A-Za-z0-9]"
+            r"[A-Za-z0-9&.,()' -]*?)\s+"
+            r"(?P<weight>\d+(?:\.\d+)?%)\s+"
+            r"(?P<sector>"
+            + sector_pattern
+            + r")\s+"
+            r"(?P<region>[A-Z]{2})\s+"
+            r"(?P<market_value>(?:US\$|\$|£|€)"
+            r"[\d,]+(?:\.\d+)?)\s+"
+            r"(?P<shares>[\d,]+)"
+        )
+    )
+
+    rows = []
+
+    for match in row_pattern.finditer(section):
+        rows.append(
+            {
+                "name": clean_vanguard_holding_name(
+                    match.group("name")
+                ),
+                "weight_percentage": (
+                    vanguard_percent_to_number(
+                        match.group("weight")
+                    )
+                ),
+                "sector": match.group("sector"),
+                "region_code": match.group("region"),
+                "market_value": match.group(
+                    "market_value"
+                ),
+                "shares": vanguard_number_to_float(
+                    match.group("shares")
+                ),
+            }
+        )
+
+    return rows
+
+
+def parse_vanguard_prices_and_structure(text):
+    outstanding = first_vanguard_match(
+        text,
+        (
+            r"Outstanding shares\s+("
+            + VANGUARD_NUMBER_PATTERN
+            + r")\s+At closure\s+("
+            + VANGUARD_DATE_PATTERN
+            + r")"
+        ),
+    )
+
+    nav_high = first_vanguard_match(
+        text,
+        (
+            r"NAV 52-week high\s+"
+            r"((?:US\$|\$|£|€)"
+            + VANGUARD_NUMBER_PATTERN
+            + r")"
+        ),
+    )
+
+    nav_low = first_vanguard_match(
+        text,
+        (
+            r"NAV 52-week low\s+"
+            r"((?:US\$|\$|£|€)"
+            + VANGUARD_NUMBER_PATTERN
+            + r")"
+        ),
+    )
+
+    listed_currencies = first_vanguard_match(
+        text,
+        r"Listed currencies:\s*([A-Z, ]+?)\s+Base currency:",
+    )
+
+    base_currency = first_vanguard_match(
+        text,
+        r"Base currency:\s*([A-Z]{3})",
+    )
+
+    return {
+        "outstanding_shares": {
+            "value": (
+                vanguard_number_to_float(
+                    outstanding[0]
+                )
+                if outstanding
+                else None
+            ),
+            "as_of": (
+                outstanding[1]
+                if outstanding
+                else None
+            ),
+        },
+        "nav_52_week_high": nav_high,
+        "nav_52_week_low": nav_low,
+        "listed_currencies": (
+            [
+                item.strip()
+                for item in listed_currencies.split(",")
+            ]
+            if listed_currencies
+            else []
+        ),
+        "base_currency": base_currency,
+    }
+
+
 def build_vanguard_etf_profile(
     asset: dict,
     source_url: str,
@@ -1361,6 +1873,36 @@ def build_vanguard_etf_profile(
     parser = OfficialEtfPageParser()
     parser.feed(page_html)
     tokens = parser.tokens
+    page_text = clean_official_text(" ".join(tokens))
+
+    tracking_error = parse_vanguard_tracking_error(
+        page_text
+    )
+    characteristics = parse_vanguard_characteristics(
+        page_text
+    )
+    market_allocation = parse_vanguard_market_allocation(
+        page_text
+    )
+    holdings = parse_vanguard_holdings(page_text)
+    prices_and_structure = (
+        parse_vanguard_prices_and_structure(page_text)
+    )
+
+    top_10_holdings = holdings[:10]
+
+    top_10_weight = (
+        round(
+            sum(
+                item["weight_percentage"]
+                for item in top_10_holdings
+                if item.get("weight_percentage") is not None
+            ),
+            4,
+        )
+        if top_10_holdings
+        else None
+    )
 
     profile = {
         "issuer": "Vanguard",
@@ -1435,10 +1977,37 @@ def build_vanguard_etf_profile(
             tokens,
             ["OCF/TER", "OCF", "TER"],
         ),
-        "number_of_stocks": find_official_value(
-            tokens,
-            ["Number of stocks"],
+        "number_of_stocks": (
+            characteristics
+            .get("number_of_stocks", {})
+            .get("fund")
+            or find_official_value(
+                tokens,
+                ["Number of stocks"],
+            )
         ),
+        "tracking_error": tracking_error,
+        "characteristics": characteristics,
+        "market_allocation": market_allocation,
+        "top_holdings": top_10_holdings,
+        "concentration": {
+            "top_10_weight_percentage": top_10_weight,
+            "largest_holding_percentage": (
+                top_10_holdings[0].get(
+                    "weight_percentage"
+                )
+                if top_10_holdings
+                else None
+            ),
+            "largest_country_percentage": (
+                market_allocation[0].get(
+                    "fund_percentage"
+                )
+                if market_allocation
+                else None
+            ),
+        },
+        "prices_and_structure": prices_and_structure,
         "distribution_policy": (
             "Accumulating"
             if "ACCUMULATING" in str(
@@ -1455,30 +2024,61 @@ def build_vanguard_etf_profile(
         "source": "Vanguard official product page",
     }
 
-    core_fields = [
-        "share_class_inception",
-        "listing_date",
-        "investment_structure",
-        "share_class_assets",
-        "total_assets",
-        "investment_method",
-        "benchmark",
-        "domicile",
-    ]
+    core_checks = {
+        "share_class_inception": bool(
+            profile.get("share_class_inception")
+        ),
+        "listing_date": bool(profile.get("listing_date")),
+        "investment_structure": bool(
+            profile.get("investment_structure")
+        ),
+        "share_class_assets": bool(
+            profile.get("share_class_assets")
+        ),
+        "total_assets": bool(profile.get("total_assets")),
+        "investment_method": bool(
+            profile.get("investment_method")
+        ),
+        "benchmark": bool(profile.get("benchmark")),
+        "domicile": bool(profile.get("domicile")),
+        "number_of_stocks": bool(
+            profile.get("number_of_stocks")
+        ),
+        "tracking_error": any(
+            value is not None
+            for value in tracking_error.values()
+        ),
+        "top_holdings": bool(top_10_holdings),
+        "market_allocation": bool(market_allocation),
+        "aggregate_valuation": any(
+            characteristics.get(key, {}).get("fund")
+            is not None
+            for key in [
+                "price_to_earnings",
+                "price_to_book",
+            ]
+        ),
+        "outstanding_shares": (
+            prices_and_structure
+            .get("outstanding_shares", {})
+            .get("value")
+            is not None
+        ),
+        "base_currency": bool(
+            prices_and_structure.get("base_currency")
+        ),
+    }
 
-    available = sum(
-        1
-        for field in core_fields
-        if profile.get(field) not in (None, "", "—")
-    )
+    available = sum(core_checks.values())
 
     profile["coverage"] = {
         "available_core_fields": available,
-        "required_core_fields": len(core_fields),
+        "required_core_fields": len(core_checks),
         "percentage": round(
-            available / len(core_fields) * 100,
+            available / len(core_checks) * 100,
             2,
         ),
+        "checks": core_checks,
     }
 
     return profile
@@ -2098,7 +2698,7 @@ def analysis_source(
 
 
 
-FRAMEWORK_ENGINE_VERSION = "0.3"
+FRAMEWORK_ENGINE_VERSION = "0.4"
 
 
 def fact_value(fact):
@@ -3126,51 +3726,236 @@ def build_etf_framework_engine(
     ]
 
     holdings_available = [
-        "número de posições"
-        for key in ["number_of_stocks"]
-        if etf_profile.get(key)
+        label
+        for available, label in [
+            (
+                bool(etf_profile.get("number_of_stocks")),
+                "número de posições",
+            ),
+            (
+                bool(etf_profile.get("top_holdings")),
+                "top holdings",
+            ),
+            (
+                bool(etf_profile.get("market_allocation")),
+                "exposição por países",
+            ),
+            (
+                bool(
+                    etf_profile.get("concentration", {}).get(
+                        "top_10_weight_percentage"
+                    )
+                    is not None
+                ),
+                "concentração do top 10",
+            ),
+            (
+                bool(
+                    etf_profile.get("top_holdings")
+                    and any(
+                        item.get("sector")
+                        for item in etf_profile.get(
+                            "top_holdings",
+                            [],
+                        )
+                    )
+                ),
+                "setores das principais posições",
+            ),
+        ]
+        if available
     ]
 
     holdings_missing = [
-        "top holdings",
-        "setores",
-        "geografias",
-        "moedas",
-        "concentração",
-        "overlap",
+        item
+        for item in [
+            (
+                "top holdings"
+                if not etf_profile.get("top_holdings")
+                else None
+            ),
+            (
+                "geografias"
+                if not etf_profile.get(
+                    "market_allocation"
+                )
+                else None
+            ),
+            "alocação setorial completa",
+            "exposição por moedas das holdings",
+            "overlap com outros ETFs",
+        ]
+        if item
     ]
+
+    tracking_error = etf_profile.get(
+        "tracking_error",
+        {},
+    )
+    characteristics = etf_profile.get(
+        "characteristics",
+        {},
+    )
+    prices_and_structure = etf_profile.get(
+        "prices_and_structure",
+        {},
+    )
+    concentration = etf_profile.get(
+        "concentration",
+        {},
+    )
+
+    tracking_error_available = any(
+        value is not None
+        for value in tracking_error.values()
+    )
 
     implementation_available = [
         label
-        for key, label in [
-            ("ocf_ter", "TER/OCF"),
-            ("share_class_assets", "ativos da classe"),
-            ("total_assets", "ativos totais"),
-            ("investment_method", "replicação"),
-            ("domicile", "domicílio"),
-            ("distribution_policy", "política de distribuição"),
-            ("tax_status", "estatuto fiscal"),
+        for available, label in [
+            (
+                bool(etf_profile.get("ocf_ter")),
+                "TER/OCF",
+            ),
+            (
+                bool(etf_profile.get("share_class_assets")),
+                "ativos da classe",
+            ),
+            (
+                bool(etf_profile.get("total_assets")),
+                "ativos totais",
+            ),
+            (
+                bool(etf_profile.get("investment_method")),
+                "replicação",
+            ),
+            (
+                bool(etf_profile.get("domicile")),
+                "domicílio",
+            ),
+            (
+                bool(etf_profile.get("distribution_policy")),
+                "política de distribuição",
+            ),
+            (
+                bool(etf_profile.get("tax_status")),
+                "estatuto fiscal",
+            ),
+            (
+                tracking_error_available,
+                "tracking error",
+            ),
+            (
+                (
+                    prices_and_structure
+                    .get("outstanding_shares", {})
+                    .get("value")
+                    is not None
+                ),
+                "unidades em circulação",
+            ),
+            (
+                bool(
+                    prices_and_structure.get(
+                        "base_currency"
+                    )
+                ),
+                "moeda base",
+            ),
+            (
+                bool(
+                    prices_and_structure.get(
+                        "listed_currencies"
+                    )
+                ),
+                "moedas de listagem",
+            ),
         ]
-        if etf_profile.get(key)
+        if available
     ]
 
     implementation_missing = [
         label
-        for key, label in [
-            ("ocf_ter", "TER/OCF"),
-            ("share_class_assets", "ativos da classe"),
-            ("total_assets", "ativos totais"),
-            ("investment_method", "replicação"),
-            ("domicile", "domicílio"),
-            ("distribution_policy", "política de distribuição"),
-            ("tax_status", "estatuto fiscal"),
+        for available, label in [
+            (
+                bool(etf_profile.get("ocf_ter")),
+                "TER/OCF",
+            ),
+            (
+                bool(etf_profile.get("share_class_assets")),
+                "ativos da classe",
+            ),
+            (
+                bool(etf_profile.get("total_assets")),
+                "ativos totais",
+            ),
+            (
+                bool(etf_profile.get("investment_method")),
+                "replicação",
+            ),
+            (
+                bool(etf_profile.get("domicile")),
+                "domicílio",
+            ),
+            (
+                bool(etf_profile.get("distribution_policy")),
+                "política de distribuição",
+            ),
+            (
+                bool(etf_profile.get("tax_status")),
+                "estatuto fiscal",
+            ),
+            (
+                tracking_error_available,
+                "tracking error",
+            ),
         ]
-        if not etf_profile.get(key)
+        if not available
     ] + [
         "tracking difference",
-        "tracking error",
         "spread",
         "liquidez",
+    ]
+
+    valuation_available = [
+        label
+        for key, label in [
+            ("price_to_earnings", "P/E agregado"),
+            ("price_to_book", "P/B agregado"),
+            (
+                "return_on_equity_percentage",
+                "ROE agregado",
+            ),
+            (
+                "earnings_growth_percentage",
+                "crescimento agregado dos lucros",
+            ),
+        ]
+        if characteristics.get(key, {}).get("fund")
+        is not None
+    ]
+
+    valuation_missing = [
+        "valuation histórico",
+        "earnings yield",
+        "comparação com ETFs alternativos",
+    ]
+
+    technical_available = [
+        label
+        for key, label in [
+            ("nav_52_week_high", "máximo NAV 52 semanas"),
+            ("nav_52_week_low", "mínimo NAV 52 semanas"),
+        ]
+        if prices_and_structure.get(key)
+    ]
+
+    technical_missing = [
+        "pullback",
+        "médias móveis",
+        "suportes",
+        "RSI",
+        "força relativa",
     ]
 
     profile_available = bool(etf_profile)
@@ -3245,27 +4030,24 @@ def build_etf_framework_engine(
         framework_item(
             "aggregate_valuation",
             "Valuation agregado",
-            "missing",
-            [],
-            [
-                "P/E agregado",
-                "crescimento dos lucros",
-                "valuation histórico",
-                "comparação com benchmark",
-            ],
+            (
+                "partial"
+                if valuation_available
+                else "missing"
+            ),
+            valuation_available,
+            valuation_missing,
         ),
         framework_item(
             "technical",
             "Pullback e momento de entrada",
-            "missing",
-            [],
-            [
-                "pullback",
-                "médias móveis",
-                "suportes",
-                "RSI",
-                "força relativa",
-            ],
+            (
+                "partial"
+                if technical_available
+                else "missing"
+            ),
+            technical_available,
+            technical_missing,
         ),
         framework_item(
             "portfolio_fit",
@@ -3316,10 +4098,11 @@ def build_etf_framework_engine(
         ),
         "scope": (
             (
-                "Identificação, preço, moeda e parte dos dados "
-                "estruturais oficiais do ETF já estão ligados. "
-                "Holdings detalhadas, tracking, valuation e carteira "
-                "continuam incompletos."
+                "Identificação, preço, moeda, composição, "
+                "tracking error, concentração e valuation agregado "
+                "já estão parcialmente ligados. TER, tracking "
+                "difference, análise técnica e carteira continuam "
+                "incompletos."
             )
             if profile_available
             else (
@@ -3349,16 +4132,24 @@ def build_etf_framework_engine(
                 "name": "Framework de decisão e monitorização",
                 "status": "blocked",
                 "reason": (
-                    "TER, holdings, metodologia, overlap, valuation "
-                    "agregado e carteira ainda ausentes."
+                    "TER, tracking difference, análise técnica, "
+                    "overlap e contexto da carteira ainda incompletos."
                 ),
             },
         ],
         "quantitative_snapshot": {
             "score": None,
             "classification": {
-                "code": "insufficient_data",
-                "label": "Dados insuficientes",
+                "code": (
+                    "partial_etf_profile"
+                    if profile_available
+                    else "insufficient_data"
+                ),
+                "label": (
+                    "Perfil estrutural parcial"
+                    if profile_available
+                    else "Dados insuficientes"
+                ),
             },
             "coverage_percentage": (
                 etf_profile.get("coverage", {}).get(
@@ -3369,10 +4160,112 @@ def build_etf_framework_engine(
                 else 0
             ),
             "rules": [],
-            "positive_signals": [],
-            "warning_signals": [],
+            "positive_signals": [
+                signal
+                for signal in [
+                    (
+                        {
+                            "label": "Tracking error a 5 anos",
+                            "value": tracking_error.get(
+                                "five_year_percentage"
+                            ),
+                            "unit": "%",
+                            "interpretation": (
+                                "Desvio histórico reduzido face "
+                                "ao benchmark."
+                            ),
+                        }
+                        if tracking_error.get(
+                            "five_year_percentage"
+                        ) is not None
+                        else None
+                    ),
+                    (
+                        {
+                            "label": "Número de posições",
+                            "value": etf_profile.get(
+                                "number_of_stocks"
+                            ),
+                            "unit": "",
+                            "interpretation": (
+                                "Elevada diversificação nominal "
+                                "do fundo."
+                            ),
+                        }
+                        if isinstance(
+                            etf_profile.get(
+                                "number_of_stocks"
+                            ),
+                            (int, float),
+                        )
+                        else None
+                    ),
+                    (
+                        {
+                            "label": "Peso do top 10",
+                            "value": concentration.get(
+                                "top_10_weight_percentage"
+                            ),
+                            "unit": "%",
+                            "interpretation": (
+                                "A concentração nas maiores "
+                                "posições permanece moderada."
+                            ),
+                        }
+                        if concentration.get(
+                            "top_10_weight_percentage"
+                        ) is not None
+                        else None
+                    ),
+                ]
+                if signal
+            ],
+            "warning_signals": [
+                signal
+                for signal in [
+                    (
+                        {
+                            "label": "Maior país",
+                            "value": concentration.get(
+                                "largest_country_percentage"
+                            ),
+                            "unit": "%",
+                            "interpretation": (
+                                "A exposição geográfica está "
+                                "fortemente concentrada nos EUA."
+                            ),
+                        }
+                        if concentration.get(
+                            "largest_country_percentage"
+                        ) is not None
+                        else None
+                    ),
+                    (
+                        {
+                            "label": "TER/OCF",
+                            "value": None,
+                            "unit": "",
+                            "interpretation": (
+                                "O custo oficial ainda não foi "
+                                "extraído com segurança."
+                            ),
+                        }
+                        if not etf_profile.get("ocf_ter")
+                        else None
+                    ),
+                ]
+                if signal
+            ],
+            "etf_metrics": {
+                "tracking_error": tracking_error,
+                "characteristics": characteristics,
+                "concentration": concentration,
+                "prices_and_structure": prices_and_structure,
+            },
             "methodology_note": (
-                "O ThesisOS não atribui um score empresarial a ETFs."
+                "O ThesisOS não aplica um score empresarial a ETFs. "
+                "Os sinais representam estrutura, diversificação, "
+                "tracking e concentração, não uma recomendação final."
             ),
         },
         "framework_checklist": {
@@ -3398,11 +4291,11 @@ def build_etf_framework_engine(
                     if not etf_profile.get("ocf_ter")
                     else None
                 ),
-                "tracking difference e tracking error",
+                "tracking difference",
                 "liquidez e spread",
-                "top holdings, setores, geografias e moedas",
+                "alocação setorial e cambial completa",
                 "overlap com a carteira",
-                "valuation agregado",
+                "valuation histórico e comparação com alternativas",
                 "análise técnica e zona de reforço",
             ]
             if item
@@ -3415,7 +4308,7 @@ def build_etf_framework_engine(
             ),
             "action": "monitor",
             "label": (
-                "Aguardar holdings, tracking, valuation e carteira"
+                "Aguardar TER, técnica, overlap e carteira"
                 if profile_available
                 else "Aguardar dados estruturais do ETF"
             ),
@@ -3426,15 +4319,16 @@ def build_etf_framework_engine(
             "catalysts": [],
             "thesis_break_signals": [],
             "next_review": (
-                "Após integração de holdings e tracking"
+                "Após integração de TER, técnica e overlap"
                 if profile_available
                 else "Após integração do factsheet oficial"
             ),
             "reason": (
                 (
-                    "Os dados oficiais melhoram a análise estrutural, "
-                    "mas ainda não permitem avaliar concentração, "
-                    "tracking, valuation e encaixe na carteira."
+                    "A composição, concentração, tracking error e "
+                    "valuation agregado já estão parcialmente ligados, "
+                    "mas faltam custos confirmados, tracking difference, "
+                    "momento de entrada e encaixe na carteira."
                 )
                 if profile_available
                 else (

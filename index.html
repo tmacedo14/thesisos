@@ -1011,6 +1011,135 @@
       .cashflow-footer{flex-direction:column}
     }
 
+  
+    /* ThesisOS ETF portfolio composition and tracking */
+    .etf-portfolio-section{
+      margin-top:14px;
+      padding-top:14px;
+      border-top:1px solid var(--line);
+    }
+    .etf-portfolio-summary{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:10px;
+      margin-top:10px;
+    }
+    .etf-portfolio-metric{
+      padding:13px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:var(--panel-2);
+      min-height:102px;
+    }
+    .etf-portfolio-metric span{
+      display:block;
+      color:var(--muted);
+      font-size:12px;
+      margin-bottom:7px;
+    }
+    .etf-portfolio-metric strong{
+      display:block;
+      font-size:20px;
+      line-height:1.2;
+    }
+    .etf-portfolio-metric small{
+      display:block;
+      color:var(--muted);
+      margin-top:6px;
+      line-height:1.35;
+    }
+    .etf-portfolio-columns{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      margin-top:12px;
+    }
+    .etf-portfolio-block{
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:var(--panel-2);
+      overflow:hidden;
+    }
+    .etf-portfolio-block-head{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+      padding:13px 14px;
+      border-bottom:1px solid var(--border);
+    }
+    .etf-portfolio-block-head strong{font-size:14px}
+    .etf-portfolio-block-head small{
+      color:var(--muted);
+      line-height:1.35;
+      text-align:right;
+    }
+    .etf-table-wrap{overflow:auto;max-height:380px}
+    .etf-portfolio-table{
+      width:100%;
+      border-collapse:collapse;
+      min-width:510px;
+      font-size:12px;
+    }
+    .etf-portfolio-table th,
+    .etf-portfolio-table td{
+      padding:10px 12px;
+      border-bottom:1px solid var(--border);
+      text-align:left;
+      vertical-align:top;
+    }
+    .etf-portfolio-table th{
+      position:sticky;
+      top:0;
+      z-index:1;
+      background:var(--panel);
+      color:var(--muted);
+      font-weight:600;
+    }
+    .etf-portfolio-table td:last-child,
+    .etf-portfolio-table th:last-child{text-align:right}
+    .etf-portfolio-empty{
+      padding:18px 14px;
+      color:var(--muted);
+      text-align:center;
+      line-height:1.5;
+    }
+    .etf-weight-bar{
+      width:86px;
+      height:6px;
+      margin-top:5px;
+      margin-left:auto;
+      overflow:hidden;
+      border-radius:999px;
+      background:rgba(131,145,168,.2);
+    }
+    .etf-weight-bar span{
+      display:block;
+      height:100%;
+      border-radius:inherit;
+      background:var(--accent);
+    }
+    .etf-portfolio-structure{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:10px;
+      margin-top:12px;
+    }
+    .etf-portfolio-structure .etf-data-item{min-height:92px}
+    @media (max-width:1050px){
+      .etf-portfolio-summary,
+      .etf-portfolio-structure{
+        grid-template-columns:repeat(2,minmax(0,1fr))
+      }
+      .etf-portfolio-columns{grid-template-columns:1fr}
+    }
+    @media (max-width:620px){
+      .etf-portfolio-summary,
+      .etf-portfolio-structure{
+        grid-template-columns:1fr
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -1852,6 +1981,129 @@
           <div class="etf-data-item">
             <span>Emitente / gestor</span>
             <strong id="etfIssuer">Dados ainda não ligados</strong>
+          </div>
+        </div>
+
+        <div class="etf-portfolio-section" id="etfPortfolioInsights">
+          <div class="section-head" style="margin:0 0 8px">
+            <div>
+              <h2>Composição, tracking e valuation agregado</h2>
+              <p class="sub" id="etfPortfolioDataDate">
+                A aguardar dados oficiais da carteira do ETF.
+              </p>
+            </div>
+            <span class="pill" id="etfPortfolioBadge">Dados parciais</span>
+          </div>
+
+          <div class="etf-portfolio-summary">
+            <div class="etf-portfolio-metric">
+              <span>Número de posições</span>
+              <strong id="etfPortfolioPositions">—</strong>
+              <small id="etfPortfolioPositionsBenchmark">Benchmark indisponível</small>
+            </div>
+            <div class="etf-portfolio-metric">
+              <span>Tracking error a 5 anos</span>
+              <strong id="etfTrackingFiveYears">—</strong>
+              <small id="etfTrackingShorterPeriods">1 e 3 anos indisponíveis</small>
+            </div>
+            <div class="etf-portfolio-metric">
+              <span>Peso das 10 maiores posições</span>
+              <strong id="etfTopTenWeight">—</strong>
+              <small id="etfLargestHolding">Maior posição indisponível</small>
+            </div>
+            <div class="etf-portfolio-metric">
+              <span>Maior exposição geográfica</span>
+              <strong id="etfLargestCountryWeight">—</strong>
+              <small id="etfLargestCountryName">País indisponível</small>
+            </div>
+          </div>
+
+          <div class="etf-portfolio-summary">
+            <div class="etf-portfolio-metric">
+              <span>P/E agregado</span>
+              <strong id="etfAggregatePe">—</strong>
+              <small id="etfAggregatePeBenchmark">Benchmark indisponível</small>
+            </div>
+            <div class="etf-portfolio-metric">
+              <span>P/B agregado</span>
+              <strong id="etfAggregatePb">—</strong>
+              <small id="etfAggregatePbBenchmark">Benchmark indisponível</small>
+            </div>
+            <div class="etf-portfolio-metric">
+              <span>ROE agregado</span>
+              <strong id="etfAggregateRoe">—</strong>
+              <small id="etfAggregateRoeBenchmark">Benchmark indisponível</small>
+            </div>
+            <div class="etf-portfolio-metric">
+              <span>Crescimento dos lucros</span>
+              <strong id="etfAggregateGrowth">—</strong>
+              <small id="etfAggregateGrowthBenchmark">Benchmark indisponível</small>
+            </div>
+          </div>
+
+          <div class="etf-portfolio-columns">
+            <div class="etf-portfolio-block">
+              <div class="etf-portfolio-block-head">
+                <strong>Principais posições</strong>
+                <small id="etfHoldingsTableMeta">Top holdings indisponíveis</small>
+              </div>
+              <div class="etf-table-wrap">
+                <table class="etf-portfolio-table">
+                  <thead>
+                    <tr>
+                      <th>Empresa</th>
+                      <th>Setor</th>
+                      <th>Região</th>
+                      <th>Peso</th>
+                    </tr>
+                  </thead>
+                  <tbody id="etfHoldingsTableBody">
+                    <tr><td colspan="4" class="etf-portfolio-empty">Dados ainda não ligados.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="etf-portfolio-block">
+              <div class="etf-portfolio-block-head">
+                <strong>Exposição por países</strong>
+                <small id="etfCountriesTableMeta">Alocação geográfica indisponível</small>
+              </div>
+              <div class="etf-table-wrap">
+                <table class="etf-portfolio-table">
+                  <thead>
+                    <tr>
+                      <th>País</th>
+                      <th>Região</th>
+                      <th>Benchmark</th>
+                      <th>Peso</th>
+                    </tr>
+                  </thead>
+                  <tbody id="etfCountriesTableBody">
+                    <tr><td colspan="4" class="etf-portfolio-empty">Dados ainda não ligados.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="etf-portfolio-structure">
+            <div class="etf-data-item">
+              <span>Unidades em circulação</span>
+              <strong id="etfOutstandingShares">—</strong>
+            </div>
+            <div class="etf-data-item">
+              <span>Moeda base</span>
+              <strong id="etfBaseCurrency">—</strong>
+            </div>
+            <div class="etf-data-item">
+              <span>Moedas de listagem</span>
+              <strong id="etfListedCurrencies">—</strong>
+            </div>
+            <div class="etf-data-item">
+              <span>Intervalo NAV 52 semanas</span>
+              <strong id="etfNavRange">—</strong>
+            </div>
           </div>
         </div>
 
@@ -3649,7 +3901,327 @@
     }
   }
 
+  function escapeEtfHtml(value){
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function formatEtfNumber(value, suffix=""){
+    const number=Number(value);
+
+    if(!Number.isFinite(number)) return "—";
+
+    return `${formatNumber(number)}${suffix}`;
+  }
+
+  function resetEtfPortfolioData(state="idle"){
+    [
+      "#etfPortfolioPositions",
+      "#etfTrackingFiveYears",
+      "#etfTopTenWeight",
+      "#etfLargestCountryWeight",
+      "#etfAggregatePe",
+      "#etfAggregatePb",
+      "#etfAggregateRoe",
+      "#etfAggregateGrowth",
+      "#etfOutstandingShares",
+      "#etfBaseCurrency",
+      "#etfListedCurrencies",
+      "#etfNavRange"
+    ].forEach(selector=>{
+      const element=$(selector);
+      if(element) element.textContent="—";
+    });
+
+    const secondary={
+      "#etfPortfolioPositionsBenchmark":"Benchmark indisponível",
+      "#etfTrackingShorterPeriods":"1 e 3 anos indisponíveis",
+      "#etfLargestHolding":"Maior posição indisponível",
+      "#etfLargestCountryName":"País indisponível",
+      "#etfAggregatePeBenchmark":"Benchmark indisponível",
+      "#etfAggregatePbBenchmark":"Benchmark indisponível",
+      "#etfAggregateRoeBenchmark":"Benchmark indisponível",
+      "#etfAggregateGrowthBenchmark":"Benchmark indisponível",
+      "#etfHoldingsTableMeta":"Top holdings indisponíveis",
+      "#etfCountriesTableMeta":"Alocação geográfica indisponível"
+    };
+
+    Object.entries(secondary).forEach(([selector,value])=>{
+      const element=$(selector);
+      if(element) element.textContent=value;
+    });
+
+    if($("#etfPortfolioDataDate")){
+      $("#etfPortfolioDataDate").textContent=
+        state==="loading"
+          ? "A consultar composição, tracking e valuation agregado."
+          : "A aguardar dados oficiais da carteira do ETF.";
+    }
+
+    if($("#etfPortfolioBadge")){
+      $("#etfPortfolioBadge").textContent=
+        state==="loading" ? "A carregar" : "Dados parciais";
+    }
+
+    if($("#etfHoldingsTableBody")){
+      $("#etfHoldingsTableBody").innerHTML=
+        `<tr><td colspan="4" class="etf-portfolio-empty">${
+          state==="loading"
+            ? "A carregar posições…"
+            : "Dados ainda não ligados."
+        }</td></tr>`;
+    }
+
+    if($("#etfCountriesTableBody")){
+      $("#etfCountriesTableBody").innerHTML=
+        `<tr><td colspan="4" class="etf-portfolio-empty">${
+          state==="loading"
+            ? "A carregar países…"
+            : "Dados ainda não ligados."
+        }</td></tr>`;
+    }
+  }
+
+  function renderEtfHoldingsTable(holdings){
+    const body=$("#etfHoldingsTableBody");
+
+    if(!body) return;
+
+    if(!Array.isArray(holdings) || !holdings.length){
+      body.innerHTML=
+        '<tr><td colspan="4" class="etf-portfolio-empty">Top holdings indisponíveis.</td></tr>';
+      return;
+    }
+
+    const maxWeight=Math.max(
+      ...holdings.map(item=>Number(item.weight_percentage)||0),
+      1
+    );
+
+    body.innerHTML=holdings.map(item=>{
+      const weight=Number(item.weight_percentage);
+      const barWidth=Number.isFinite(weight)
+        ? Math.max(2, Math.min(100, weight/maxWeight*100))
+        : 0;
+
+      return `
+        <tr>
+          <td><strong>${escapeEtfHtml(item.name || "—")}</strong></td>
+          <td>${escapeEtfHtml(item.sector || "—")}</td>
+          <td>${escapeEtfHtml(item.region_code || "—")}</td>
+          <td>
+            ${formatEtfNumber(weight, "%")}
+            <div class="etf-weight-bar"><span style="width:${barWidth}%"></span></div>
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  function renderEtfCountriesTable(countries){
+    const body=$("#etfCountriesTableBody");
+
+    if(!body) return;
+
+    if(!Array.isArray(countries) || !countries.length){
+      body.innerHTML=
+        '<tr><td colspan="4" class="etf-portfolio-empty">Alocação geográfica indisponível.</td></tr>';
+      return;
+    }
+
+    const maxWeight=Math.max(
+      ...countries.map(item=>Number(item.fund_percentage)||0),
+      1
+    );
+
+    body.innerHTML=countries.map(item=>{
+      const weight=Number(item.fund_percentage);
+      const benchmark=Number(item.benchmark_percentage);
+      const barWidth=Number.isFinite(weight)
+        ? Math.max(2, Math.min(100, weight/maxWeight*100))
+        : 0;
+
+      return `
+        <tr>
+          <td><strong>${escapeEtfHtml(item.country || "—")}</strong></td>
+          <td>${escapeEtfHtml(item.region || "—")}</td>
+          <td>${formatEtfNumber(benchmark, "%")}</td>
+          <td>
+            ${formatEtfNumber(weight, "%")}
+            <div class="etf-weight-bar"><span style="width:${barWidth}%"></span></div>
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  function renderEtfPortfolioData(profile){
+    const tracking=profile.tracking_error || {};
+    const characteristics=profile.characteristics || {};
+    const concentration=profile.concentration || {};
+    const structure=profile.prices_and_structure || {};
+    const positions=characteristics.number_of_stocks || {};
+    const pe=characteristics.price_to_earnings || {};
+    const pb=characteristics.price_to_book || {};
+    const roe=characteristics.return_on_equity_percentage || {};
+    const growth=characteristics.earnings_growth_percentage || {};
+    const holdings=Array.isArray(profile.top_holdings)
+      ? profile.top_holdings
+      : [];
+    const countries=Array.isArray(profile.market_allocation)
+      ? profile.market_allocation
+      : [];
+    const largestHolding=holdings[0] || null;
+    const largestCountry=countries[0] || null;
+    const outstanding=structure.outstanding_shares || {};
+
+    setEtfProfileText(
+      "#etfPortfolioPositions",
+      positions.fund ?? profile.number_of_stocks
+    );
+    setEtfProfileText(
+      "#etfPortfolioPositionsBenchmark",
+      Number.isFinite(Number(positions.benchmark))
+        ? `${formatNumber(Number(positions.benchmark))} no benchmark`
+        : null,
+      "Benchmark indisponível"
+    );
+
+    setEtfProfileText(
+      "#etfTrackingFiveYears",
+      Number.isFinite(Number(tracking.five_year_percentage))
+        ? `${formatNumber(Number(tracking.five_year_percentage))}%`
+        : null
+    );
+    setEtfProfileText(
+      "#etfTrackingShorterPeriods",
+      [
+        Number.isFinite(Number(tracking.one_year_percentage))
+          ? `1 ano ${formatNumber(Number(tracking.one_year_percentage))}%`
+          : null,
+        Number.isFinite(Number(tracking.three_year_percentage))
+          ? `3 anos ${formatNumber(Number(tracking.three_year_percentage))}%`
+          : null
+      ].filter(Boolean).join(" · "),
+      "1 e 3 anos indisponíveis"
+    );
+
+    setEtfProfileText(
+      "#etfTopTenWeight",
+      Number.isFinite(Number(concentration.top_10_weight_percentage))
+        ? `${formatNumber(Number(concentration.top_10_weight_percentage))}%`
+        : null
+    );
+    setEtfProfileText(
+      "#etfLargestHolding",
+      largestHolding
+        ? `${largestHolding.name} · ${formatEtfNumber(largestHolding.weight_percentage, "%")}`
+        : null,
+      "Maior posição indisponível"
+    );
+
+    setEtfProfileText(
+      "#etfLargestCountryWeight",
+      Number.isFinite(Number(concentration.largest_country_percentage))
+        ? `${formatNumber(Number(concentration.largest_country_percentage))}%`
+        : null
+    );
+    setEtfProfileText(
+      "#etfLargestCountryName",
+      largestCountry?.country,
+      "País indisponível"
+    );
+
+    const valuationRows=[
+      ["#etfAggregatePe", "#etfAggregatePeBenchmark", pe, "x"],
+      ["#etfAggregatePb", "#etfAggregatePbBenchmark", pb, "x"],
+      ["#etfAggregateRoe", "#etfAggregateRoeBenchmark", roe, "%"],
+      ["#etfAggregateGrowth", "#etfAggregateGrowthBenchmark", growth, "%"]
+    ];
+
+    valuationRows.forEach(([valueSelector,benchmarkSelector,item,suffix])=>{
+      setEtfProfileText(
+        valueSelector,
+        Number.isFinite(Number(item.fund))
+          ? `${formatNumber(Number(item.fund))}${suffix}`
+          : null
+      );
+      setEtfProfileText(
+        benchmarkSelector,
+        Number.isFinite(Number(item.benchmark))
+          ? `Benchmark ${formatNumber(Number(item.benchmark))}${suffix}`
+          : null,
+        "Benchmark indisponível"
+      );
+    });
+
+    setEtfProfileText(
+      "#etfOutstandingShares",
+      Number.isFinite(Number(outstanding.value))
+        ? `${formatNumber(Number(outstanding.value))}${
+            outstanding.as_of ? ` · ${outstanding.as_of}` : ""
+          }`
+        : null
+    );
+    setEtfProfileText("#etfBaseCurrency", structure.base_currency);
+    setEtfProfileText(
+      "#etfListedCurrencies",
+      Array.isArray(structure.listed_currencies)
+        ? structure.listed_currencies.join(" · ")
+        : null
+    );
+    setEtfProfileText(
+      "#etfNavRange",
+      structure.nav_52_week_low || structure.nav_52_week_high
+        ? `${structure.nav_52_week_low || "—"} — ${structure.nav_52_week_high || "—"}`
+        : null
+    );
+
+    if($("#etfPortfolioDataDate")){
+      const asOf=positions.as_of || outstanding.as_of;
+      $("#etfPortfolioDataDate").textContent=
+        asOf
+          ? `Composição oficial com referência a ${asOf}.`
+          : "Composição oficial do emitente.";
+    }
+
+    if($("#etfPortfolioBadge")){
+      $("#etfPortfolioBadge").textContent=
+        holdings.length && countries.length
+          ? "Composição oficial"
+          : "Dados parciais";
+    }
+
+    if($("#etfHoldingsTableMeta")){
+      $("#etfHoldingsTableMeta").textContent=
+        holdings.length
+          ? `${holdings.length} posições apresentadas · top 10 ${formatEtfNumber(concentration.top_10_weight_percentage, "%")}`
+          : "Top holdings indisponíveis";
+    }
+
+    if($("#etfCountriesTableMeta")){
+      $("#etfCountriesTableMeta").textContent=
+        countries.length
+          ? `${countries.length} países apresentados`
+          : "Alocação geográfica indisponível";
+    }
+
+    renderEtfHoldingsTable(holdings);
+    renderEtfCountriesTable(countries);
+
+    if(Number.isFinite(Number(outstanding.value))){
+      $("#realShares").textContent=
+        formatNumber(Number(outstanding.value));
+    }
+  }
+
   function resetEtfOfficialProfile(state="idle"){
+    resetEtfPortfolioData(state);
+
     [
       "#etfBenchmark",
       "#etfTer",
@@ -3747,8 +4319,16 @@
       return;
     }
 
+    const topTenWeight=Number(
+      profile.concentration?.top_10_weight_percentage
+    );
+
     const holdings=profile.number_of_stocks
-      ? `${profile.number_of_stocks} posições`
+      ? `${formatNumber(Number(profile.number_of_stocks))} posições${
+          Number.isFinite(topTenWeight)
+            ? ` · top 10 ${formatNumber(topTenWeight)}%`
+            : ""
+        }`
       : null;
 
     const aum=[
@@ -3823,7 +4403,7 @@
 
     if($("#etfProfileStatus")){
       $("#etfProfileStatus").innerHTML=
-        "<strong>Estado atual:</strong> benchmark, replicação, dimensão, domicílio e datas oficiais estão ligados. TER, holdings detalhadas, tracking, valuation e encaixe na carteira continuam incompletos quando não aparecem acima.";
+        "<strong>Estado atual:</strong> benchmark, replicação, dimensão, composição, tracking error, concentração e valuation agregado estão parcialmente ligados. TER/OCF, tracking difference, liquidez, análise técnica e encaixe na carteira continuam incompletos.";
     }
 
     setEtfProfileLink(
@@ -3836,6 +4416,8 @@
       profile.factsheet_url,
       "Abrir factsheet"
     );
+
+    renderEtfPortfolioData(profile);
 
     if(profile.total_assets || profile.share_class_assets){
       $("#realMarketCap").textContent=
