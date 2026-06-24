@@ -1441,6 +1441,48 @@
     @media(max-width:1100px){.policy-kpis{grid-template-columns:repeat(2,1fr)}.policy-layout{grid-template-columns:1fr}.policy-sizing-grid{grid-template-columns:repeat(3,1fr)}.policy-allocation-grid{grid-template-columns:repeat(3,1fr)}}
     @media(max-width:700px){.policy-kpis,.policy-form-grid,.policy-sizing-grid,.policy-allocation-grid{grid-template-columns:1fr}.policy-actions{width:100%}.policy-actions button{flex:1}.policy-sizing-top{flex-direction:column}}
 
+  
+    /* ThesisOS portfolio construction and stress-test engine */
+    .construction-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .construction-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+    .construction-layout{display:grid;grid-template-columns:minmax(360px,.82fr) minmax(0,1.18fr);gap:16px}
+    .construction-controls{display:grid;gap:13px}
+    .construction-mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:6px;border:1px solid #263a59;background:#0f1b2d;border-radius:14px}
+    .construction-mode button{border:0;border-radius:10px;padding:11px;background:transparent;color:#9fb0c8;font-weight:800}
+    .construction-mode button.active{background:#263d64;color:#fff}
+    .construction-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .construction-policy-summary{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .construction-policy-item{padding:11px;border:1px solid #263a59;border-radius:11px;background:#101b2d}
+    .construction-policy-item span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+    .construction-policy-item strong{display:block;margin-top:5px;font-size:14px}
+    .construction-table-wrap{overflow:auto}
+    .construction-table{width:100%;min-width:850px;border-collapse:collapse;font-size:12px}
+    .construction-table th,.construction-table td{padding:10px 9px;border-bottom:1px solid #22344d;text-align:left}
+    .construction-table th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+    .construction-table td.numeric,.construction-table th.numeric{text-align:right;font-variant-numeric:tabular-nums}
+    .construction-gap-positive{color:var(--success)}.construction-gap-negative{color:var(--danger)}
+    .construction-plan-list{display:grid;gap:8px;margin-top:12px}
+    .construction-plan-row{display:grid;grid-template-columns:minmax(0,1fr) 110px 110px;gap:10px;align-items:center;padding:11px;border:1px solid #263a59;border-radius:11px;background:#101b2d}
+    .construction-plan-row small{display:block;color:var(--muted);margin-top:3px}.construction-plan-row strong{text-align:right}
+    .construction-diagnostics{display:grid;gap:9px}
+    .construction-diagnostic{padding:12px;border:1px solid #2a3f5e;border-radius:12px;background:#101b2d}
+    .construction-diagnostic.good{border-color:#2d5a4c}.construction-diagnostic.warn{border-color:#5c4824}.construction-diagnostic.bad{border-color:#60303c}
+    .construction-diagnostic strong{display:block;margin-bottom:4px}.construction-diagnostic p{margin:0;color:var(--muted);font-size:12px;line-height:1.45}
+    .stress-grid{display:grid;grid-template-columns:minmax(300px,.72fr) minmax(0,1.28fr);gap:14px}
+    .stress-input-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:12px}
+    .stress-result-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}
+    .stress-result{padding:12px;border:1px solid #263a59;border-radius:12px;background:#101b2d}
+    .stress-result span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase}.stress-result strong{display:block;margin-top:5px;font-size:18px}
+    .stress-bars{display:grid;gap:9px;margin-top:12px}
+    .stress-bar-row{display:grid;grid-template-columns:115px 1fr 65px;gap:9px;align-items:center;font-size:12px}
+    .position-sim-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .position-sim-results{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}
+    .position-sim-result{padding:11px;border:1px solid #263a59;border-radius:11px;background:#101b2d}
+    .position-sim-result span{display:block;color:var(--muted);font-size:10px}.position-sim-result strong{display:block;margin-top:5px}
+    .construction-empty{padding:32px 18px;text-align:center;color:var(--muted);border:1px dashed #354b6c;border-radius:14px}
+    @media(max-width:1100px){.construction-layout,.stress-grid{grid-template-columns:1fr}.construction-kpis{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:720px){.construction-kpis,.construction-form-grid,.construction-policy-summary,.stress-input-grid,.stress-result-grid,.position-sim-grid,.position-sim-results{grid-template-columns:1fr}.construction-actions{width:100%}.construction-actions button{flex:1}.construction-plan-row{grid-template-columns:1fr 90px}.construction-plan-row small{grid-column:1/-1}.stress-bar-row{grid-template-columns:90px 1fr 55px}}
+
   </style>
 </head>
 <body>
@@ -2529,75 +2571,85 @@
     </section>
 
 <section id="portfolio" class="page">
-      <div class="hero"><div><h1>Portfolio Builder</h1><p class="sub">Carteira ajustada ao horizonte, risco, objetivos e exposições existentes.</p></div><button class="primary" id="generatePortfolio">Gerar proposta</button></div>
-
-      <div class="mode-switch">
-        <button class="mode-btn active" data-mode="zero">Começar do zero</button>
-        <button class="mode-btn" data-mode="existing">Já tenho carteira</button>
-      </div>
-      <div class="portfolio-wrap">
-        <div class="card">
-          <h2>Perfil do investidor</h2>
-          <div id="mode-zero" class="mode-panel active">
-            <div class="form-grid">
-              <label>Entrada inicial disponível (€)<input id="initialCapital" type="number" min="0" value="0"></label>
-              <label>Primeira contribuição já disponível?<select id="firstContributionNow"><option value="yes">Sim</option><option value="no">Ainda não</option></select></label>
-              <label>Contribuição mensal (€)<input id="monthlyContribution" type="number" min="0" value="150"></label>
-              <label>Método de construção<select id="buildMethod"><option value="smart">Construção inteligente</option><option value="proportional">Distribuição proporcional</option></select></label>
-            </div>
-            <div class="source-note">Se a carteira atual for €0 e a primeira contribuição já estiver disponível, o sistema usa essa contribuição como capital investível inicial.</div>
-          </div>
-          <div id="mode-existing" class="mode-panel">
-            <div class="form-grid">
-              <label>Valor atual da carteira (€)<input id="existingPortfolioValue" type="number" min="0" value="10000"></label>
-              <label>Capital novo disponível (€)<input id="newCapitalAvailable" type="number" min="0" value="500"></label>
-              <label>Contribuição mensal (€)<input id="existingMonthlyContribution" type="number" min="0" value="150"></label>
-              <label>Importar posições<select><option>Adicionar manualmente</option><option>Importar CSV</option></select></label>
-            </div>
-            <div class="source-note">A carteira real é atualizada por transações, preços atuais e câmbio — não por edição manual do valor total.</div>
-          </div>
-          <div class="form-grid" style="margin-top:14px">
-            <label>Idade<input id="age" type="number" min="18" max="90" value="30"></label><label>Capital usado na proposta (€) <span class="help" tabindex="0" data-tip="No modo começar do zero, usa a entrada inicial e, se disponível, a primeira contribuição mensal. No modo existente, usa o valor atual da carteira.">?</span><input id="portfolioCapital" type="number" min="0" value="150" readonly></label>
-            <label>Horizonte<select id="horizon"><option value="20">Mais de 15 anos</option><option value="10">7–15 anos</option><option value="5">3–7 anos</option><option value="2">Menos de 3 anos</option></select></label>
-            <label>Objetivo<select id="goal"><option>Crescimento de capital</option><option>Rendimento</option><option>Preservação</option><option>Compra de casa</option></select></label><label>Necessidade de liquidez<select id="liquidity"><option value="low">Baixa</option><option value="medium">Média</option><option value="high">Alta</option></select></label>
-            <label>Contribuição mensal<input id="legacyContribution" type="number" value="150"></label>
-          </div>
-          <label style="display:block;margin-top:16px">Queda máxima que suportarias sem vender: <strong id="riskText">-30%</strong><input id="riskRange" type="range" min="10" max="50" step="10" value="30"></label>
-          <div class="risk-box" style="margin-top:15px">
-            <div class="metric-label">Perfil calculado</div>
-            <div class="risk-value" id="profileLabel">Crescimento moderado</div>
-            <p class="sub" id="profileDesc">Horizonte longo, tolerância média-alta e necessidade de liquidez reduzida.</p>
-          </div>
-          <div class="section-head"><div><h2>Alocação proposta</h2><p class="sub">Estratégica para longo prazo ou tática para manter mais caixa temporariamente.</p></div></div>
-          <div class="strategy-pills" style="margin-bottom:12px"><span class="tag active" data-strategy="strategic">Estratégica</span><span class="tag" data-strategy="tactical">Tática</span></div>
-          <div class="allocation" id="allocation"></div>
+      <div id="portfolioConstructionEngine">
+        <div class="hero">
+          <div><h1>Portfolio Construction Engine</h1><p class="sub">Transforma a Investment Policy numa proposta de alocação, plano de financiamento e testes de resistência — sem executar ordens.</p></div>
+          <div class="construction-actions"><button class="ghost" id="constructionExportBtn" type="button">Exportar plano</button><button class="ghost" id="constructionSaveBtn" type="button">Guardar snapshot</button><button class="primary" id="generatePortfolio" type="button">Gerar proposta</button></div>
         </div>
-        <div class="card">
-          <h2>Diagnóstico</h2>
-          <div class="alert-card"><div class="alert-left"><div class="news-icon">⚠</div><div><strong>Concentração tecnológica</strong><p>Incluindo os ETFs, a exposição efetiva é 31%. Alvo recomendado: até 25%.</p></div></div></div>
-          <div class="alert-card" style="margin-top:12px"><div class="alert-left"><div class="news-icon">✓</div><div><strong>Boa base diversificada</strong><p>O ETF core reduz risco específico e mantém exposição global.</p></div></div></div>
-          <div class="alert-card" style="margin-top:12px"><div class="alert-left"><div class="news-icon">◎</div><div><strong>Caixa para oportunidades</strong><p>Reserva suficiente para reforços faseados sem alterar o plano mensal.</p></div></div></div>
-          <div class="section-head"><h3>Simular nova posição</h3></div>
-          <div class="simulation-box">
-            <div class="simulation-grid">
-              <label>Ativo<select id="simAsset"><option value="PWR">PWR · AI Infrastructure</option><option value="ZTS">ZTS · Saúde animal</option><option value="IREN">IREN · Especulativa</option></select></label>
-              <label>Peso pretendido<input id="simWeight" type="number" min="0.5" max="15" step="0.5" value="2"></label>
+
+        <div class="construction-kpis">
+          <div class="card"><div class="metric-label">Perfil da política</div><div class="metric" id="constructionPolicyProfile">—</div><div class="delta" id="constructionPolicyScore">Risk capacity —</div></div>
+          <div class="card"><div class="metric-label">Capital após entrada</div><div class="metric" id="constructionTotalCapital">€0</div><div class="delta" id="constructionCapitalDetail">Sem capital definido</div></div>
+          <div class="card"><div class="metric-label">Capital a distribuir</div><div class="metric" id="constructionDeployable">€0</div><div class="delta" id="constructionDeployableDetail">Respeita a caixa mínima</div></div>
+          <div class="card"><div class="metric-label">Diagnóstico</div><div class="metric" id="constructionIssueCount">0</div><div class="delta" id="constructionIssueDetail">Sem violações críticas</div></div>
+        </div>
+
+        <div class="construction-layout">
+          <div class="card construction-controls">
+            <div><h2>Parâmetros da proposta</h2><p class="sub">A política guardada fornece os limites; aqui defines apenas o capital e o método de implementação.</p></div>
+            <div class="construction-mode"><button class="active" type="button" data-construction-mode="zero">Começar do zero</button><button type="button" data-construction-mode="existing">Usar carteira atual</button></div>
+            <div class="construction-form-grid">
+              <label>Capital novo disponível (€)<input id="constructionNewCapital" type="number" min="0" step="1" value="150"></label>
+              <label>Contribuição mensal (€)<input id="constructionMonthly" type="number" min="0" step="1" value="150"></label>
+              <label>Método<select id="constructionMethod"><option value="contribution">Apenas compras / contribuições</option><option value="rebalance">Rebalanceamento completo</option></select></label>
+              <label>Caixa tática adicional (%)<input id="constructionTacticalCash" type="number" min="0" max="40" step="1" value="0"></label>
             </div>
-            <button class="primary" id="simulatePosition" style="width:100%;margin-top:12px">Simular impacto</button>
-            <div class="impact-list" id="impactList">
-              <div class="impact-item"><span>Valor da posição</span><strong>€200</strong></div>
-              <div class="impact-item"><span>Exposição tecnológica</span><strong>31% → 33%</strong></div>
-              <div class="impact-item"><span>Overlap via ETF Core</span><strong>+0,6%</strong></div>
-              <div class="impact-item"><span>Risco cambial USD</span><strong>62% → 64%</strong></div>
-            </div>
-            <div class="logic-note" id="overlapWarning"><strong>⚠️ Alerta de overlap</strong><br>Esta empresa já está indiretamente presente no ETF Core. A posição direta aumenta a exposição ao mesmo fator de risco.</div>
+            <div class="construction-policy-summary" id="constructionPolicySummary"></div>
+            <div class="logic-note">No modo “Apenas compras”, o motor não sugere vendas: direciona caixa para os maiores défices. No rebalanceamento completo, as vendas aparecem apenas como simulação.</div>
+            <button class="ghost" id="constructionOpenPolicyBtn" type="button">Abrir Investment Policy</button>
           </div>
-          <button class="primary" style="width:100%;margin-top:12px">Guardar carteira</button>
+
+          <div class="card">
+            <div class="section-head" style="margin:0 0 10px"><div><h2>Alocação atual vs. alvo</h2><p class="sub">Categorias calculadas a partir das transações, tipo de ativo e classificação registada.</p></div><span class="freshness" id="constructionUpdated">Ainda não calculado</span></div>
+            <div class="construction-table-wrap"><table class="construction-table"><thead><tr><th>Bloco</th><th class="numeric">Atual</th><th class="numeric">Peso atual</th><th class="numeric">Alvo</th><th class="numeric">Valor-alvo</th><th class="numeric">Gap</th><th>Estado</th></tr></thead><tbody id="constructionAllocationBody"></tbody></table></div>
+            <div class="section-head" style="margin:18px 0 8px"><div><h2>Plano de implementação</h2><p class="sub">Ações calculadas sem ordens automáticas.</p></div><button class="ghost" id="constructionSendContributionBtn" type="button">Abrir em My Portfolio</button></div>
+            <div class="construction-plan-list" id="constructionPlanList"></div>
+          </div>
+        </div>
+
+        <div class="grid g2" style="margin-top:16px">
+          <div class="card"><h2>Diagnóstico de política</h2><div class="construction-diagnostics" id="constructionDiagnostics"></div></div>
+          <div class="card"><h2>Snapshot guardado</h2><div id="constructionSavedSnapshot" class="construction-empty">Ainda não existe um plano guardado.</div></div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-head" style="margin:0 0 10px"><div><h2>Stress Test</h2><p class="sub">Estima o impacto de choques por bloco. Não é VaR nem previsão.</p></div><button class="ghost" id="runStressTestBtn" type="button">Executar cenário</button></div>
+          <div class="stress-grid">
+            <div>
+              <label>Cenário<select id="stressPreset"><option value="correction">Correção global</option><option value="recession">Recessão</option><option value="rates">Taxas mais altas</option><option value="custom">Personalizado</option></select></label>
+              <div class="stress-input-grid">
+                <label>ETF Core (%)<input id="stressCore" type="number" step="1" value="-20"></label>
+                <label>Quality (%)<input id="stressQuality" type="number" step="1" value="-25"></label>
+                <label>Dividendos (%)<input id="stressDividend" type="number" step="1" value="-15"></label>
+                <label>Especulativas (%)<input id="stressSpeculative" type="number" step="1" value="-40"></label>
+              </div>
+              <div class="source-note">A caixa assume choque de 0%. O risco cambial direto é mostrado separadamente e não inclui o look-through cambial interno dos ETFs.</div>
+            </div>
+            <div>
+              <div class="stress-result-grid"><div class="stress-result"><span>Valor inicial</span><strong id="stressStartValue">€0</strong></div><div class="stress-result"><span>Perda estimada</span><strong id="stressLossValue">€0</strong></div><div class="stress-result"><span>Drawdown</span><strong id="stressDrawdown">0%</strong></div><div class="stress-result"><span>Valor final</span><strong id="stressEndValue">€0</strong></div></div>
+              <div class="stress-bars" id="stressBars"></div>
+              <div class="logic-note" id="stressConclusion">Gera primeiro uma proposta.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-head" style="margin:0 0 10px"><div><h2>Simular nova posição</h2><p class="sub">Testa o peso, categoria, moeda, caixa e limite pessoal antes de registar uma compra.</p></div><button class="ghost" id="constructionUseAnalysisBtn" type="button">Usar análise atual</button></div>
+          <div class="position-sim-grid">
+            <label>Ticker<input id="constructionSimSymbol" placeholder="AAPL"></label>
+            <label>Tipo<select id="constructionSimType"><option value="stock">Ação</option><option value="etf">ETF</option></select></label>
+            <label>Categoria<select id="constructionSimCategory"><option value="quality">Quality</option><option value="core">ETF Core</option><option value="dividend">Dividendos</option><option value="speculative">Especulativa</option></select></label>
+            <label>Moeda<select id="constructionSimCurrency"><option>USD</option><option>EUR</option><option>GBP</option><option>CHF</option></select></label>
+            <label>Montante (€)<input id="constructionSimAmount" type="number" min="0" step="1" value="100"></label>
+            <label>Preço em EUR<input id="constructionSimPrice" type="number" min="0" step="0.0001"></label>
+          </div>
+          <button class="primary" id="constructionSimulateBtn" type="button" style="margin-top:12px">Simular impacto</button>
+          <div class="position-sim-results" id="constructionSimResults"></div>
+          <div class="construction-diagnostics" id="constructionSimDiagnostics" style="margin-top:10px"></div>
         </div>
       </div>
     </section>
 
-    
     <section id="myportfolio" class="page">
       <div class="hero">
         <div><h1>My Portfolio</h1><p class="sub">Transações reais, preços atualizados, pesos, objetivos e plano de contribuição.</p></div>
@@ -6680,7 +6732,7 @@
   function applyRecommendedPolicy(){const input=policyFormInput(),score=policyRiskScore(input),recommended={...input,...policyRecommendedValues(score,input),score,label:policyLabel(score),updated_at:null};fillPolicyForm(recommended);renderInvestorPolicy();showToast("Limites recomendados aplicados. Revê e guarda a política.");}
   function saveInvestorPolicy(){const policy=policyFromForm(),total=policyAllocationTotal(policy);if(Math.abs(total-100)>.01){showToast("A alocação estratégica deve somar 100%.");return;}if(policy.initial_position_weight>policy.max_stock_weight){showToast("O peso inicial não pode exceder o máximo por ação.");return;}localStorage.setItem(INVESTOR_POLICY_KEY,JSON.stringify(policy));investorPolicyFormLoaded=false;fillPolicyForm(policy);renderInvestorPolicy();syncPortfolioBuilderFromPolicy();if(window.currentAnalysisPayload)renderPolicySizing(window.currentAnalysisPayload);renderLiveDashboard();showToast("Investment Policy guardada.");}
   function exportInvestorPolicy(){const policy=getInvestorPolicy(),blob=new Blob([JSON.stringify(policy,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=`thesisos_investor_policy_${new Date().toISOString().slice(0,10)}.json`;link.click();URL.revokeObjectURL(url);}
-  function syncPortfolioBuilderFromPolicy(){const policy=getInvestorPolicy();if($("#age"))$("#age").value=policy.age;if($("#horizon"))$("#horizon").value=String(policy.horizon);if($("#goal"))$("#goal").selectedIndex=policy.goal==="growth"?0:policy.goal==="income"?1:policy.goal==="preservation"?2:3;if($("#liquidity"))$("#liquidity").value=policy.liquidity;if($("#riskRange"))$("#riskRange").value=Math.min(50,Math.max(10,Math.round(policy.drawdown/10)*10));if($("#monthlyContribution"))$("#monthlyContribution").value=policy.monthly_contribution;if($("#existingMonthlyContribution"))$("#existingMonthlyContribution").value=policy.monthly_contribution;if($("#legacyContribution"))$("#legacyContribution").value=policy.monthly_contribution;calculatePortfolio();updateRisk();}
+  function syncPortfolioBuilderFromPolicy(){const policy=getInvestorPolicy();if($("#constructionMonthly"))$("#constructionMonthly").value=policy.monthly_contribution;if($("#constructionNewCapital")&&!Number($("#constructionNewCapital").value))$("#constructionNewCapital").value=policy.monthly_contribution;renderPortfolioConstruction();}
   function policyPositionForPayload(payload){
     const policy=getInvestorPolicy(),asset=payload?.asset||{},snapshot=portfolioSnapshot(),symbol=asset.symbol||payload?.query,current=snapshot.positions.find(item=>item.symbol===symbol),base=snapshot.totalValue>0?snapshot.totalValue:policy.planning_capital,maxWeight=asset.asset_type==="etf"?policy.max_etf_weight:policy.max_stock_weight,currentWeight=current?.weight||0,remaining=Math.max(0,maxWeight-currentWeight);let initial=Math.min(policy.initial_position_weight,remaining);const valuation=Number(payload?.valuation?.score),technical=Number(payload?.technical?.score),material=Boolean(payload?.evidence?.review_required||payload?.evidence?.material_events_count>0);let status="Dentro da política",reason="O tamanho respeita os limites guardados.";if(material){initial=0;status="Rever eventos";reason="Existe evidência material recente; o ThesisOS pausa a sugestão até revisão.";}else if(Number.isFinite(valuation)&&valuation<45){initial*=.5;status="Entrada reduzida";reason="Valuation exigente: a tranche inicial foi reduzida em 50%.";}else if(Number.isFinite(technical)&&technical<45){initial*=.7;status="Entrada prudente";reason="Momento técnico fraco: a tranche inicial foi reduzida.";}const initialAmount=base*initial/100,maxAdditional=base*remaining/100,priceEur=Number(payload?.fx?.converted_amount)||(String(asset.currency||payload?.market?.currency).toUpperCase()==="EUR"?Number(payload?.market?.price):null),units=priceEur>0?initialAmount/priceEur:null;return {policy,base,current,currentWeight,maxWeight,remaining,initial,initialAmount,maxAdditional,priceEur,units,status,reason};
   }
@@ -6834,154 +6886,47 @@
   void dashboardCheckHealth();
 
   // ---------------------------------------------------------------
-  // Portfolio Builder
+  // Portfolio Construction & Stress Test Engine
   // ---------------------------------------------------------------
-  let portfolioMode="zero";
-  const portfolioCapital=$("#portfolioCapital");
-  const riskRange=$("#riskRange");
-  const liquidity=$("#liquidity");
+  const PORTFOLIO_CONSTRUCTION_KEY="thesisos_portfolio_construction_v1";
+  let constructionMode="zero";
+  let currentConstructionPlan=null;
 
-  function euro(value){
-    return new Intl.NumberFormat("pt-PT",{
-      style:"currency",currency:"EUR",maximumFractionDigits:0
-    }).format(Number.isFinite(value)?value:0);
-  }
+  const CONSTRUCTION_BUCKETS=[
+    {id:"core",label:"ETF Core global"},
+    {id:"quality",label:"Ações quality"},
+    {id:"dividend",label:"Dividendos"},
+    {id:"speculative",label:"Especulativas"},
+    {id:"cash",label:"Caixa"},
+  ];
 
-  function renderAllocation(values){
-    if(!$("#allocation") || !portfolioCapital) return;
-    const capital=Number(portfolioCapital.value||0);
-    $("#allocation").innerHTML=values.map(([name,weight])=>`
-      <div class="allocation-row">
-        <span>${name}<span class="allocation-amount">${euro(capital*weight/100)}</span></span>
-        <div class="bar"><span style="width:${weight}%"></span></div>
-        <strong>${weight}%</strong>
-      </div>
-    `).join("");
-    window.currentAllocation=values;
-  }
+  function constructionEuro(value){return new Intl.NumberFormat("pt-PT",{style:"currency",currency:"EUR",maximumFractionDigits:2}).format(Number.isFinite(Number(value))?Number(value):0);}
+  function constructionPercent(value,digits=1){const n=Number(value);return Number.isFinite(n)?`${new Intl.NumberFormat("pt-PT",{maximumFractionDigits:digits}).format(n)}%`:"—";}
+  function constructionBucket(position){const text=`${position.category||""} ${position.name||""}`.toLowerCase();if(/espec|spec|growth|tem[aá]tic|crypto|miner/.test(text))return "speculative";if(/dividend|income|rendimento/.test(text))return "dividend";if(/quality|qualidade/.test(text))return "quality";if(/core|global|world|all-world/.test(text))return "core";if(position.asset_type==="etf")return "core";if(position.asset_type==="stock")return "quality";return "quality";}
+  function constructionCurrent(snapshot){const amounts={core:0,quality:0,dividend:0,speculative:0,cash:Number(snapshot.cash)||0};for(const position of snapshot.positions){amounts[constructionBucket(position)]+=Number(position.market_value_eur)||0;}return amounts;}
+  function constructionTargets(policy,tacticalCash=0){const target={...policy.target_allocation},extra=Math.max(0,Math.min(40,Number(tacticalCash)||0));if(extra>0){let remaining=extra;for(const key of ["core","quality","dividend","speculative"]){const reduction=Math.min(Number(target[key])||0,remaining*(key==="core"?0.65:key==="quality"?0.25:0.10));target[key]=Math.max(0,(Number(target[key])||0)-reduction);remaining-=reduction;if(remaining<=0.001)break;}if(remaining>0){for(const key of ["core","quality","dividend","speculative"]){const reduction=Math.min(Number(target[key])||0,remaining);target[key]-=reduction;remaining-=reduction;if(remaining<=0.001)break;}}target.cash=(Number(target.cash)||0)+extra;}const total=Object.values(target).reduce((sum,value)=>sum+(Number(value)||0),0);if(Math.abs(total-100)>.001)target.core+=(100-total);return target;}
+  function constructionInputs(){return {mode:constructionMode,newCapital:Math.max(0,Number($("#constructionNewCapital")?.value)||0),monthly:Math.max(0,Number($("#constructionMonthly")?.value)||0),method:$("#constructionMethod")?.value||"contribution",tacticalCash:Math.max(0,Number($("#constructionTacticalCash")?.value)||0)};}
+  function buildPortfolioConstruction(){const policy=getInvestorPolicy(),snapshot=portfolioSnapshot(),input=constructionInputs(),baseSnapshot=input.mode==="existing"?snapshot:{positions:[],cash:0,totalValue:0},current=constructionCurrent(baseSnapshot),capitalBefore=Number(baseSnapshot.totalValue)||0,totalAfter=capitalBefore+input.newCapital,startCash=(Number(current.cash)||0)+input.newCapital,targetWeights=constructionTargets(policy,input.tacticalCash),targetAmounts={},gaps={};for(const bucket of CONSTRUCTION_BUCKETS){targetAmounts[bucket.id]=totalAfter*(Number(targetWeights[bucket.id])||0)/100;gaps[bucket.id]=targetAmounts[bucket.id]-(Number(current[bucket.id])||0)-(bucket.id==="cash"?input.newCapital:0);}const desiredCash=targetAmounts.cash,deployable=Math.max(0,startCash-desiredCash),nonCash=CONSTRUCTION_BUCKETS.filter(item=>item.id!=="cash"),positive=nonCash.map(item=>({id:item.id,deficit:Math.max(0,targetAmounts[item.id]-(Number(current[item.id])||0))})).filter(item=>item.deficit>.01),positiveTotal=positive.reduce((sum,item)=>sum+item.deficit,0),actions=[];if(input.method==="contribution"){let remaining=deployable;for(const item of positive){const amount=positiveTotal>0?Math.min(item.deficit,deployable*item.deficit/positiveTotal):0;actions.push({bucket:item.id,action:"BUY",amount});remaining-=amount;}if(remaining>.01)actions.push({bucket:"cash",action:"HOLD",amount:remaining});}else{for(const item of nonCash){const gap=targetAmounts[item.id]-(Number(current[item.id])||0);if(Math.abs(gap)<.01)actions.push({bucket:item.id,action:"HOLD",amount:0});else actions.push({bucket:item.id,action:gap>0?"BUY":"SELL",amount:Math.abs(gap)});}actions.push({bucket:"cash",action:"HOLD",amount:targetAmounts.cash});}const projected={...current,cash:startCash};for(const action of actions){if(action.bucket==="cash")continue;if(action.action==="BUY"){projected[action.bucket]+=action.amount;projected.cash-=action.amount;}else if(action.action==="SELL"){projected[action.bucket]=Math.max(0,projected[action.bucket]-action.amount);projected.cash+=action.amount;}}const diagnostics=constructionDiagnostics(policy,baseSnapshot,current,totalAfter,projected,targetWeights);return {generated_at:new Date().toISOString(),input,policy:{label:policy.label,score:policy.score,max_stock_weight:policy.max_stock_weight,max_etf_weight:policy.max_etf_weight,max_speculative:policy.max_speculative,max_currency:policy.max_currency,min_cash:policy.min_cash,drawdown:policy.drawdown,target_allocation:policy.target_allocation},capitalBefore,totalAfter,current,targetWeights,targetAmounts,gaps,deployable,actions,projected,diagnostics,snapshot_positions:baseSnapshot.positions.length};}
+  function constructionDiagnostics(policy,snapshot,current,totalAfter,projected,targetWeights){const rows=[],positionMax=snapshot.positions.length?Math.max(...snapshot.positions.map(item=>Number(item.weight)||0)):0,specWeight=totalAfter>0?(projected.speculative/totalAfter*100):0,cashWeight=totalAfter>0?(projected.cash/totalAfter*100):0,directUsd=snapshot.positions.filter(item=>String(item.currency).toUpperCase()==="USD").reduce((sum,item)=>sum+(Number(item.market_value_eur)||0),0),usdWeight=totalAfter>0?directUsd/totalAfter*100:0;if(positionMax>Math.max(policy.max_stock_weight,policy.max_etf_weight))rows.push({level:"warn",title:`Maior posição: ${constructionPercent(positionMax)}`,detail:"Compara o tipo do ativo com o respetivo limite individual da política."});else rows.push({level:"good",title:"Concentração individual controlada",detail:`Maior posição ${constructionPercent(positionMax)}.`});if(specWeight>policy.max_speculative+.05)rows.push({level:"bad",title:`Especulativas ${constructionPercent(specWeight)}`,detail:`Ultrapassa o máximo pessoal de ${constructionPercent(policy.max_speculative)}.`});else rows.push({level:"good",title:`Especulativas ${constructionPercent(specWeight)}`,detail:`Dentro do máximo de ${constructionPercent(policy.max_speculative)}.`});if(cashWeight+0.05<policy.min_cash)rows.push({level:"bad",title:`Caixa ${constructionPercent(cashWeight)}`,detail:`Abaixo da caixa mínima de ${constructionPercent(policy.min_cash)}.`});else rows.push({level:"good",title:`Caixa ${constructionPercent(cashWeight)}`,detail:`Mínimo pessoal: ${constructionPercent(policy.min_cash)}.`});if(usdWeight>policy.max_currency)rows.push({level:"warn",title:`USD direto ${constructionPercent(usdWeight)}`,detail:`Acima do limite cambial de ${constructionPercent(policy.max_currency)}; não inclui look-through dos ETFs.`});else rows.push({level:"good",title:`USD direto ${constructionPercent(usdWeight)}`,detail:"Não inclui exposição cambial interna dos ETFs."});const targetTotal=Object.values(targetWeights).reduce((sum,value)=>sum+Number(value||0),0);if(Math.abs(targetTotal-100)>.01)rows.push({level:"bad",title:`Alvos somam ${constructionPercent(targetTotal)}`,detail:"A proposta deve somar 100%."});return rows;}
+  function renderPortfolioConstruction(){if(!$("#portfolioConstructionEngine"))return;const policy=getInvestorPolicy(),plan=buildPortfolioConstruction();currentConstructionPlan=plan;$("#constructionPolicyProfile").textContent=policy.label;$("#constructionPolicyScore").textContent=`Risk capacity ${policy.score}/100`;$("#constructionTotalCapital").textContent=constructionEuro(plan.totalAfter);$("#constructionCapitalDetail").textContent=plan.input.mode==="existing"?`${constructionEuro(plan.capitalBefore)} atuais + ${constructionEuro(plan.input.newCapital)} novos`:`Capital inicial ${constructionEuro(plan.input.newCapital)}`;$("#constructionDeployable").textContent=constructionEuro(plan.deployable);$("#constructionDeployableDetail").textContent=`Caixa-alvo ${constructionPercent(plan.targetWeights.cash)}`;const issues=plan.diagnostics.filter(item=>item.level!=="good");$("#constructionIssueCount").textContent=String(issues.length);$("#constructionIssueDetail").textContent=issues.length?`${issues.filter(item=>item.level==="bad").length} críticas / ${issues.filter(item=>item.level==="warn").length} avisos`:"Sem violações críticas";$("#constructionPolicySummary").innerHTML=[["Máx. ação",constructionPercent(policy.max_stock_weight)],["Máx. ETF",constructionPercent(policy.max_etf_weight)],["Máx. especulativo",constructionPercent(policy.max_speculative)],["Caixa mínima",constructionPercent(policy.min_cash)]].map(([label,value])=>`<div class="construction-policy-item"><span>${label}</span><strong>${value}</strong></div>`).join("");const body=$("#constructionAllocationBody");body.innerHTML=CONSTRUCTION_BUCKETS.map(bucket=>{const currentValue=Number(plan.current[bucket.id])+(bucket.id==="cash"?plan.input.newCapital:0),currentWeight=plan.totalAfter>0?currentValue/plan.totalAfter*100:0,gap=plan.targetAmounts[bucket.id]-currentValue,status=Math.abs(gap)<Math.max(1,plan.totalAfter*.005)?["Próximo do alvo","good"]:gap>0?["Abaixo do alvo","warn"]:["Acima do alvo","bad"];return `<tr><td><strong>${portfolioEscape(bucket.label)}</strong></td><td class="numeric">${constructionEuro(currentValue)}</td><td class="numeric">${constructionPercent(currentWeight)}</td><td class="numeric">${constructionPercent(plan.targetWeights[bucket.id])}</td><td class="numeric">${constructionEuro(plan.targetAmounts[bucket.id])}</td><td class="numeric ${gap>=0?"construction-gap-positive":"construction-gap-negative"}">${gap>=0?"+":""}${constructionEuro(gap)}</td><td><span class="tag ${status[1]}">${status[0]}</span></td></tr>`;}).join("");const labels=Object.fromEntries(CONSTRUCTION_BUCKETS.map(item=>[item.id,item.label]));const actionLabels={BUY:"Comprar / direcionar",SELL:"Reduzir (simulação)",HOLD:"Manter em caixa"};const actionable=plan.actions.filter(item=>item.amount>.01||item.action==="HOLD");$("#constructionPlanList").innerHTML=actionable.length?actionable.map(item=>`<div class="construction-plan-row"><span><strong>${portfolioEscape(labels[item.bucket])}</strong><small>${portfolioEscape(actionLabels[item.action]||item.action)}</small></span><strong>${constructionEuro(item.amount)}</strong><small>${item.action==="SELL"?"Não executado":"Plano calculado"}</small></div>`).join(""):'<div class="construction-empty">Não existem movimentos relevantes para esta configuração.</div>';$("#constructionDiagnostics").innerHTML=plan.diagnostics.map(item=>`<div class="construction-diagnostic ${item.level}"><strong>${portfolioEscape(item.title)}</strong><p>${portfolioEscape(item.detail)}</p></div>`).join("");$("#constructionUpdated").textContent=`Calculado ${new Date().toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"})}`;$("#constructionUpdated").className="freshness";renderConstructionSavedSnapshot();runConstructionStressTest();}
+  function renderConstructionSavedSnapshot(){const container=$("#constructionSavedSnapshot");let saved=null;try{saved=JSON.parse(localStorage.getItem(PORTFOLIO_CONSTRUCTION_KEY));}catch{}if(!saved){container.className="construction-empty";container.innerHTML="Ainda não existe um plano guardado.";return;}container.className="";container.innerHTML=`<div class="impact-list"><div class="impact-item"><span>Guardado</span><strong>${portfolioEscape(formatAssetDate(saved.generated_at)||saved.generated_at)}</strong></div><div class="impact-item"><span>Perfil</span><strong>${portfolioEscape(saved.policy?.label||"—")}</strong></div><div class="impact-item"><span>Capital</span><strong>${constructionEuro(saved.totalAfter)}</strong></div><div class="impact-item"><span>Método</span><strong>${saved.input?.method==="rebalance"?"Rebalanceamento":"Contribuições"}</strong></div></div><div class="source-note">O snapshot documenta a proposta; não modifica transações nem envia ordens.</div>`;}
+  function savePortfolioConstruction(){if(!currentConstructionPlan)renderPortfolioConstruction();localStorage.setItem(PORTFOLIO_CONSTRUCTION_KEY,JSON.stringify(currentConstructionPlan));renderConstructionSavedSnapshot();renderLiveDashboard();showToast("Plano de construção guardado.");}
+  function exportPortfolioConstruction(){if(!currentConstructionPlan)renderPortfolioConstruction();const blob=new Blob([JSON.stringify(currentConstructionPlan,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=`thesisos_portfolio_plan_${new Date().toISOString().slice(0,10)}.json`;link.click();URL.revokeObjectURL(url);}
+  function stressPresetValues(preset){return preset==="recession"?{core:-28,quality:-35,dividend:-22,speculative:-55}:preset==="rates"?{core:-12,quality:-20,dividend:-10,speculative:-30}:{core:-20,quality:-25,dividend:-15,speculative:-40};}
+  function applyStressPreset(){const preset=$("#stressPreset").value;if(preset==="custom")return;const values=stressPresetValues(preset);for(const [key,value] of Object.entries(values))$("#stress"+key[0].toUpperCase()+key.slice(1)).value=value;runConstructionStressTest();}
+  function runConstructionStressTest(){if(!currentConstructionPlan)return;const shocks={core:Number($("#stressCore")?.value)||0,quality:Number($("#stressQuality")?.value)||0,dividend:Number($("#stressDividend")?.value)||0,speculative:Number($("#stressSpeculative")?.value)||0,cash:0},start=Object.values(currentConstructionPlan.projected).reduce((sum,value)=>sum+(Number(value)||0),0);let end=0;const rows=[];for(const bucket of CONSTRUCTION_BUCKETS){const amount=Number(currentConstructionPlan.projected[bucket.id])||0,shock=Number(shocks[bucket.id])||0,after=amount*(1+shock/100);end+=after;rows.push({bucket,amount,shock,after,loss:after-amount});}const loss=end-start,drawdown=start>0?loss/start*100:0;$("#stressStartValue").textContent=constructionEuro(start);$("#stressLossValue").textContent=constructionEuro(loss);$("#stressLossValue").className=loss<0?"portfolio-pnl-negative":"portfolio-pnl-positive";$("#stressDrawdown").textContent=constructionPercent(drawdown,2);$("#stressEndValue").textContent=constructionEuro(end);$("#stressBars").innerHTML=rows.map(item=>`<div class="stress-bar-row"><span>${portfolioEscape(item.bucket.label)}</span><div class="bar"><span style="width:${Math.max(0,Math.min(100,start>0?item.amount/start*100:0))}%"></span></div><strong>${constructionPercent(item.shock)}</strong></div>`).join("");const tolerance=Number(getInvestorPolicy().drawdown)||0;$("#stressConclusion").innerHTML=Math.abs(drawdown)>tolerance?`<strong>⚠ Ultrapassa a tolerância declarada</strong><br>Drawdown estimado de ${constructionPercent(Math.abs(drawdown),2)} versus tolerância de ${constructionPercent(tolerance)}.`:`<strong>Dentro da tolerância declarada</strong><br>Drawdown estimado de ${constructionPercent(Math.abs(drawdown),2)} versus tolerância de ${constructionPercent(tolerance)}. Isto não garante conforto emocional nem prevê o pior cenário real.`;}
+  function useCurrentAnalysisInConstruction(){const payload=window.currentAnalysisPayload;if(!payload){showToast("Pesquisa primeiro um ativo.");return;}const asset=payload.asset||{},symbol=String(asset.symbol||payload.query||"").toUpperCase(),type=asset.asset_type==="etf"?"etf":"stock",currency=String(payload.market?.currency||asset.currency||"USD").toUpperCase(),price=Number(payload.fx?.converted_amount)||(currency==="EUR"?Number(payload.market?.price):null);$("#constructionSimSymbol").value=symbol;$("#constructionSimType").value=type;$("#constructionSimCategory").value=type==="etf"?"core":"quality";if(["USD","EUR","GBP","CHF"].includes(currency))$("#constructionSimCurrency").value=currency;$("#constructionSimPrice").value=price||"";const sizing=policyPositionForPayload(payload);$("#constructionSimAmount").value=Math.round(sizing.initialAmount||100);simulateConstructionPosition();}
+  function simulateConstructionPosition(){if(!currentConstructionPlan)renderPortfolioConstruction();const symbol=$("#constructionSimSymbol").value.trim().toUpperCase()||"Nova posição",type=$("#constructionSimType").value,category=$("#constructionSimCategory").value,currency=$("#constructionSimCurrency").value,amount=Math.max(0,Number($("#constructionSimAmount").value)||0),price=Math.max(0,Number($("#constructionSimPrice").value)||0),plan=currentConstructionPlan,policy=getInvestorPolicy(),snapshot=portfolioSnapshot(),base=Math.max(plan.totalAfter,amount),existing=snapshot.positions.filter(item=>item.symbol===symbol).reduce((sum,item)=>sum+(Number(item.market_value_eur)||0),0),newWeight=base>0?(existing+amount)/base*100:0,maxWeight=type==="etf"?policy.max_etf_weight:policy.max_stock_weight,currentCategory=Number(plan.projected[category])||0,categoryWeight=base>0?(currentCategory+amount)/base*100:0,cashAfter=(Number(plan.projected.cash)||0)-amount,cashWeight=base>0?cashAfter/base*100:0,directUsd=snapshot.positions.filter(item=>String(item.currency).toUpperCase()==="USD").reduce((sum,item)=>sum+(Number(item.market_value_eur)||0),0)+(currency==="USD"?amount:0),usdWeight=base>0?directUsd/base*100:0,units=price>0?amount/price:null;$("#constructionSimResults").innerHTML=[["Novo peso",constructionPercent(newWeight,2)],["Limite individual",constructionPercent(maxWeight)],["Caixa após",constructionPercent(cashWeight,2)],["Unidades estimadas",units===null?"—":new Intl.NumberFormat("pt-PT",{maximumFractionDigits:6}).format(units)]].map(([label,value])=>`<div class="position-sim-result"><span>${label}</span><strong>${value}</strong></div>`).join("");const diagnostics=[];diagnostics.push(newWeight>maxWeight?{level:"bad",title:`${symbol} excede o limite`,detail:`Novo peso ${constructionPercent(newWeight,2)} > máximo ${constructionPercent(maxWeight)}.`}:{level:"good",title:`${symbol} dentro do limite`,detail:`Novo peso ${constructionPercent(newWeight,2)} de um máximo de ${constructionPercent(maxWeight)}.`});if(category==="speculative")diagnostics.push(categoryWeight>policy.max_speculative?{level:"bad",title:"Exposição especulativa excessiva",detail:`Ficaria em ${constructionPercent(categoryWeight,2)} versus máximo ${constructionPercent(policy.max_speculative)}.`}:{level:"good",title:"Especulativas dentro da política",detail:`Exposição projetada ${constructionPercent(categoryWeight,2)}.`});diagnostics.push(cashWeight<policy.min_cash?{level:"warn",title:"Caixa abaixo do mínimo",detail:`Ficaria em ${constructionPercent(cashWeight,2)} versus mínimo ${constructionPercent(policy.min_cash)}.`}:{level:"good",title:"Caixa preservada",detail:`Caixa projetada ${constructionPercent(cashWeight,2)}.`});if(currency==="USD")diagnostics.push(usdWeight>policy.max_currency?{level:"warn",title:"Limite cambial direto ultrapassado",detail:`USD direto ${constructionPercent(usdWeight,2)} versus máximo ${constructionPercent(policy.max_currency)}.`}:{level:"good",title:"USD direto dentro do limite",detail:`Exposição direta projetada ${constructionPercent(usdWeight,2)}; sem look-through dos ETFs.`});$("#constructionSimDiagnostics").innerHTML=diagnostics.map(item=>`<div class="construction-diagnostic ${item.level}"><strong>${portfolioEscape(item.title)}</strong><p>${portfolioEscape(item.detail)}</p></div>`).join("");}
 
-  function syncPortfolioCapital(){
-    if(!portfolioCapital) return;
-    let value=0;
-    if(portfolioMode==="zero"){
-      const initial=Number($("#initialCapital")?.value||0);
-      const monthly=Number($("#monthlyContribution")?.value||0);
-      const available=$("#firstContributionNow")?.value==="yes";
-      value=initial+(available?monthly:0);
-    }else{
-      value=Number($("#existingPortfolioValue")?.value||0);
-    }
-    portfolioCapital.value=value;
-    renderAllocation(window.currentAllocation||[
-      ["ETF Core global",70],["Ações quality",15],["Dividendos",8],["Especulativas",2],["Caixa",5]
-    ]);
-  }
+  $$('[data-construction-mode]').forEach(button=>button.addEventListener('click',()=>{constructionMode=button.dataset.constructionMode;$$('[data-construction-mode]').forEach(item=>item.classList.toggle('active',item===button));renderPortfolioConstruction();}));
+  ["constructionNewCapital","constructionMonthly","constructionMethod","constructionTacticalCash"].forEach(id=>{$("#"+id)?.addEventListener("input",renderPortfolioConstruction);$("#"+id)?.addEventListener("change",renderPortfolioConstruction);});
+  $("#generatePortfolio")?.addEventListener("click",()=>{renderPortfolioConstruction();showToast("Proposta de carteira atualizada.");});
+  $("#constructionSaveBtn")?.addEventListener("click",savePortfolioConstruction);$("#constructionExportBtn")?.addEventListener("click",exportPortfolioConstruction);$("#constructionOpenPolicyBtn")?.addEventListener("click",()=>handlePageOpen("profile"));
+  $("#constructionSendContributionBtn")?.addEventListener("click",()=>{const amount=Number($("#constructionNewCapital").value)||Number($("#constructionMonthly").value)||0;if($("#portfolioContributionInput"))$("#portfolioContributionInput").value=amount;handlePageOpen("myportfolio");renderPortfolioContribution();showToast("Capital transferido para o plano de contribuição da carteira.");});
+  $("#stressPreset")?.addEventListener("change",applyStressPreset);["stressCore","stressQuality","stressDividend","stressSpeculative"].forEach(id=>$("#"+id)?.addEventListener("input",runConstructionStressTest));$("#runStressTestBtn")?.addEventListener("click",runConstructionStressTest);
+  $("#constructionUseAnalysisBtn")?.addEventListener("click",useCurrentAnalysisInConstruction);$("#constructionSimulateBtn")?.addEventListener("click",simulateConstructionPosition);
+  if($("#constructionMonthly"))$("#constructionMonthly").value=getInvestorPolicy().monthly_contribution;if($("#constructionNewCapital"))$("#constructionNewCapital").value=getInvestorPolicy().monthly_contribution;renderPortfolioConstruction();
 
-  function calculatePortfolio(){
-    if(!riskRange || !liquidity) return;
-    const policy=getInvestorPolicy();
-    const values=[
-      ["ETF Core global",policy.target_allocation.core],
-      ["Ações quality",policy.target_allocation.quality],
-      ["Dividendos",policy.target_allocation.dividend],
-      ["Especulativas",policy.target_allocation.speculative],
-      ["Caixa",policy.target_allocation.cash],
-    ];
-    renderAllocation(values);
-    const label=$("#profileLabel"),desc=$("#profileDesc");
-    if(label)label.textContent=policy.label;
-    if(desc)desc.textContent=`Política guardada · score ${policy.score}/100 · caixa mínima ${policy.min_cash}%`;
-  }
-
-  $$(".mode-btn").forEach(button=>button.addEventListener("click",()=>{
-    portfolioMode=button.dataset.mode;
-    $$(".mode-btn").forEach(item=>item.classList.toggle("active",item===button));
-    $$(".mode-panel").forEach(panel=>panel.classList.remove("active"));
-    $(`#mode-${portfolioMode}`)?.classList.add("active");
-    syncPortfolioCapital();
-    calculatePortfolio();
-  }));
-
-  ["initialCapital","monthlyContribution","firstContributionNow","existingPortfolioValue"].forEach(id=>{
-    const element=$("#"+id);
-    element?.addEventListener("input",syncPortfolioCapital);
-    element?.addEventListener("change",syncPortfolioCapital);
-  });
-
-  function updateRisk(){
-    if(!riskRange) return;
-    const value=Number(riskRange.value);
-    if($("#riskText")) $("#riskText").textContent=`-${value}%`;
-    const label=$("#profileLabel");
-    const desc=$("#profileDesc");
-    if(value<=10){label.textContent="Conservador";desc.textContent="Prioridade à preservação e liquidez.";}
-    else if(value<=20){label.textContent="Equilibrado";desc.textContent="Crescimento controlado com volatilidade moderada.";}
-    else if(value<=30){label.textContent="Crescimento moderado";desc.textContent="Horizonte longo, tolerância média-alta e liquidez reduzida.";}
-    else{label.textContent="Agressivo";desc.textContent="Aceita drawdowns elevados em troca de maior potencial.";}
-  }
-  riskRange?.addEventListener("input",updateRisk);
-  $("#generatePortfolio")?.addEventListener("click",()=>{calculatePortfolio();showToast("Proposta de carteira atualizada.");});
-  portfolioCapital?.addEventListener("input",()=>renderAllocation(window.currentAllocation||[
-    ["ETF Core global",70],["Ações quality",15],["Dividendos",8],["Especulativas",2],["Caixa",5]
-  ]));
-
-  $$(".strategy-pills .tag").forEach(tag=>tag.addEventListener("click",()=>{
-    $$(".strategy-pills .tag").forEach(item=>item.classList.remove("active"));
-    tag.classList.add("active");
-    if(tag.dataset.strategy==="tactical"){
-      renderAllocation([["ETF Core global",65],["Ações quality",14],["Dividendos",8],["Especulativas",2],["Caixa",11]]);
-      showToast("Alocação tática aplicada: mais caixa temporariamente.");
-    }else{
-      calculatePortfolio();
-      showToast("Alocação estratégica restaurada.");
-    }
-  }));
-
-  syncPortfolioCapital();
-  calculatePortfolio();
-  updateRisk();
-
-  // ---------------------------------------------------------------
-  // Monthly contribution and position simulation
-  // ---------------------------------------------------------------
-  const realContribution=$("#realContribution");
-  function updateContributionPlan(){
-    if(!realContribution || !$("#contributionPlan")) return;
-    const value=Number(realContribution.value||0);
-    const core=Math.round(value*.60);
-    const quality=Math.round(value*.20);
-    const cash=value-core-quality;
-    $("#contributionPlan").innerHTML=`
-      <div class="impact-item"><span>VWCE · ETF Core</span><strong>${euro(core)}</strong></div>
-      <div class="impact-item"><span>Ações quality</span><strong>${euro(quality)}</strong></div>
-      <div class="impact-item"><span>Manter em caixa</span><strong>${euro(cash)}</strong></div>
-    `;
-  }
-  $("#recalculateContribution")?.addEventListener("click",()=>{updateContributionPlan();showToast("Plano da contribuição recalculado.");});
-  realContribution?.addEventListener("input",updateContributionPlan);
-  updateContributionPlan();
-
-  const assetMeta={
-    PWR:{tech:2,overlap:.6,usd:2,label:"PWR"},
-    ZTS:{tech:0,overlap:.2,usd:2,label:"ZTS"},
-    IREN:{tech:3,overlap:.1,usd:2,label:"IREN"}
-  };
-  $("#simulatePosition")?.addEventListener("click",()=>{
-    const key=$("#simAsset").value;
-    const weight=Number($("#simWeight").value||0);
-    const capital=Number(portfolioCapital?.value||0);
-    const meta=assetMeta[key];
-    $("#impactList").innerHTML=`
-      <div class="impact-item"><span>Valor da posição</span><strong>${euro(capital*weight/100)}</strong></div>
-      <div class="impact-item"><span>Exposição tecnológica</span><strong>31% → ${31+(meta.tech?weight:0)}%</strong></div>
-      <div class="impact-item"><span>Overlap via ETF Core</span><strong>+${(meta.overlap*weight/2).toFixed(1)}%</strong></div>
-      <div class="impact-item"><span>Risco cambial USD</span><strong>62% → ${62+meta.usd}%</strong></div>
-    `;
-    $("#overlapWarning").innerHTML=meta.overlap>.3
-      ? `<strong>⚠️ Alerta de overlap</strong><br>${meta.label} já está indiretamente presente no ETF Core.`
-      : `<strong>✓ Overlap reduzido</strong><br>A nova posição acrescenta uma exposição relativamente distinta.`;
-    showToast("Impacto da posição simulado.");
-  });
 })();
 </script>
 

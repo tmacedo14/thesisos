@@ -14,6 +14,7 @@ ThesisOS is a functional academic prototype for evidence-based investment analys
 - Automated Opportunity Radar for configurable universes and the browser watchlist.
 - Persistent local watchlist.
 - Functional local Portfolio Manager with transactions, current prices, average monitoring cost, P&L, target weights, contribution optimisation and CSV import/export.
+- Functional Portfolio Construction & Stress Test Engine using the saved Investment Policy, current transactions, funding gaps, scenario shocks and position-limit checks.
 - Functional Decision Journal with thesis versioning, snapshots, entry zones, review dates and CSV export.
 - Functional monitoring alerts for price, scores, RSI, pullback and thesis review dates.
 - Evidence & Events Engine with SEC submissions, recent company news, source hierarchy, materiality and thesis-review gates.
@@ -119,3 +120,7 @@ Para ações com dados SEC e capitalização Finnhub, o ThesisOS calcula automat
 - simulador DCF com pressupostos editáveis.
 
 O modelo é deliberadamente parcial e não substitui múltiplos históricos, comparáveis setoriais, guidance, normalização do FCF, notícias ou contexto da carteira. O Opportunity Radar usa o valuation como uma camada adicional, sem converter o ranking numa recomendação automática.
+
+## Portfolio construction methodology
+
+The Portfolio Construction Engine converts the saved Investment Policy into target category weights, compares them with the transaction-based portfolio, and proposes either contribution-only funding or a full simulated rebalance. Stress tests apply transparent shocks to policy buckets and are not forecasts or Value-at-Risk estimates. Direct currency concentration excludes ETF look-through unless official holdings data is available.
