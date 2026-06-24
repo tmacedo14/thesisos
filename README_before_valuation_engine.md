@@ -97,16 +97,3 @@ python3 server.py
 ## Disclaimer
 
 This project is an educational decision-support prototype and not financial advice. Scores are partial models based on available data and must not be interpreted as automatic buy or sell recommendations.
-
-
-## Valuation Engine
-
-Para ações com dados SEC e capitalização Finnhub, o ThesisOS calcula automaticamente:
-
-- free cash flow yield;
-- P/E, P/S e P/B derivados;
-- crescimento de FCF implícito num reverse DCF;
-- score de exigência relativa com cobertura explícita;
-- simulador DCF com pressupostos editáveis.
-
-O modelo é deliberadamente parcial e não substitui múltiplos históricos, comparáveis setoriais, guidance, normalização do FCF, notícias ou contexto da carteira. O Opportunity Radar usa o valuation como uma camada adicional, sem converter o ranking numa recomendação automática.

@@ -3758,7 +3758,7 @@ def enrich_framework_engine_with_technical(
 
 
 
-FRAMEWORK_ENGINE_VERSION = "0.8"
+FRAMEWORK_ENGINE_VERSION = "0.7"
 
 
 def fact_value(fact):
@@ -6039,32 +6039,6 @@ def build_analysis_payload(
             "A análise técnica está temporariamente indisponível."
         )
 
-    valuation = None
-    if asset.get("asset_type") == "stock":
-        try:
-            valuation = build_stock_valuation_snapshot(asset, fundamentals)
-            valuation_status = (
-                "ok"
-                if valuation and valuation.get("score") is not None
-                else "unavailable"
-            )
-            sources["valuation"] = analysis_source(
-                "ThesisOS calculation from Finnhub + SEC EDGAR",
-                valuation_status,
-                coverage_percentage=(valuation or {}).get(
-                    "coverage_percentage"
-                ),
-            )
-        except Exception as error:
-            sources["valuation"] = analysis_source(
-                "ThesisOS Valuation Engine",
-                "unavailable",
-                detail=str(error),
-            )
-            warnings.append(
-                "O valuation quantitativo está temporariamente indisponível."
-            )
-
     fx = None
     price = asset.get("price")
     currency = asset.get("currency")
@@ -6160,7 +6134,6 @@ def build_analysis_payload(
         "fundamentals": fundamentals,
         "etf_profile": etf_profile,
         "technical": technical,
-        "valuation": valuation,
         "fx": fx,
         "sources": sources,
         "data_quality": {
@@ -6190,555 +6163,9 @@ def build_analysis_payload(
         payload["framework_engine"],
         technical,
     )
-    payload["framework_engine"] = enrich_framework_engine_with_valuation(
-        payload["framework_engine"],
-        valuation,
-    )
 
     return payload, 200
 
-
-
-def valuation_rule(
-    rule_id: str,
-    label: str,
-    value,
-    unit: str,
-    points: int,
-    max_points: int,
-    status: str,
-    interpretation: str,
-) -> dict:
-    return {
-        "id": rule_id,
-        "label": label,
-        "value": value,
-        "unit": unit,
-        "points": points,
-        "max_points": max_points,
-        "status": status,
-        "interpretation": interpretation,
-        "source": "ThesisOS calculation from Finnhub + SEC EDGAR",
-    }
-
-
-def unavailable_valuation_rule(
-    rule_id: str,
-    label: str,
-    unit: str,
-    max_points: int,
-    interpretation: str,
-) -> dict:
-    return valuation_rule(
-        rule_id,
-        label,
-        None,
-        unit,
-        0,
-        max_points,
-        "unavailable",
-        interpretation,
-    )
-
-
-def classify_valuation_score(score):
-    if score is None:
-        return {
-            "code": "insufficient_data",
-            "label": "Dados insuficientes",
-        }
-    if score >= 80:
-        return {
-            "code": "low_relative_demand",
-            "label": "Exigência relativa baixa",
-        }
-    if score >= 65:
-        return {
-            "code": "moderate_relative_demand",
-            "label": "Exigência relativa moderada",
-        }
-    if score >= 45:
-        return {
-            "code": "high_relative_demand",
-            "label": "Exigência relativa elevada",
-        }
-    return {
-        "code": "very_high_relative_demand",
-        "label": "Exigência relativa muito elevada",
-    }
-
-
-def discounted_fcf_equity_value(
-    annual_fcf: float,
-    growth_rate: float,
-    discount_rate: float,
-    terminal_growth_rate: float,
-    years: int = 5,
-):
-    if annual_fcf <= 0:
-        return None
-    if discount_rate <= terminal_growth_rate:
-        return None
-
-    value = 0.0
-    projected_fcf = annual_fcf
-
-    for year in range(1, years + 1):
-        projected_fcf *= 1 + growth_rate
-        value += projected_fcf / ((1 + discount_rate) ** year)
-
-    terminal_value = (
-        projected_fcf
-        * (1 + terminal_growth_rate)
-        / (discount_rate - terminal_growth_rate)
-    )
-    value += terminal_value / ((1 + discount_rate) ** years)
-    return value
-
-
-def reverse_dcf_implied_growth(
-    annual_fcf,
-    market_cap,
-    discount_rate=0.09,
-    terminal_growth_rate=0.025,
-    years=5,
-):
-    if not isinstance(annual_fcf, (int, float)) or annual_fcf <= 0:
-        return None
-    if not isinstance(market_cap, (int, float)) or market_cap <= 0:
-        return None
-    if discount_rate <= terminal_growth_rate:
-        return None
-
-    low = -0.50
-    high = 0.50
-    low_value = discounted_fcf_equity_value(
-        annual_fcf,
-        low,
-        discount_rate,
-        terminal_growth_rate,
-        years,
-    )
-    high_value = discounted_fcf_equity_value(
-        annual_fcf,
-        high,
-        discount_rate,
-        terminal_growth_rate,
-        years,
-    )
-
-    if low_value is not None and low_value >= market_cap:
-        return -50.0
-    if high_value is not None and high_value <= market_cap:
-        return 50.0
-
-    for _ in range(80):
-        middle = (low + high) / 2
-        middle_value = discounted_fcf_equity_value(
-            annual_fcf,
-            middle,
-            discount_rate,
-            terminal_growth_rate,
-            years,
-        )
-        if middle_value is None:
-            return None
-        if middle_value < market_cap:
-            low = middle
-        else:
-            high = middle
-
-    return round(((low + high) / 2) * 100, 2)
-
-
-def evaluate_fcf_yield(value):
-    if value is None:
-        return unavailable_valuation_rule(
-            "fcf_yield",
-            "Free cash flow yield",
-            "%",
-            30,
-            "FCF anual ou capitalização bolsista indisponível.",
-        )
-    if value >= 7:
-        points, status, text = 30, "strong", "FCF yield elevado nos dados disponíveis."
-    elif value >= 5:
-        points, status, text = 25, "positive", "FCF yield sólido nos dados disponíveis."
-    elif value >= 3:
-        points, status, text = 18, "neutral", "FCF yield intermédio."
-    elif value > 0:
-        points, status, text = 8, "watch", "FCF yield reduzido."
-    else:
-        points, status, text = 0, "warning", "Free cash flow anual não positivo."
-    return valuation_rule(
-        "fcf_yield", "Free cash flow yield", value, "%",
-        points, 30, status, text,
-    )
-
-
-def evaluate_pe(value, annual_net_income):
-    if value is None:
-        if isinstance(annual_net_income, (int, float)) and annual_net_income <= 0:
-            return valuation_rule(
-                "price_to_earnings", "P/E calculado", None, "x",
-                0, 25, "warning", "Lucro anual não positivo; P/E não é interpretável.",
-            )
-        return unavailable_valuation_rule(
-            "price_to_earnings", "P/E calculado", "x", 25,
-            "Lucro anual ou capitalização bolsista indisponível.",
-        )
-    if value <= 15:
-        points, status, text = 25, "strong", "Múltiplo de lucro reduzido, sujeito ao contexto do negócio."
-    elif value <= 22:
-        points, status, text = 20, "positive", "Múltiplo de lucro moderado."
-    elif value <= 30:
-        points, status, text = 13, "neutral", "Múltiplo de lucro relevante."
-    elif value <= 45:
-        points, status, text = 6, "watch", "Múltiplo de lucro exigente."
-    else:
-        points, status, text = 1, "warning", "Múltiplo de lucro muito exigente."
-    return valuation_rule(
-        "price_to_earnings", "P/E calculado", value, "x",
-        points, 25, status, text,
-    )
-
-
-def evaluate_ps(value):
-    if value is None:
-        return unavailable_valuation_rule(
-            "price_to_sales", "P/S calculado", "x", 15,
-            "Receitas anuais ou capitalização bolsista indisponível.",
-        )
-    if value <= 2:
-        points, status, text = 15, "strong", "Preço/receitas reduzido."
-    elif value <= 4:
-        points, status, text = 12, "positive", "Preço/receitas moderado."
-    elif value <= 7:
-        points, status, text = 8, "neutral", "Preço/receitas relevante."
-    elif value <= 12:
-        points, status, text = 4, "watch", "Preço/receitas exigente."
-    else:
-        points, status, text = 0, "warning", "Preço/receitas muito exigente."
-    return valuation_rule(
-        "price_to_sales", "P/S calculado", value, "x",
-        points, 15, status, text,
-    )
-
-
-def evaluate_pb(value, equity):
-    if value is None:
-        if isinstance(equity, (int, float)) and equity <= 0:
-            return valuation_rule(
-                "price_to_book", "P/B calculado", None, "x",
-                0, 10, "warning", "Capital próprio não positivo; P/B não é interpretável.",
-            )
-        return unavailable_valuation_rule(
-            "price_to_book", "P/B calculado", "x", 10,
-            "Capital próprio ou capitalização bolsista indisponível.",
-        )
-    if value <= 3:
-        points, status, text = 10, "positive", "P/B reduzido a moderado."
-    elif value <= 6:
-        points, status, text = 7, "neutral", "P/B relevante."
-    elif value <= 10:
-        points, status, text = 3, "watch", "P/B exigente."
-    else:
-        points, status, text = 0, "warning", "P/B muito exigente."
-    return valuation_rule(
-        "price_to_book", "P/B calculado", value, "x",
-        points, 10, status, text,
-    )
-
-
-def evaluate_implied_growth(value):
-    if value is None:
-        return unavailable_valuation_rule(
-            "reverse_dcf_growth", "Crescimento implícito no reverse DCF", "%", 20,
-            "É necessário FCF anual positivo e capitalização bolsista.",
-        )
-    if value <= 0:
-        points, status, text = 20, "strong", "O preço não exige crescimento positivo no cenário-base."
-    elif value <= 5:
-        points, status, text = 17, "positive", "O preço implica crescimento moderado do FCF."
-    elif value <= 10:
-        points, status, text = 12, "neutral", "O preço implica crescimento material do FCF."
-    elif value <= 15:
-        points, status, text = 6, "watch", "O preço exige crescimento elevado do FCF."
-    else:
-        points, status, text = 1, "warning", "O preço exige crescimento muito elevado do FCF."
-    return valuation_rule(
-        "reverse_dcf_growth",
-        "Crescimento implícito no reverse DCF",
-        value,
-        "%",
-        points,
-        20,
-        status,
-        text,
-    )
-
-
-def build_stock_valuation_snapshot(asset: dict, fundamentals: dict | None):
-    if asset.get("asset_type") != "stock":
-        return None
-
-    fundamentals = fundamentals or {}
-    duration = fundamentals.get("duration_metrics", {})
-    instant = fundamentals.get("instant_metrics", {})
-    derived = fundamentals.get("derived_metrics", {})
-
-    market_cap_millions = finite_number(asset.get("market_cap_millions"))
-    market_cap = (
-        market_cap_millions * 1_000_000
-        if market_cap_millions is not None and market_cap_millions > 0
-        else None
-    )
-
-    annual_revenue = fact_value(
-        duration.get("revenue", {}).get("latest_annual")
-    )
-    annual_net_income = fact_value(
-        duration.get("net_income", {}).get("latest_annual")
-    )
-    equity = fact_value(instant.get("equity"))
-    annual_fcf = finite_number(derived.get("annual_free_cash_flow"))
-
-    price = finite_number(asset.get("price"))
-    shares_millions = finite_number(asset.get("shares_outstanding_millions"))
-    shares = (
-        shares_millions * 1_000_000
-        if shares_millions is not None and shares_millions > 0
-        else None
-    )
-    if shares is None and market_cap and price and price > 0:
-        shares = market_cap / price
-
-    def ratio(numerator, denominator):
-        if not isinstance(numerator, (int, float)):
-            return None
-        if not isinstance(denominator, (int, float)) or denominator == 0:
-            return None
-        return round(numerator / denominator, 2)
-
-    fcf_yield = (
-        round((annual_fcf / market_cap) * 100, 2)
-        if isinstance(annual_fcf, (int, float)) and market_cap
-        else None
-    )
-    earnings_yield = (
-        round((annual_net_income / market_cap) * 100, 2)
-        if isinstance(annual_net_income, (int, float)) and market_cap
-        else None
-    )
-    pe = (
-        ratio(market_cap, annual_net_income)
-        if isinstance(annual_net_income, (int, float)) and annual_net_income > 0
-        else None
-    )
-    ps = (
-        ratio(market_cap, annual_revenue)
-        if isinstance(annual_revenue, (int, float)) and annual_revenue > 0
-        else None
-    )
-    pb = (
-        ratio(market_cap, equity)
-        if isinstance(equity, (int, float)) and equity > 0
-        else None
-    )
-
-    assumptions = {
-        "forecast_years": 5,
-        "discount_rate_percentage": 9.0,
-        "terminal_growth_percentage": 2.5,
-    }
-    implied_growth = reverse_dcf_implied_growth(
-        annual_fcf,
-        market_cap,
-        discount_rate=assumptions["discount_rate_percentage"] / 100,
-        terminal_growth_rate=assumptions["terminal_growth_percentage"] / 100,
-        years=assumptions["forecast_years"],
-    )
-
-    rules = [
-        evaluate_fcf_yield(fcf_yield),
-        evaluate_pe(pe, annual_net_income),
-        evaluate_ps(ps),
-        evaluate_pb(pb, equity),
-        evaluate_implied_growth(implied_growth),
-    ]
-    available_rules = [rule for rule in rules if rule["status"] != "unavailable"]
-    achieved_points = sum(rule["points"] for rule in available_rules)
-    available_max_points = sum(rule["max_points"] for rule in available_rules)
-    total_max_points = sum(rule["max_points"] for rule in rules)
-    score = (
-        round((achieved_points / available_max_points) * 100)
-        if available_max_points
-        else None
-    )
-    coverage = round((available_max_points / total_max_points) * 100)
-
-    positive_signals = [
-        {
-            "rule_id": rule["id"],
-            "label": rule["label"],
-            "value": rule["value"],
-            "unit": rule["unit"],
-            "interpretation": rule["interpretation"],
-        }
-        for rule in rules
-        if rule["status"] in {"strong", "positive"}
-    ]
-    warning_signals = [
-        {
-            "rule_id": rule["id"],
-            "label": rule["label"],
-            "value": rule["value"],
-            "unit": rule["unit"],
-            "interpretation": rule["interpretation"],
-        }
-        for rule in rules
-        if rule["status"] in {"watch", "warning"}
-    ]
-
-    current_dcf_value = discounted_fcf_equity_value(
-        annual_fcf,
-        0.05,
-        assumptions["discount_rate_percentage"] / 100,
-        assumptions["terminal_growth_percentage"] / 100,
-        assumptions["forecast_years"],
-    ) if isinstance(annual_fcf, (int, float)) and annual_fcf > 0 else None
-
-    indicative_value_per_share = (
-        round(current_dcf_value / shares, 2)
-        if current_dcf_value is not None and shares
-        else None
-    )
-
-    return {
-        "status": "partial" if score is not None else "insufficient_data",
-        "score": score,
-        "classification": classify_valuation_score(score),
-        "coverage_percentage": coverage,
-        "achieved_points": achieved_points,
-        "available_max_points": available_max_points,
-        "total_max_points": total_max_points,
-        "currency": asset.get("currency"),
-        "metrics": {
-            "market_cap": market_cap,
-            "annual_revenue": annual_revenue,
-            "annual_net_income": annual_net_income,
-            "annual_free_cash_flow": annual_fcf,
-            "equity": equity,
-            "shares_outstanding": shares,
-            "free_cash_flow_yield_percentage": fcf_yield,
-            "earnings_yield_percentage": earnings_yield,
-            "price_to_earnings": pe,
-            "price_to_sales": ps,
-            "price_to_book": pb,
-            "reverse_dcf_implied_growth_percentage": implied_growth,
-            "illustrative_value_per_share_at_5pct_growth": indicative_value_per_share,
-        },
-        "reverse_dcf": {
-            "assumptions": assumptions,
-            "implied_growth_percentage": implied_growth,
-            "interpretation": (
-                "Crescimento anual do FCF necessário para aproximar o valor "
-                "presente da capitalização atual, usando pressupostos genéricos."
-            ),
-        },
-        "rules": rules,
-        "positive_signals": positive_signals,
-        "warning_signals": warning_signals,
-        "methodology_note": (
-            "Snapshot relativo e setorialmente neutro. Não substitui histórico de "
-            "múltiplos, comparáveis, guidance, normalização do FCF ou cenários próprios."
-        ),
-    }
-
-
-def enrich_framework_engine_with_valuation(engine: dict, valuation: dict | None):
-    if not isinstance(engine, dict) or not valuation:
-        return engine
-
-    checklist = engine.get("framework_checklist", {}).get("items", [])
-    valuation_item = next(
-        (item for item in checklist if item.get("id") == "valuation"),
-        None,
-    )
-    metrics = valuation.get("metrics", {})
-    available = []
-    if metrics.get("free_cash_flow_yield_percentage") is not None:
-        available.append("free cash flow yield")
-    if metrics.get("price_to_earnings") is not None:
-        available.append("P/E calculado")
-    if metrics.get("price_to_sales") is not None:
-        available.append("P/S calculado")
-    if metrics.get("price_to_book") is not None:
-        available.append("P/B calculado")
-    if metrics.get("reverse_dcf_implied_growth_percentage") is not None:
-        available.append("reverse DCF com crescimento implícito")
-
-    missing = [
-        "múltiplos históricos",
-        "comparáveis setoriais",
-        "normalização do FCF",
-        "guidance e estimativas",
-        "cenários bear/base/bull específicos",
-        "retorno esperado ajustado ao risco",
-    ]
-
-    if valuation_item:
-        valuation_item["status"] = "partial" if available else "missing"
-        valuation_item["available_data"] = available
-        valuation_item["missing_data"] = missing
-
-    framework = engine.get("framework_checklist", {})
-    if checklist:
-        available_sections = sum(
-            1 for item in checklist
-            if item.get("status") in {"available", "partial"}
-        )
-        framework["coverage_percentage"] = round(
-            (available_sections / len(checklist)) * 100
-        )
-        framework["confidence"] = (
-            "high" if framework["coverage_percentage"] >= 70
-            else "moderate" if framework["coverage_percentage"] >= 40
-            else "low"
-        )
-
-    engine["valuation_snapshot"] = valuation
-    engine["next_required_data"] = [
-        item
-        for item in engine.get("next_required_data", [])
-        if item != "valuation, reverse DCF e cenários"
-    ]
-    for item in missing:
-        if item not in engine["next_required_data"]:
-            engine["next_required_data"].append(item)
-
-    decision = engine.get("decision", {})
-    decision["valuation_context"] = {
-        "score": valuation.get("score"),
-        "classification": valuation.get("classification"),
-        "fcf_yield_percentage": metrics.get("free_cash_flow_yield_percentage"),
-        "reverse_dcf_implied_growth_percentage": metrics.get(
-            "reverse_dcf_implied_growth_percentage"
-        ),
-    }
-    if decision.get("label") == "Aguardar valuation e revisão qualitativa":
-        decision["label"] = "Aguardar comparação histórica, notícias e carteira"
-        decision["reason"] = (
-            "O valuation quantitativo inicial está disponível, mas ainda faltam "
-            "comparáveis, contexto qualitativo, notícias, carteira e plano de entrada."
-        )
-
-    engine["scope"] = (
-        "Snapshot quantitativo de qualidade, cash flow, dívida, diluição, "
-        "alocação de capital, valuation relativo e reverse DCF. "
-        "Não representa ainda uma análise integral."
-    )
-    return engine
 
 def resolve_analysis_payload(
     identifier: str,
@@ -6792,30 +6219,20 @@ def radar_composite_score(payload: dict):
     engine = payload.get("framework_engine", {})
     snapshot = engine.get("quantitative_snapshot", {})
     technical = payload.get("technical") or {}
-    valuation = payload.get("valuation") or {}
-    asset_type = payload.get("asset", {}).get("asset_type")
     quality_score = finite_number(snapshot.get("score"))
     technical_score = finite_number(technical.get("score"))
-    valuation_score = finite_number(valuation.get("score"))
     source_coverage = finite_number(
         payload.get("data_quality", {}).get("completeness_percentage")
     )
 
     weighted = []
-    weights = (
-        {"quality": 0.55, "valuation": 0.20, "technical": 0.15, "data": 0.10}
-        if asset_type == "stock"
-        else {"quality": 0.70, "technical": 0.20, "data": 0.10}
-    )
 
     if quality_score is not None:
-        weighted.append((quality_score, weights["quality"]))
-    if valuation_score is not None and "valuation" in weights:
-        weighted.append((valuation_score, weights["valuation"]))
+        weighted.append((quality_score, 0.7))
     if technical_score is not None:
-        weighted.append((technical_score, weights["technical"]))
+        weighted.append((technical_score, 0.2))
     if source_coverage is not None:
-        weighted.append((source_coverage, weights["data"]))
+        weighted.append((source_coverage, 0.1))
 
     if not weighted:
         return None
@@ -6860,8 +6277,6 @@ def radar_result_from_payload(payload: dict) -> dict:
     engine = payload.get("framework_engine", {})
     snapshot = engine.get("quantitative_snapshot", {})
     technical = payload.get("technical") or {}
-    valuation = payload.get("valuation") or {}
-    valuation_metrics = valuation.get("metrics", {})
     indicators = technical.get("indicators", {})
     score = radar_composite_score(payload)
     status = radar_status(score, payload)
@@ -6871,7 +6286,6 @@ def radar_result_from_payload(payload: dict) -> dict:
 
     for source in (
         snapshot.get("positive_signals", []),
-        valuation.get("positive_signals", []),
         technical.get("positive_signals", []),
     ):
         for item in source:
@@ -6881,7 +6295,6 @@ def radar_result_from_payload(payload: dict) -> dict:
 
     for source in (
         snapshot.get("warning_signals", []),
-        valuation.get("warning_signals", []),
         technical.get("warning_signals", []),
     ):
         for item in source:
@@ -6901,15 +6314,6 @@ def radar_result_from_payload(payload: dict) -> dict:
         "status": status,
         "quality_score": snapshot.get("score"),
         "quality_classification": snapshot.get("classification"),
-        "valuation_score": valuation.get("score"),
-        "valuation_classification": valuation.get("classification"),
-        "free_cash_flow_yield_percentage": valuation_metrics.get(
-            "free_cash_flow_yield_percentage"
-        ),
-        "price_to_earnings": valuation_metrics.get("price_to_earnings"),
-        "reverse_dcf_implied_growth_percentage": valuation_metrics.get(
-            "reverse_dcf_implied_growth_percentage"
-        ),
         "technical_score": technical.get("score"),
         "technical_classification": technical.get("classification"),
         "framework_coverage_percentage": engine.get(
@@ -7029,20 +6433,12 @@ def build_opportunity_radar(
         "errors": errors,
         "cached": False,
         "methodology": {
-            "stock_weights": {
-                "quality": 0.55,
-                "valuation": 0.20,
-                "technical": 0.15,
-                "data_quality": 0.10,
-            },
-            "etf_weights": {
-                "structure": 0.70,
-                "technical": 0.20,
-                "data_quality": 0.10,
-            },
+            "quality_weight": 0.7,
+            "technical_weight": 0.2,
+            "data_quality_weight": 0.1,
             "decision_limit": (
                 "O ranking identifica candidatas para análise. "
-                "Não substitui notícias, contexto qualitativo, carteira ou plano de entrada."
+                "Não substitui valuation, notícias, carteira ou plano de entrada."
             ),
         },
     }
@@ -7155,10 +6551,6 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             self.handle_technical_request(parsed_url)
             return
 
-        if parsed_url.path.startswith("/api/valuation/"):
-            self.handle_valuation_request(parsed_url)
-            return
-
         if parsed_url.path.startswith("/api/fx/"):
             self.handle_fx_request(parsed_url)
             return
@@ -7253,30 +6645,6 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             self.send_json(
                 {
                     "error": "Erro ao calcular análise técnica.",
-                    "detail": str(error),
-                },
-                status=500,
-            )
-
-    def handle_valuation_request(self, parsed_url) -> None:
-        identifier = unquote(
-            parsed_url.path.removeprefix("/api/valuation/")
-        ).strip().upper()
-
-        if not identifier:
-            self.send_json({"error": "Identificador inválido."}, status=400)
-            return
-
-        try:
-            payload, status = resolve_analysis_payload(identifier)
-            if status != 200:
-                self.send_json(payload, status=status)
-                return
-            self.send_json(payload.get("valuation") or {})
-        except Exception as error:
-            self.send_json(
-                {
-                    "error": "Erro ao calcular valuation.",
                     "detail": str(error),
                 },
                 status=500,

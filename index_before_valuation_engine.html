@@ -575,7 +575,7 @@
     #etfAnalysisPanel{display:none}
     #analysis.stock-mode #stockFundamentalsPanel{display:block}
     #analysis.stock-mode #etfAnalysisPanel{display:none!important}
-    #analysis.stock-mode #realMarketDataCard ~ *:not(#stockFundamentalsPanel):not(#stockCashFlowPanel):not(#stockValuationPanel){display:none!important}
+    #analysis.stock-mode #realMarketDataCard ~ *:not(#stockFundamentalsPanel):not(#stockCashFlowPanel){display:none!important}
     #analysis.etf-mode #stockFundamentalsPanel{display:none!important}
     #analysis.etf-mode #etfAnalysisPanel{display:block}
     #analysis.etf-mode #realMarketDataCard ~ *:not(#etfAnalysisPanel){display:none!important}
@@ -1211,7 +1211,7 @@
     .radar-config{margin-bottom:0}.radar-config-grid{display:grid;grid-template-columns:1fr 2fr .7fr 1fr;gap:12px;align-items:end}
     .radar-loading{margin-top:16px;padding:26px;border:1px dashed #385174;border-radius:16px;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);text-align:center}
     .radar-loading[hidden]{display:none}.radar-spinner{width:30px;height:30px;border-radius:50%;border:3px solid #2b4162;border-top-color:var(--accent);animation:radarSpin .8s linear infinite}@keyframes radarSpin{to{transform:rotate(360deg)}}
-    .radar-live-card .ticker-logo{font-size:12px}.radar-score-layout{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:13px 0}.radar-score-box{padding:9px;border-radius:10px;background:#0f1a2c;border:1px solid #243650}.radar-score-box span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.radar-score-box strong{display:block;margin-top:4px}
+    .radar-live-card .ticker-logo{font-size:12px}.radar-score-layout{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin:13px 0}.radar-score-box{padding:9px;border-radius:10px;background:#0f1a2c;border:1px solid #243650}.radar-score-box span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.radar-score-box strong{display:block;margin-top:4px}
     .radar-reasons{display:grid;gap:6px;margin-top:10px}.radar-reason{font-size:11px;color:#bdc9da}.radar-reason.good:before{content:'✓ ';color:var(--success)}.radar-reason.warn:before{content:'! ';color:var(--warn)}
     .watchlist-add-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}.watchlist-add-row input{margin:0}
     .watchlist-card-meta{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}.watchlist-card-meta>div{padding:9px;border-radius:10px;background:#0f1a2c;border:1px solid #243650}.watchlist-card-meta span{display:block;color:var(--muted);font-size:9px}.watchlist-card-meta strong{display:block;margin-top:4px;font-size:12px}
@@ -1315,32 +1315,6 @@
     .decision-check{display:flex;gap:9px;align-items:flex-start;margin-top:12px;color:#b8c5d8;font-size:12px}.decision-check input{width:auto;margin:2px 0 0}
     @media(max-width:1050px){.decision-workspace{grid-template-columns:1fr}.decision-kpi-grid,.monitoring-summary{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:760px){.decision-kpi-grid,.monitoring-summary,.monitoring-grid,.decision-plan-grid,.decision-snapshot,.decision-notes-grid{grid-template-columns:1fr}.decision-filter-row{grid-template-columns:1fr}.decision-detail-head{flex-direction:column}.decision-version-row{grid-template-columns:65px 1fr}.decision-version-row button{grid-column:1/-1}}
-
-  
-    /* ThesisOS stock valuation engine */
-    #stockValuationPanel{display:none;margin-bottom:16px}
-    #analysis.stock-mode #stockValuationPanel{display:block}
-    #analysis.etf-mode #stockValuationPanel,
-    #analysis.analysis-neutral #stockValuationPanel{display:none!important}
-    .valuation-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
-    .valuation-score{font-size:30px;font-weight:900;letter-spacing:-.04em}
-    .valuation-metric-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:14px}
-    .valuation-metric{padding:13px;border:1px solid #263a59;border-radius:13px;background:#111d30;min-height:94px}
-    .valuation-metric span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
-    .valuation-metric strong{display:block;font-size:18px;margin:7px 0 3px}
-    .valuation-metric small{color:var(--muted);line-height:1.35}
-    .valuation-layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);gap:14px;margin-top:14px}
-    .valuation-rule-list{display:grid;gap:8px;margin-top:10px}
-    .valuation-rule{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 11px;border:1px solid #263a59;border-radius:11px;background:#101b2d}
-    .valuation-rule strong{display:block;font-size:12px}.valuation-rule small{display:block;color:var(--muted);margin-top:4px;line-height:1.35}
-    .valuation-points{font-weight:900;white-space:nowrap}
-    .dcf-lab{padding:14px;border:1px solid #304968;border-radius:14px;background:linear-gradient(180deg,#14243b,#101c2f)}
-    .dcf-input-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:12px 0}
-    .dcf-result-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
-    .dcf-result{padding:11px;border-radius:11px;background:#0f1b2d;border:1px solid #22344f}
-    .dcf-result span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase}.dcf-result strong{display:block;margin-top:5px;font-size:17px}
-    @media(max-width:1100px){.valuation-metric-grid{grid-template-columns:repeat(3,1fr)}.valuation-layout{grid-template-columns:1fr}}
-    @media(max-width:700px){.valuation-metric-grid,.dcf-input-grid,.dcf-result-grid{grid-template-columns:1fr}}
 
   </style>
 </head>
@@ -1517,7 +1491,7 @@
           <label>Máximo de ativos<select id="radarLimit"><option value="6">6</option><option value="8" selected>8</option><option value="10">10</option><option value="12">12</option></select></label>
           <label>Ordenação<select id="radarSort"><option value="score">Radar score</option><option value="quality">Qualidade</option><option value="technical">Técnica</option><option value="pullback">Maior pullback</option></select></label>
         </div>
-        <div class="logic-note">Ações: 55% qualidade + 20% valuation + 15% técnica + 10% qualidade dos dados. ETFs: 70% estrutura + 20% técnica + 10% dados. Notícias, carteira e plano de entrada continuam obrigatórios.</div>
+        <div class="logic-note">Radar score = 70% qualidade estrutural/fundamental + 20% Technical Engine + 10% qualidade dos dados. Valuation, notícias e carteira continuam obrigatórios antes de uma decisão.</div>
       </div>
       <div class="radar-loading" id="radarLoading" hidden><div class="radar-spinner"></div><strong>A analisar ativos e a aplicar os frameworks…</strong><span>Na primeira execução pode demorar alguns segundos; os resultados ficam em cache.</span></div>
       <div class="grid g3 opportunity-list" id="dynamicRadarCards" style="margin-top:16px"></div>
@@ -1593,13 +1567,6 @@
               <span class="analysis-source-status">A aguardar</span>
             </div>
             <small>Yahoo Finance</small>
-          </div>
-          <div class="analysis-source-item" id="analysisSourceValuation" data-status="waiting" style="display:none">
-            <div class="analysis-source-item-head">
-              <strong>Valuation</strong>
-              <span class="analysis-source-status">A aguardar</span>
-            </div>
-            <small>Cálculo ThesisOS · Finnhub + SEC</small>
           </div>
           <div class="analysis-source-item" id="analysisSourceFundamentals" data-status="waiting">
             <div class="analysis-source-item-head">
@@ -1987,53 +1954,6 @@
             inclui maturidades, juros, covenants, leases ou pensões.
           </div>
         </div>
-      </section>
-
-
-      <section class="card" id="stockValuationPanel">
-        <div class="valuation-top">
-          <div>
-            <h2 style="margin:0 0 6px">Valuation Engine</h2>
-            <p class="sub" id="valuationScope">Múltiplos calculados, FCF yield e reverse DCF.</p>
-          </div>
-          <div style="text-align:right">
-            <div><strong class="valuation-score" id="valuationScore">—</strong><span class="sub">/100</span></div>
-            <span class="pill" id="valuationClassification">A aguardar</span>
-          </div>
-        </div>
-
-        <div class="valuation-metric-grid">
-          <div class="valuation-metric"><span>Capitalização</span><strong id="valuationMarketCap">—</strong><small id="valuationCoverage">Cobertura indisponível</small></div>
-          <div class="valuation-metric"><span>FCF yield</span><strong id="valuationFcfYield">—</strong><small>FCF anual / capitalização</small></div>
-          <div class="valuation-metric"><span>P/E calculado</span><strong id="valuationPe">—</strong><small>Capitalização / lucro anual</small></div>
-          <div class="valuation-metric"><span>P/S calculado</span><strong id="valuationPs">—</strong><small>Capitalização / receitas anuais</small></div>
-          <div class="valuation-metric"><span>P/B calculado</span><strong id="valuationPb">—</strong><small>Capitalização / capital próprio</small></div>
-          <div class="valuation-metric"><span>Crescimento implícito</span><strong id="valuationImpliedGrowth">—</strong><small>Reverse DCF a 5 anos</small></div>
-        </div>
-
-        <div class="valuation-layout">
-          <div>
-            <div class="section-head" style="margin:0 0 8px"><div><h3>Regras transparentes</h3><p class="sub" style="margin:4px 0 0">Leitura genérica; setores e ciclos exigem comparação própria.</p></div></div>
-            <div class="valuation-rule-list" id="valuationRules"></div>
-          </div>
-          <div class="dcf-lab">
-            <h3>DCF ilustrativo</h3>
-            <p class="sub" style="margin:5px 0 0">Altera os pressupostos para testar cenários. O cálculo usa o FCF anual reportado e não normalizado.</p>
-            <div class="dcf-input-grid">
-              <label>Crescimento FCF anual (%)<input id="dcfGrowth" type="number" step="0.5" value="5"></label>
-              <label>Taxa de desconto (%)<input id="dcfDiscount" type="number" step="0.5" value="9"></label>
-              <label>Crescimento terminal (%)<input id="dcfTerminal" type="number" step="0.1" value="2.5"></label>
-            </div>
-            <button class="primary" id="dcfCalculateBtn" type="button">Calcular cenário</button>
-            <div class="dcf-result-grid">
-              <div class="dcf-result"><span>Valor indicativo / ação</span><strong id="dcfValuePerShare">—</strong></div>
-              <div class="dcf-result"><span>Upside / downside</span><strong id="dcfUpside">—</strong></div>
-            </div>
-            <div class="logic-note" id="dcfMethodology">O reverse DCF automático mostra o crescimento necessário para justificar o preço atual. Este simulador testa um cenário escolhido pelo utilizador.</div>
-          </div>
-        </div>
-
-        <div class="framework-engine-note" id="valuationMethodology">Valuation relativo inicial. Ainda faltam histórico, comparáveis, guidance, normalização do FCF e cenários específicos.</div>
       </section>
 
       <section class="card" id="etfAnalysisPanel" style="margin-bottom:16px">
@@ -3380,7 +3300,6 @@
       "#analysisSourceIdentification",
       "#analysisSourceMarket",
       "#analysisSourceTechnical",
-      "#analysisSourceValuation",
       "#analysisSourceFundamentals",
       "#analysisSourceFx",
       "#analysisSourceEtfStructure"
@@ -3439,17 +3358,6 @@
       "#analysisSourceTechnical",
       sources.technical
     );
-    const valuationSourceCard=$("#analysisSourceValuation");
-    if(valuationSourceCard){
-      const isStock=payload.asset?.asset_type==="stock";
-      valuationSourceCard.style.display=isStock ? "" : "none";
-      if(isStock){
-        updateAnalysisSourceCard(
-          "#analysisSourceValuation",
-          sources.valuation
-        );
-      }
-    }
     updateAnalysisSourceCard(
       "#analysisSourceFundamentals",
       sources.fundamentals
@@ -5030,7 +4938,6 @@
     renderAnalysisQuality(payload);
     renderFrameworkEngine(payload.framework_engine);
     renderTechnicalAnalysis(payload.technical);
-    renderStockValuation(payload.valuation,asset);
     syncAnalysisActionButtons();
 
     showToast(
@@ -5059,7 +4966,6 @@
     resetAnalysisQuality("loading");
     resetFrameworkEngine("loading");
     resetTechnicalAnalysis("loading");
-    resetStockValuation("loading");
     resetEtfOfficialProfile("loading");
 
     status.textContent="A construir análise agregada…";
@@ -5920,72 +5826,6 @@
   $$(".update-now-btn").forEach(button=>button.addEventListener("click",simulateUpdate));
 
 
-
-  // ---------------------------------------------------------------
-  // Stock Valuation Engine
-  // ---------------------------------------------------------------
-  function valuationNumber(value,digits=2){
-    const number=Number(value);
-    return Number.isFinite(number)?formatNumber(number,digits):"—";
-  }
-  function valuationMoney(value,currency="USD"){
-    const number=Number(value);
-    if(!Number.isFinite(number))return "—";
-    if(Math.abs(number)>=1e12)return `${currency} ${formatNumber(number/1e12,2)} T`;
-    if(Math.abs(number)>=1e9)return `${currency} ${formatNumber(number/1e9,2)} B`;
-    if(Math.abs(number)>=1e6)return `${currency} ${formatNumber(number/1e6,2)} M`;
-    return `${currency} ${formatNumber(number,2)}`;
-  }
-  function resetStockValuation(state="idle"){
-    window.currentValuationSnapshot=null;
-    ["#valuationScore","#valuationMarketCap","#valuationFcfYield","#valuationPe","#valuationPs","#valuationPb","#valuationImpliedGrowth","#dcfValuePerShare","#dcfUpside"].forEach(selector=>{const el=$(selector);if(el)el.textContent=state==="loading"?"…":"—";});
-    if($("#valuationClassification"))$("#valuationClassification").textContent=state==="loading"?"A calcular":"A aguardar";
-    if($("#valuationCoverage"))$("#valuationCoverage").textContent="Cobertura indisponível";
-    if($("#valuationRules"))$("#valuationRules").innerHTML='<div class="sub">Pesquisa uma ação para calcular o valuation.</div>';
-  }
-  function valuationStatusClass(status){
-    if(["strong","positive"].includes(status))return "pill";
-    if(status==="warning")return "pill bad";
-    return "pill warn";
-  }
-  function renderStockValuation(valuation,asset={}){
-    if(asset.asset_type!=="stock"){
-      resetStockValuation();
-      return;
-    }
-    window.currentValuationSnapshot=valuation||null;
-    if(!valuation){resetStockValuation();return;}
-    const metrics=valuation.metrics||{},currency=valuation.currency||asset.currency||"USD";
-    $("#valuationScore").textContent=Number.isFinite(Number(valuation.score))?formatNumber(valuation.score,0):"—";
-    $("#valuationClassification").textContent=valuation.classification?.label||"Dados insuficientes";
-    $("#valuationMarketCap").textContent=valuationMoney(metrics.market_cap,currency);
-    $("#valuationCoverage").textContent=`Cobertura ${valuationNumber(valuation.coverage_percentage,0)}%`;
-    $("#valuationFcfYield").textContent=Number.isFinite(Number(metrics.free_cash_flow_yield_percentage))?`${valuationNumber(metrics.free_cash_flow_yield_percentage)}%`:"—";
-    $("#valuationPe").textContent=Number.isFinite(Number(metrics.price_to_earnings))?`${valuationNumber(metrics.price_to_earnings)}x`:"—";
-    $("#valuationPs").textContent=Number.isFinite(Number(metrics.price_to_sales))?`${valuationNumber(metrics.price_to_sales)}x`:"—";
-    $("#valuationPb").textContent=Number.isFinite(Number(metrics.price_to_book))?`${valuationNumber(metrics.price_to_book)}x`:"—";
-    $("#valuationImpliedGrowth").textContent=Number.isFinite(Number(metrics.reverse_dcf_implied_growth_percentage))?`${valuationNumber(metrics.reverse_dcf_implied_growth_percentage)}%`:"—";
-    $("#valuationRules").innerHTML=(valuation.rules||[]).map(rule=>`<div class="valuation-rule"><div><strong>${escapeHtml(rule.label)}</strong><small>${escapeHtml(rule.interpretation||"")}</small><span class="${valuationStatusClass(rule.status)}" style="display:inline-flex;margin-top:7px">${rule.value===null||rule.value===undefined?"Indisponível":escapeHtml(`${rule.value}${rule.unit||""}`)}</span></div><div class="valuation-points">${rule.status==="unavailable"?"—":`${rule.points}/${rule.max_points}`}</div></div>`).join("")||'<div class="sub">Sem regras disponíveis.</div>';
-    $("#valuationMethodology").textContent=valuation.methodology_note||"Valuation quantitativo parcial.";
-    calculateDcfScenario();
-  }
-  function calculateDcfScenario(){
-    const valuation=window.currentValuationSnapshot,asset=window.currentAnalysisPayload?.asset||{};
-    const metrics=valuation?.metrics||{};
-    const fcf=Number(metrics.annual_free_cash_flow),shares=Number(metrics.shares_outstanding),price=Number(asset.price);
-    const growth=Number($("#dcfGrowth")?.value)/100,discount=Number($("#dcfDiscount")?.value)/100,terminal=Number($("#dcfTerminal")?.value)/100;
-    if(!Number.isFinite(fcf)||fcf<=0||!Number.isFinite(shares)||shares<=0||!Number.isFinite(discount)||!Number.isFinite(terminal)||discount<=terminal){
-      $("#dcfValuePerShare").textContent="Indisponível";$("#dcfUpside").textContent="—";return;
-    }
-    let projected=fcf,value=0;
-    for(let year=1;year<=5;year++){projected*=1+growth;value+=projected/Math.pow(1+discount,year);}
-    value+=(projected*(1+terminal)/(discount-terminal))/Math.pow(1+discount,5);
-    const perShare=value/shares,currency=valuation.currency||asset.currency||"USD";
-    $("#dcfValuePerShare").textContent=`${currency} ${formatNumber(perShare,2)}`;
-    $("#dcfUpside").textContent=Number.isFinite(price)&&price>0?`${perShare/price-1>=0?"+":""}${formatNumber((perShare/price-1)*100,1)}%`:"—";
-  }
-  $("#dcfCalculateBtn")?.addEventListener("click",calculateDcfScenario);
-
   // ---------------------------------------------------------------
   // Technical Engine, Watchlist, live Radar, Comparison and Export
   // ---------------------------------------------------------------
@@ -6107,7 +5947,7 @@
       const statusClass=item.status?.code==="candidate"?"":item.status?.code==="monitor"?"warn":"bad";
       const positives=(item.positive_reasons||[]).slice(0,2).map(text=>`<div class="radar-reason good">${escapeHtml(text)}</div>`).join("");
       const warnings=(item.warning_reasons||[]).slice(0,2).map(text=>`<div class="radar-reason warn">${escapeHtml(text)}</div>`).join("");
-      return `<article class="card opportunity radar-live-card"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="score-line"><div><span class="metric-label">Radar score</span><div class="score">${Number.isFinite(Number(item.radar_score))?formatNumber(item.radar_score,0)+"/100":"—"}</div></div><span class="pill ${statusClass}">${escapeHtml(item.status?.label || "Sem estado")}</span></div><div class="radar-score-layout"><div class="radar-score-box"><span>Qualidade</span><strong>${Number.isFinite(Number(item.quality_score))?formatNumber(item.quality_score,0):"—"}</strong></div><div class="radar-score-box"><span>Valuation</span><strong>${Number.isFinite(Number(item.valuation_score))?formatNumber(item.valuation_score,0):"—"}</strong></div><div class="radar-score-box"><span>Técnica</span><strong>${Number.isFinite(Number(item.technical_score))?formatNumber(item.technical_score,0):"—"}</strong></div><div class="radar-score-box"><span>Pullback</span><strong>${Number.isFinite(Number(item.pullback_percentage))?formatNumber(item.pullback_percentage)+"%":"—"}</strong></div></div><div class="why-now"><strong>Próxima ação:</strong><br>${escapeHtml(item.status?.action || item.decision_label || "Analisar")}</div><div class="radar-reasons">${positives}${warnings}</div><div class="validity"><span>Dados ${formatNumber(item.data_completeness_percentage || 0,0)}%</span><strong>Framework ${formatNumber(item.framework_coverage_percentage || 0,0)}%</strong></div><div class="card-actions"><button class="ghost radar-analyze" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}" data-exchange="${escapeHtml(item.analysis_exchange || "")}" data-ticker="${escapeHtml(item.analysis_ticker || item.symbol)}">Analisar</button><button class="ghost radar-compare" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}">Comparar</button><button class="primary radar-watch" data-record="${encodeURIComponent(JSON.stringify(item))}">Watchlist</button></div></article>`;
+      return `<article class="card opportunity radar-live-card"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="score-line"><div><span class="metric-label">Radar score</span><div class="score">${Number.isFinite(Number(item.radar_score))?formatNumber(item.radar_score,0)+"/100":"—"}</div></div><span class="pill ${statusClass}">${escapeHtml(item.status?.label || "Sem estado")}</span></div><div class="radar-score-layout"><div class="radar-score-box"><span>Qualidade</span><strong>${Number.isFinite(Number(item.quality_score))?formatNumber(item.quality_score,0):"—"}</strong></div><div class="radar-score-box"><span>Técnica</span><strong>${Number.isFinite(Number(item.technical_score))?formatNumber(item.technical_score,0):"—"}</strong></div><div class="radar-score-box"><span>Pullback</span><strong>${Number.isFinite(Number(item.pullback_percentage))?formatNumber(item.pullback_percentage)+"%":"—"}</strong></div></div><div class="why-now"><strong>Próxima ação:</strong><br>${escapeHtml(item.status?.action || item.decision_label || "Analisar")}</div><div class="radar-reasons">${positives}${warnings}</div><div class="validity"><span>Dados ${formatNumber(item.data_completeness_percentage || 0,0)}%</span><strong>Framework ${formatNumber(item.framework_coverage_percentage || 0,0)}%</strong></div><div class="card-actions"><button class="ghost radar-analyze" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}" data-exchange="${escapeHtml(item.analysis_exchange || "")}" data-ticker="${escapeHtml(item.analysis_ticker || item.symbol)}">Analisar</button><button class="ghost radar-compare" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}">Comparar</button><button class="primary radar-watch" data-record="${encodeURIComponent(JSON.stringify(item))}">Watchlist</button></div></article>`;
     }).join("");
   }
 
@@ -6116,12 +5956,11 @@
     const lf=left.framework_engine?.quantitative_snapshot || {},rf=right.framework_engine?.quantitative_snapshot || {};
     const lt=left.technical || {},rt=right.technical || {};
     add("Framework score",lf.score,rf.score,value=>Number.isFinite(Number(value))?`${formatNumber(value,0)}/100`:"—");
-    add("Valuation score",left.valuation?.score,right.valuation?.score,value=>Number.isFinite(Number(value))?`${formatNumber(value,0)}/100`:"—");
     add("Technical score",lt.score,rt.score,value=>Number.isFinite(Number(value))?`${formatNumber(value,0)}/100`:"—");
     add("Cobertura de dados",left.data_quality?.completeness_percentage,right.data_quality?.completeness_percentage,value=>Number.isFinite(Number(value))?`${formatNumber(value,0)}%`:"—");
     if(type==="stock"){
       const ld=left.fundamentals?.derived_metrics || {},rd=right.fundamentals?.derived_metrics || {};const ldur=left.fundamentals?.duration_metrics || {},rdur=right.fundamentals?.duration_metrics || {};
-      add("Receitas YoY",ldur.revenue?.quarter_yoy_percentage,rdur.revenue?.quarter_yoy_percentage,pct);add("Margem operacional",ld.operating_margin_quarter_percentage,rd.operating_margin_quarter_percentage,pct);add("Margem FCF",ld.free_cash_flow_margin_percentage,rd.free_cash_flow_margin_percentage,pct);add("FCF yield",left.valuation?.metrics?.free_cash_flow_yield_percentage,right.valuation?.metrics?.free_cash_flow_yield_percentage,pct);add("P/E calculado",left.valuation?.metrics?.price_to_earnings,right.valuation?.metrics?.price_to_earnings,multiple);add("Crescimento implícito reverse DCF",left.valuation?.metrics?.reverse_dcf_implied_growth_percentage,right.valuation?.metrics?.reverse_dcf_implied_growth_percentage,pct);add("Conversão lucro/caixa",ld.operating_cash_flow_to_net_income_percentage,rd.operating_cash_flow_to_net_income_percentage,pct);add("Dívida líquida / FCF",ld.net_debt_to_annual_free_cash_flow,rd.net_debt_to_annual_free_cash_flow,multiple);add("SBC / receitas",ld.stock_based_compensation_to_revenue_percentage,rd.stock_based_compensation_to_revenue_percentage,pct);
+      add("Receitas YoY",ldur.revenue?.quarter_yoy_percentage,rdur.revenue?.quarter_yoy_percentage,pct);add("Margem operacional",ld.operating_margin_quarter_percentage,rd.operating_margin_quarter_percentage,pct);add("Margem FCF",ld.free_cash_flow_margin_percentage,rd.free_cash_flow_margin_percentage,pct);add("Conversão lucro/caixa",ld.operating_cash_flow_to_net_income_percentage,rd.operating_cash_flow_to_net_income_percentage,pct);add("Dívida líquida / FCF",ld.net_debt_to_annual_free_cash_flow,rd.net_debt_to_annual_free_cash_flow,multiple);add("SBC / receitas",ld.stock_based_compensation_to_revenue_percentage,rd.stock_based_compensation_to_revenue_percentage,pct);
     }else if(type==="etf"){
       const lp=left.etf_profile || {},rp=right.etf_profile || {};
       add("OCF / TER",lp.ongoing_charges_percentage,rp.ongoing_charges_percentage,pct);add("Tracking error 5A",lp.tracking_error?.five_year_percentage,rp.tracking_error?.five_year_percentage,pct);add("Número de posições",lp.number_of_stocks,rp.number_of_stocks,value=>Number.isFinite(Number(value))?formatNumber(value,0):"—");add("Peso top 10",lp.concentration?.top_10_weight_percentage,rp.concentration?.top_10_weight_percentage,pct);add("Maior país",lp.concentration?.largest_country_percentage,rp.concentration?.largest_country_percentage,pct);add("Maior setor",lp.largest_sector?.weight_percentage,rp.largest_sector?.weight_percentage,pct);add("P/E agregado",lp.characteristics?.price_to_earnings?.fund,rp.characteristics?.price_to_earnings?.fund,multiple);
