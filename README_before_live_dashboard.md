@@ -20,9 +20,6 @@ ThesisOS is a functional academic prototype for evidence-based investment analys
 - Stock-to-stock and ETF-to-ETF comparison.
 - Printable analysis that can be saved as PDF from the browser.
 
-- Live operational dashboard combining portfolio, Radar, alerts, thesis reviews, evidence and API health.
-- Investor Policy Engine with risk-capacity score, personal limits, strategic allocation, portfolio compliance and policy-aware position sizing.
-
 ## Data sources
 
 - **Finnhub:** US quotes and company profiles.
@@ -74,14 +71,12 @@ python3 server.py
 
 ## Useful demo flow
 
-1. Configure **Investor Policy Engine** and save personal limits.
-2. Open the live Dashboard to show portfolio, Radar, alerts, reviews, evidence and API status.
-3. Search `AAPL` to demonstrate stock fundamentals, valuation, technical analysis and policy-aware position sizing.
-3. Search `VWCE`, select XETRA, and demonstrate official ETF structure, costs, tracking and holdings.
-4. Open **Opportunity Radar** and execute the Core US universe.
-5. Add an asset to **Watchlist**.
-6. Compare `MSFT` with `AAPL`.
-7. Add AAPL or VWCE to **My Portfolio**, refresh prices and calculate the next contribution.
+1. Search `AAPL` to demonstrate stock fundamentals, cash flow, debt and technical analysis.
+2. Search `VWCE`, select XETRA, and demonstrate official ETF structure, costs, tracking and holdings.
+3. Open **Opportunity Radar** and execute the Core US universe.
+4. Add an asset to **Watchlist**.
+5. Compare `MSFT` with `AAPL`.
+6. Add AAPL or VWCE to **My Portfolio**, refresh prices and calculate the next contribution.
 7. Open **Notícias & Alertas**, load AAPL and inspect SEC filings and recent news.
 8. Save the current analysis in **Investment Journal**, create monitoring alerts and update them.
 9. In an analysis, choose **Imprimir / PDF**.
@@ -90,7 +85,7 @@ python3 server.py
 
 - All API keys stay server-side in environment variables.
 - The browser never receives broker credentials.
-- The watchlist, investor policy, portfolio transactions, decision journal and alerts are stored only in browser `localStorage`.
+- The watchlist, portfolio transactions, decision journal and alerts are stored only in browser `localStorage`.
 - No trading orders are created or sent.
 - Provider failures produce explicit unavailable states rather than fabricated values.
 - In-memory caches reduce repeated calls and rate-limit pressure.
