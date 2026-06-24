@@ -91,7 +91,7 @@ python3 server.py
 
 - All API keys stay server-side in environment variables.
 - The browser never receives broker credentials.
-- The browser keeps a local cache in `localStorage`; authenticated users can synchronize the supported namespaces to their own Supabase account.
+- The watchlist, investor policy, portfolio transactions, decision journal and alerts are stored only in browser `localStorage`.
 - No trading orders are created or sent.
 - Provider failures produce explicit unavailable states rather than fabricated values.
 - In-memory caches reduce repeated calls and rate-limit pressure.
@@ -125,11 +125,9 @@ O modelo é deliberadamente parcial e não substitui múltiplos históricos, com
 
 The Portfolio Construction Engine converts the saved Investment Policy into target category weights, compares them with the transaction-based portfolio, and proposes either contribution-only funding or a full simulated rebalance. Stress tests apply transparent shocks to policy buckets and are not forecasts or Value-at-Risk estimates. Direct currency concentration excludes ETF look-through unless official holdings data is available.
 
-## Supabase Auth and per-user Cloud Sync
+## Secure Cloud Sync with Supabase
 
-ThesisOS supports personal accounts through Supabase Auth. Each authenticated
-user receives an independent cloud workspace stored in
-`public.thesisos_user_state`.
+ThesisOS can optionally persist browser state in a Supabase Postgres table while keeping all database credentials on the server.
 
 Synchronized namespaces:
 
@@ -144,52 +142,29 @@ Synchronized namespaces:
 
 ### Supabase setup
 
-1. Execute `supabase_schema.sql` if the legacy Cloud Sync table does not yet
-   exist.
-2. Execute `supabase_auth_migration.sql` once.
-3. In **Authentication → URL Configuration**, set the production Site URL to
-   the public ThesisOS URL and add the same origin to the allowed redirect
-   URLs.
-4. Keep Email/Password enabled in **Authentication → Providers**.
-5. Add these Replit Secrets:
+1. Create a Supabase project.
+2. Open **SQL Editor** and execute `supabase_schema.sql` once.
+3. Add the following server-side environment variables / Replit Secrets:
 
 ```text
 SUPABASE_URL
-SUPABASE_PUBLISHABLE_KEY
 SUPABASE_SECRET_KEY
+THESISOS_SYNC_PASSWORD
+THESISOS_WORKSPACE_ID
+THESISOS_COOKIE_SECURE
 ```
 
-`SUPABASE_ANON_KEY` is supported as a legacy fallback for the publishable key,
-and `SUPABASE_SERVICE_ROLE_KEY` remains a legacy fallback for the secret key.
+`SUPABASE_SERVICE_ROLE_KEY` remains supported as a legacy fallback when `SUPABASE_SECRET_KEY` is absent. Neither key may be placed in `index.html` or exposed to the browser.
 
-The publishable key is intentionally returned to the browser so the official
-Supabase JavaScript client can create and refresh user sessions. The secret key
-remains server-side and is used only for the optional one-time migration of the
-old single-workspace data.
-
-### Authorization model
-
-- Supabase Auth manages registration, email confirmation, login, logout and
-  password recovery.
-- The browser sends the authenticated user's access token to the ThesisOS
-  backend.
-- The backend forwards that same user token to Supabase PostgREST.
-- Row Level Security enforces `auth.uid() = user_id`.
-- Anonymous users have no database privileges.
-- The legacy `public.thesisos_state` table remains server-only and can be kept
-  temporarily as a backup.
+The table has Row Level Security enabled and grants no access to `anon` or `authenticated`. All reads and writes pass through the ThesisOS server. The browser authenticates to ThesisOS using the workspace password and receives only an HttpOnly, SameSite=Strict session cookie.
 
 ### Conflict strategy
 
-- `localStorage` remains the offline cache and local fallback.
-- If the browser is empty and the account contains cloud data, the cloud copy
-  is restored.
-- If the account is empty and the browser contains data, the local copy is
-  associated with the account.
-- If both contain data, ThesisOS asks the user to choose which copy should
-  prevail before enabling automatic synchronization.
-- The old workspace can be imported once by an authenticated user who knows
-  the former `THESISOS_SYNC_PASSWORD`.
+- localStorage remains the offline cache and fallback;
+- if the browser is empty and cloud data exists, the cloud copy is restored after login;
+- if the cloud is empty and local data exists, the local copy is uploaded after login;
+- if both contain data, ThesisOS does not overwrite either automatically: the user must choose **Enviar dados locais** or **Restaurar da cloud**;
+- after that first choice, automatic synchronization can remain enabled.
 
-Cloud Sync stores application state only. It does not store broker credentials,
-place orders or replace tax records.
+Cloud Sync persists application state only. It does not store broker credentials, place orders or replace tax records.
+

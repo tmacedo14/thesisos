@@ -1501,26 +1501,6 @@
     .cloud-sync-message.warn{border-color:#6a4f25;background:#2c2417}.cloud-sync-message.bad{border-color:#6a3340;background:#2b1d24}
     @media(max-width:850px){.cloud-sync-layout{grid-template-columns:1fr}.cloud-sync-form{grid-template-columns:1fr}}
 
-  
-/* ThesisOS Supabase Auth */
-.cloud-auth-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:12px 0}
-.cloud-auth-tab{border:1px solid #2b4162;background:#132139;color:#aebbd0;border-radius:10px;padding:9px;font-weight:800}
-.cloud-auth-tab.active{background:#284268;color:#fff;border-color:#4c6c9e}
-.cloud-auth-fields{display:grid;gap:10px}
-.cloud-auth-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.cloud-auth-user{display:none;padding:13px;border:1px solid #2d5a4c;border-radius:12px;background:#17352a}
-.cloud-auth-user.visible{display:block}
-.cloud-auth-user strong{display:block}
-.cloud-auth-user small{display:block;color:#a9cbbb;margin-top:5px;overflow-wrap:anywhere}
-.cloud-auth-signed-out.hidden{display:none}
-.cloud-auth-recovery{display:none;margin-top:12px;padding:13px;border:1px solid #604a26;border-radius:12px;background:#2c2417}
-.cloud-auth-recovery.visible{display:block}
-.cloud-legacy-migration{display:none;margin-top:12px;padding:13px;border:1px solid #304968;border-radius:12px;background:#132139}
-.cloud-legacy-migration.visible{display:block}
-.cloud-legacy-migration p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.45}
-.cloud-auth-note{margin-top:10px;color:var(--muted);font-size:11px;line-height:1.5}
-@media(max-width:620px){.cloud-auth-tabs{grid-template-columns:1fr}.cloud-auth-actions button{flex:1}}
-
   </style>
 </head>
 <body>
@@ -1555,7 +1535,7 @@
     <div class="topbar">
       <div class="search"><span>⌕</span><input id="globalSearch" placeholder="Pesquisar ticker, ETF ou ISIN…" /></div>
       <div class="view-toggle"><button id="simpleModeBtn" class="active">Modo simples</button><button id="advancedModeBtn">Modo avançado</button></div>
-      <div class="user"><div><strong id="topbarUserName">Visitante</strong><div id="topbarPolicyLabel" style="font-size:11px;color:var(--muted)">Política por configurar</div></div><div class="avatar" id="topbarUserAvatar">—</div></div>
+      <div class="user"><div><strong>Tiago</strong><div id="topbarPolicyLabel" style="font-size:11px;color:var(--muted)">Política por configurar</div></div><div class="avatar">TS</div></div>
     </div>
 
     <section id="dashboard" class="page active">
@@ -2841,84 +2821,33 @@
           <div class="policy-status-list" style="margin-top:14px" id="policyAllocationStatus"></div>
         </div>
       </div>
-<section class="card cloud-sync-card" id="cloudSyncCard">
-  <div class="cloud-sync-head">
-    <div><h2 style="margin:0 0 6px">Conta & Cloud Sync · Supabase</h2><p class="sub">Cria uma conta pessoal para sincronizar carteira, Journal, alertas, política, planos, Radar e Evidence Feed entre dispositivos.</p></div>
-    <span class="freshness warn" id="cloudSyncBadge">A verificar</span>
-  </div>
-  <div class="cloud-sync-layout">
-    <div class="cloud-sync-auth">
-      <h3>Conta ThesisOS</h3>
-      <p class="sub" style="font-size:12px;margin-top:6px">A autenticação é gerida pelo Supabase Auth. Cada utilizador vê apenas os seus próprios dados através de Row Level Security.</p>
-
-      <div class="cloud-auth-signed-out" id="cloudAuthSignedOut">
-        <div class="cloud-auth-tabs">
-          <button class="cloud-auth-tab active" id="cloudAuthLoginTab" type="button">Entrar</button>
-          <button class="cloud-auth-tab" id="cloudAuthSignupTab" type="button">Criar conta</button>
-          <button class="cloud-auth-tab" id="cloudAuthResetTab" type="button">Recuperar</button>
+      <section class="card cloud-sync-card" id="cloudSyncCard">
+        <div class="cloud-sync-head">
+          <div><h2 style="margin:0 0 6px">Cloud Sync · Supabase</h2><p class="sub">Persistência opcional e segura para carteira, Journal, alertas, política, planos, Radar e Evidence Feed.</p></div>
+          <span class="freshness warn" id="cloudSyncBadge">A verificar</span>
         </div>
-        <div class="cloud-auth-fields">
-          <input id="cloudSyncEmail" type="email" autocomplete="email" placeholder="Email">
-          <input id="cloudSyncPassword" type="password" autocomplete="current-password" placeholder="Palavra-passe">
+        <div class="cloud-sync-layout">
+          <div class="cloud-sync-auth">
+            <h3>Autenticação do workspace</h3>
+            <p class="sub" style="font-size:12px;margin-top:6px">A chave da Supabase permanece no servidor. O navegador recebe apenas um cookie de sessão HttpOnly.</p>
+            <div class="cloud-sync-form"><input id="cloudSyncPassword" type="password" autocomplete="current-password" placeholder="Palavra-passe do Cloud Sync"><button class="primary" id="cloudSyncLoginBtn" type="button">Entrar</button></div>
+            <div class="cloud-sync-buttons"><button class="ghost" id="cloudSyncLogoutBtn" type="button">Terminar sessão</button><button class="ghost" id="cloudSyncRefreshBtn" type="button">Verificar estado</button></div>
+            <label class="cloud-sync-toggle"><input id="cloudSyncAuto" type="checkbox"><span>Sincronizar automaticamente depois de cada alteração local, após escolher a origem inicial dos dados.</span></label>
+          </div>
+          <div class="cloud-sync-state">
+            <h3>Estado e controlo de conflitos</h3>
+            <div class="cloud-sync-status-list">
+              <div class="cloud-sync-status-row"><span>Configuração</span><strong id="cloudSyncConfigured">A verificar</strong></div>
+              <div class="cloud-sync-status-row"><span>Sessão</span><strong id="cloudSyncSession">Desligada</strong></div>
+              <div class="cloud-sync-status-row"><span>Workspace</span><strong id="cloudSyncWorkspace">—</strong></div>
+              <div class="cloud-sync-status-row"><span>Última sincronização</span><strong id="cloudSyncLastSync">Nunca</strong></div>
+              <div class="cloud-sync-status-row"><span>Dados cloud</span><strong id="cloudSyncRows">—</strong></div>
+            </div>
+            <div class="cloud-sync-buttons"><button class="primary" id="cloudSyncPushBtn" type="button">Enviar dados locais</button><button class="ghost" id="cloudSyncPullBtn" type="button">Restaurar da cloud</button></div>
+            <div class="cloud-sync-message" id="cloudSyncMessage">O localStorage continua a funcionar como cache e fallback offline. Na primeira ligação, escolhe explicitamente qual cópia deve prevalecer quando existirem dados dos dois lados.</div>
+          </div>
         </div>
-        <div class="cloud-auth-actions">
-          <button class="primary" id="cloudSyncLoginBtn" type="button">Entrar</button>
-          <button class="primary" id="cloudSyncSignupBtn" type="button" style="display:none">Criar conta</button>
-          <button class="ghost" id="cloudSyncResetBtn" type="button" style="display:none">Enviar email de recuperação</button>
-        </div>
-        <div class="cloud-auth-note">A chave publicável pode ser usada no navegador. A chave secreta permanece exclusivamente no backend.</div>
-      </div>
-
-      <div class="cloud-auth-user" id="cloudAuthSignedIn">
-        <strong id="cloudAuthUserEmail">Sessão iniciada</strong>
-        <small id="cloudAuthUserId">—</small>
-        <div class="cloud-auth-actions">
-          <button class="ghost" id="cloudSyncLogoutBtn" type="button">Terminar sessão</button>
-          <button class="ghost" id="cloudSyncRefreshBtn" type="button">Verificar estado</button>
-        </div>
-      </div>
-
-      <div class="cloud-auth-recovery" id="cloudRecoveryPanel">
-        <strong>Definir nova palavra-passe</strong>
-        <div class="cloud-auth-fields" style="margin-top:10px">
-          <input id="cloudNewPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Nova palavra-passe">
-        </div>
-        <div class="cloud-auth-actions">
-          <button class="primary" id="cloudUpdatePasswordBtn" type="button">Atualizar palavra-passe</button>
-        </div>
-      </div>
-
-      <div class="cloud-legacy-migration" id="cloudLegacyMigration">
-        <strong>Importar o workspace antigo</strong>
-        <p>Usa uma única vez a antiga palavra-passe do Cloud Sync para copiar os dados do workspace <code>tiago</code> para esta conta. A tabela antiga permanece como backup.</p>
-        <div class="cloud-auth-fields" style="margin-top:10px">
-          <input id="cloudLegacyPassword" type="password" autocomplete="off" placeholder="Palavra-passe antiga do Cloud Sync">
-        </div>
-        <div class="cloud-auth-actions">
-          <button class="ghost" id="cloudLegacyMigrateBtn" type="button">Importar dados antigos</button>
-        </div>
-      </div>
-
-      <label class="cloud-sync-toggle"><input id="cloudSyncAuto" type="checkbox"><span>Sincronizar automaticamente depois de escolher a origem inicial dos dados.</span></label>
-    </div>
-
-    <div class="cloud-sync-state">
-      <h3>Estado e controlo de conflitos</h3>
-      <div class="cloud-sync-status-list">
-        <div class="cloud-sync-status-row"><span>Configuração</span><strong id="cloudSyncConfigured">A verificar</strong></div>
-        <div class="cloud-sync-status-row"><span>Sessão</span><strong id="cloudSyncSession">Desligada</strong></div>
-        <div class="cloud-sync-status-row"><span>Conta</span><strong id="cloudSyncWorkspace">—</strong></div>
-        <div class="cloud-sync-status-row"><span>Última sincronização</span><strong id="cloudSyncLastSync">Nunca</strong></div>
-        <div class="cloud-sync-status-row"><span>Dados cloud</span><strong id="cloudSyncRows">—</strong></div>
-      </div>
-      <div class="cloud-sync-buttons">
-        <button class="primary" id="cloudSyncPushBtn" type="button">Enviar dados locais</button>
-        <button class="ghost" id="cloudSyncPullBtn" type="button">Restaurar da cloud</button>
-      </div>
-      <div class="cloud-sync-message" id="cloudSyncMessage">Podes continuar a usar o ThesisOS apenas neste navegador. Ao iniciar sessão, a cloud passa a estar associada à tua conta pessoal.</div>
-    </div>
-  </div>
-</section>
+      </section>
     </section>
 
     <p class="prototype-note">ThesisOS Preview V4 · dados, custos e recomendações demonstrativos · sem execução de ordens ou aconselhamento fiscal.</p>
@@ -3038,7 +2967,6 @@
   </section>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (() => {
   "use strict";
@@ -7046,17 +6974,14 @@
 
 
   // ---------------------------------------------------------------
-  // Supabase Auth + per-user Cloud Sync with localStorage fallback
+  // Secure Supabase persistence with localStorage fallback
   // ---------------------------------------------------------------
-  const CLOUD_AUTOSYNC_KEY="thesisos_cloud_autosync_user_v1";
-  const CLOUD_LAST_SYNC_KEY="thesisos_cloud_last_sync_user_v1";
-  let cloudSyncSession={configured:false,authenticated:false,user:null,row_count:null};
-  let cloudAuthClient=null;
-  let cloudAuthMode="login";
+  const CLOUD_AUTOSYNC_KEY="thesisos_cloud_autosync_v1";
+  const CLOUD_LAST_SYNC_KEY="thesisos_cloud_last_sync_v1";
+  let cloudSyncSession={configured:false,authenticated:false,workspace_id:null,row_count:null};
   let cloudSyncTimer=null;
   let cloudApplyingState=false;
   let cloudSyncBusy=false;
-  let cloudRecoveryMode=false;
 
   function cloudStorageMap(){return {
     watchlist:WATCHLIST_KEY,
@@ -7073,31 +6998,20 @@
   function cloudCollectState(){const state={};for(const [namespace,key] of Object.entries(cloudStorageMap())){const raw=localStorage.getItem(key);if(raw===null){state[namespace]=cloudDefaultFor(namespace);continue;}try{state[namespace]=JSON.parse(raw);}catch{state[namespace]=cloudDefaultFor(namespace);}}return state;}
   function cloudLocalHasData(){const state=cloudCollectState();return Object.values(state).some(value=>Array.isArray(value)?value.length>0:value&&typeof value==="object"?Object.keys(value).length>0:value!==null&&value!=="");}
   function cloudSetMessage(text,tone=""){const element=$("#cloudSyncMessage");if(!element)return;element.textContent=text;element.className=`cloud-sync-message ${tone}`.trim();}
-  function cloudSetBusy(value){cloudSyncBusy=value;["cloudSyncLoginBtn","cloudSyncSignupBtn","cloudSyncResetBtn","cloudSyncLogoutBtn","cloudSyncRefreshBtn","cloudSyncPushBtn","cloudSyncPullBtn","cloudUpdatePasswordBtn","cloudLegacyMigrateBtn"].forEach(id=>{const el=$("#"+id);if(el)el.disabled=value;});}
-  function cloudInitials(email){const name=String(email||"").split("@")[0].replace(/[^A-Za-z0-9]+/g," ").trim();const parts=name.split(/\s+/).filter(Boolean);return (parts.length>1?parts[0][0]+parts[1][0]:name.slice(0,2)||"U").toUpperCase();}
-  function cloudDisplayName(email){const name=String(email||"").split("@")[0].replace(/[._-]+/g," ").trim();return name?name.replace(/\b\w/g,char=>char.toUpperCase()):"Utilizador";}
-  function cloudSwitchAuthMode(mode){cloudAuthMode=mode;["login","signup","reset"].forEach(value=>{$(`#cloudAuth${value[0].toUpperCase()+value.slice(1)}Tab`)?.classList.toggle("active",value===mode);});if($("#cloudSyncLoginBtn"))$("#cloudSyncLoginBtn").style.display=mode==="login"?"inline-block":"none";if($("#cloudSyncSignupBtn"))$("#cloudSyncSignupBtn").style.display=mode==="signup"?"inline-block":"none";if($("#cloudSyncResetBtn"))$("#cloudSyncResetBtn").style.display=mode==="reset"?"inline-block":"none";const password=$("#cloudSyncPassword");if(password){password.style.display=mode==="reset"?"none":"block";password.autocomplete=mode==="signup"?"new-password":"current-password";password.placeholder=mode==="signup"?"Palavra-passe nova (mínimo 8 caracteres)":"Palavra-passe";}}
-  function cloudUpdateUi(){const configured=cloudSyncSession.configured,authenticated=cloudSyncSession.authenticated,user=cloudSyncSession.user||{},badge=$("#cloudSyncBadge");if(badge){badge.textContent=!configured?"Não configurado":authenticated?"Conta ligada":"Sessão desligada";badge.className=`freshness ${!configured?"bad":authenticated?"":"warn"}`.trim();}if($("#cloudSyncConfigured"))$("#cloudSyncConfigured").textContent=configured?"Supabase Auth pronta":"Falta configuração";if($("#cloudSyncSession"))$("#cloudSyncSession").textContent=authenticated?"Autenticada":"Desligada";if($("#cloudSyncWorkspace"))$("#cloudSyncWorkspace").textContent=user.email||"—";if($("#cloudSyncRows"))$("#cloudSyncRows").textContent=cloudSyncSession.row_count===null?"—":`${cloudSyncSession.row_count} namespaces`;const last=localStorage.getItem(CLOUD_LAST_SYNC_KEY);if($("#cloudSyncLastSync"))$("#cloudSyncLastSync").textContent=last?new Date(last).toLocaleString("pt-PT"):"Nunca";if($("#cloudSyncAuto"))$("#cloudSyncAuto").checked=localStorage.getItem(CLOUD_AUTOSYNC_KEY)==="1";$("#cloudAuthSignedOut")?.classList.toggle("hidden",authenticated);$("#cloudAuthSignedIn")?.classList.toggle("visible",authenticated);$("#cloudLegacyMigration")?.classList.toggle("visible",authenticated);$("#cloudRecoveryPanel")?.classList.toggle("visible",cloudRecoveryMode&&authenticated);if($("#cloudAuthUserEmail"))$("#cloudAuthUserEmail").textContent=user.email||"Sessão iniciada";if($("#cloudAuthUserId"))$("#cloudAuthUserId").textContent=user.id?`ID: ${user.id}`:"—";["cloudSyncPushBtn","cloudSyncPullBtn","cloudSyncAuto","cloudLegacyMigrateBtn"].forEach(id=>{const el=$("#"+id);if(el)el.disabled=!authenticated||cloudSyncBusy;});const topName=$("#topbarUserName"),topAvatar=$("#topbarUserAvatar");if(topName)topName.textContent=authenticated?cloudDisplayName(user.email):"Visitante";if(topAvatar)topAvatar.textContent=authenticated?cloudInitials(user.email):"—";}
-  async function cloudRequest(path,options={},requireAuth=false){const headers={"Content-Type":"application/json",...(options.headers||{})};if(requireAuth){if(!cloudAuthClient)throw new Error("Supabase Auth ainda não inicializada.");const {data,error}=await cloudAuthClient.auth.getSession();if(error)throw error;const token=data?.session?.access_token;if(!token)throw new Error("Inicia sessão para aceder à cloud.");headers.Authorization=`Bearer ${token}`;}const response=await fetch(path,{...options,headers,credentials:"same-origin"}),data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||data.error||`Erro HTTP ${response.status}`);return data;}
+  function cloudSetBusy(value){cloudSyncBusy=value;["cloudSyncLoginBtn","cloudSyncLogoutBtn","cloudSyncRefreshBtn","cloudSyncPushBtn","cloudSyncPullBtn"].forEach(id=>{const el=$("#"+id);if(el)el.disabled=value;});}
+  function cloudUpdateUi(){const configured=cloudSyncSession.configured,authenticated=cloudSyncSession.authenticated,badge=$("#cloudSyncBadge");if(badge){badge.textContent=!configured?"Não configurado":authenticated?"Ligado":"Sessão desligada";badge.className=`freshness ${!configured?"bad":authenticated?"":"warn"}`.trim();}if($("#cloudSyncConfigured"))$("#cloudSyncConfigured").textContent=configured?"Supabase pronta":"Faltam Secrets";if($("#cloudSyncSession"))$("#cloudSyncSession").textContent=authenticated?"Autenticada":"Desligada";if($("#cloudSyncWorkspace"))$("#cloudSyncWorkspace").textContent=cloudSyncSession.workspace_id||"—";if($("#cloudSyncRows"))$("#cloudSyncRows").textContent=cloudSyncSession.row_count===null?"—":`${cloudSyncSession.row_count} namespaces`;const last=localStorage.getItem(CLOUD_LAST_SYNC_KEY);if($("#cloudSyncLastSync"))$("#cloudSyncLastSync").textContent=last?new Date(last).toLocaleString("pt-PT"):"Nunca";if($("#cloudSyncAuto"))$("#cloudSyncAuto").checked=localStorage.getItem(CLOUD_AUTOSYNC_KEY)==="1";const password=$("#cloudSyncPassword");if(password)password.disabled=authenticated;const login=$("#cloudSyncLoginBtn");if(login)login.style.display=authenticated?"none":"inline-block";const logout=$("#cloudSyncLogoutBtn");if(logout)logout.style.display=authenticated?"inline-block":"none";["cloudSyncPushBtn","cloudSyncPullBtn","cloudSyncAuto"].forEach(id=>{const el=$("#"+id);if(el)el.disabled=!authenticated||cloudSyncBusy;});}
+  async function cloudRequest(path,options={}){const response=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}}),data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||data.error||`Erro HTTP ${response.status}`);return data;}
   function cloudRenderAll(){updateWatchlistCount();renderWatchlist();renderPortfolioManager();renderDecisionJournal();renderMonitoringAlerts();investorPolicyFormLoaded=false;fillPolicyForm(getInvestorPolicy());renderInvestorPolicy();renderPortfolioConstruction();renderLiveDashboard();const radar=dashboardRead(DASHBOARD_RADAR_KEY,null);if(radar){window.lastRadarData=radar;renderRadarResults(radar);}const evidence=dashboardRead(DASHBOARD_EVIDENCE_KEY,null);if(evidence)renderEvidenceFeed(evidence);if(window.currentAnalysisPayload)renderPolicySizing(window.currentAnalysisPayload);}
   function cloudApplyState(state){cloudApplyingState=true;try{for(const [namespace,key] of Object.entries(cloudStorageMap())){if(!Object.prototype.hasOwnProperty.call(state,namespace))continue;const value=state[namespace];if(value===null||value===undefined)localStorage.removeItem(key);else localStorage.setItem(key,JSON.stringify(value));}localStorage.setItem(CLOUD_LAST_SYNC_KEY,new Date().toISOString());}finally{cloudApplyingState=false;}cloudRenderAll();cloudUpdateUi();}
-  async function cloudRefreshAuthenticatedState({resolveConflict=false,autoPull=false}={}){if(!cloudAuthClient)return null;const {data,error}=await cloudAuthClient.auth.getSession();if(error)throw error;const session=data?.session;if(!session){cloudSyncSession={...cloudSyncSession,authenticated:false,user:null,row_count:0};cloudUpdateUi();return null;}const backend=await cloudRequest("/api/auth/session",{method:"GET"},true);if(!backend.authenticated){cloudSyncSession={...cloudSyncSession,authenticated:false,user:null,row_count:0};cloudUpdateUi();return null;}cloudSyncSession={...cloudSyncSession,configured:true,authenticated:true,user:backend.user,row_count:backend.row_count??0};cloudUpdateUi();if(resolveConflict)await cloudResolveInitialConflict();else if(autoPull&&localStorage.getItem(CLOUD_AUTOSYNC_KEY)==="1")await cloudPullState({silent:true,confirmOverwrite:false});return backend;}
-  async function cloudResolveInitialConflict(){const localHas=cloudLocalHasData(),cloudHas=(cloudSyncSession.row_count||0)>0;if(cloudHas&&!localHas){await cloudPullState({silent:true,confirmOverwrite:false});localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Os dados desta conta foram restaurados porque este navegador estava vazio.");}else if(!cloudHas&&localHas){await cloudPushState({silent:true});localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Os dados locais foram associados automaticamente à nova conta.");}else if(cloudHas&&localHas){localStorage.setItem(CLOUD_AUTOSYNC_KEY,"0");cloudSetMessage("Existem dados locais e dados na conta. Escolhe ‘Enviar dados locais’ ou ‘Restaurar da cloud’ antes de ativar a sincronização automática.","warn");}else{localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Conta vazia e pronta para sincronizar.");}cloudUpdateUi();}
-  async function cloudInitializeAuth(){try{const config=await cloudRequest("/api/auth/config",{method:"GET"});cloudSyncSession.configured=Boolean(config.configured);cloudUpdateUi();if(!config.configured){cloudSetMessage(`Configuração incompleta: ${(config.missing||[]).join(", ")}.`,"warn");return;}if(!window.supabase?.createClient)throw new Error("Biblioteca Supabase JS indisponível.");cloudAuthClient=window.supabase.createClient(config.url,config.publishable_key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});cloudAuthClient.auth.onAuthStateChange((event,session)=>{setTimeout(()=>void cloudHandleAuthEvent(event,session),0);});await cloudRefreshAuthenticatedState({autoPull:true});if(!cloudSyncSession.authenticated)cloudSetMessage("Cria uma conta ou inicia sessão para sincronizar entre dispositivos.");}catch(error){cloudSyncSession={configured:false,authenticated:false,user:null,row_count:null};cloudUpdateUi();cloudSetMessage(`Supabase Auth indisponível: ${error.message}`,"bad");}}
-  async function cloudHandleAuthEvent(event,session){if(event==="PASSWORD_RECOVERY"){cloudRecoveryMode=true;cloudSetMessage("Sessão de recuperação validada. Define agora uma nova palavra-passe.","warn");}if(event==="SIGNED_OUT"){cloudSyncSession={...cloudSyncSession,authenticated:false,user:null,row_count:0};localStorage.setItem(CLOUD_AUTOSYNC_KEY,"0");cloudRecoveryMode=false;cloudUpdateUi();return;}if(session){try{await cloudRefreshAuthenticatedState();}catch(error){cloudSetMessage(`Sessão recebida, mas a validação falhou: ${error.message}`,"bad");}}cloudUpdateUi();}
-  async function cloudLogin(){const email=$("#cloudSyncEmail")?.value.trim()||"",password=$("#cloudSyncPassword")?.value||"";if(!email||!password){showToast("Preenche email e palavra-passe.");return;}if(!cloudAuthClient){showToast("Supabase Auth ainda não está pronta.");return;}cloudSetBusy(true);try{const {error}=await cloudAuthClient.auth.signInWithPassword({email,password});if(error)throw error;$("#cloudSyncPassword").value="";await cloudRefreshAuthenticatedState({resolveConflict:true});cloudSetMessage("Sessão iniciada. A cloud está associada à tua conta.");showToast("Sessão iniciada.");}catch(error){cloudSetMessage(error.message,"bad");showToast("Não foi possível iniciar sessão.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
-  async function cloudSignup(){const email=$("#cloudSyncEmail")?.value.trim()||"",password=$("#cloudSyncPassword")?.value||"";if(!email||password.length<8){showToast("Indica um email e uma palavra-passe com pelo menos 8 caracteres.");return;}if(!cloudAuthClient){showToast("Supabase Auth ainda não está pronta.");return;}cloudSetBusy(true);try{const redirectTo=`${location.origin}/?auth=confirmed`;const {data,error}=await cloudAuthClient.auth.signUp({email,password,options:{emailRedirectTo:redirectTo}});if(error)throw error;$("#cloudSyncPassword").value="";if(data.session){await cloudRefreshAuthenticatedState({resolveConflict:true});cloudSetMessage("Conta criada e sessão iniciada.");}else{cloudSetMessage("Conta criada. Consulta o email e confirma o registo antes de iniciar sessão.");}showToast("Pedido de registo concluído.");}catch(error){cloudSetMessage(error.message,"bad");showToast("Não foi possível criar a conta.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
-  async function cloudSendRecovery(){const email=$("#cloudSyncEmail")?.value.trim()||"";if(!email){showToast("Indica o email da conta.");return;}if(!cloudAuthClient){showToast("Supabase Auth ainda não está pronta.");return;}cloudSetBusy(true);try{const redirectTo=`${location.origin}/?auth=recovery`;const {error}=await cloudAuthClient.auth.resetPasswordForEmail(email,{redirectTo});if(error)throw error;cloudSetMessage("Email de recuperação solicitado. Consulta a caixa de entrada e o spam.");showToast("Email de recuperação solicitado.");}catch(error){cloudSetMessage(error.message,"bad");showToast("Falha ao solicitar recuperação.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
-  async function cloudUpdatePassword(){const password=$("#cloudNewPassword")?.value||"";if(password.length<8){showToast("A nova palavra-passe deve ter pelo menos 8 caracteres.");return;}cloudSetBusy(true);try{const {error}=await cloudAuthClient.auth.updateUser({password});if(error)throw error;$("#cloudNewPassword").value="";cloudRecoveryMode=false;history.replaceState({},document.title,location.pathname);cloudSetMessage("Palavra-passe atualizada com sucesso.");showToast("Palavra-passe atualizada.");}catch(error){cloudSetMessage(error.message,"bad");showToast("Falha ao atualizar a palavra-passe.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
-  async function cloudLogout(){cloudSetBusy(true);try{if(cloudAuthClient){const {error}=await cloudAuthClient.auth.signOut();if(error)throw error;}cloudSyncSession={...cloudSyncSession,authenticated:false,user:null,row_count:0};localStorage.setItem(CLOUD_AUTOSYNC_KEY,"0");cloudSetMessage("Sessão terminada. Os dados locais continuam disponíveis neste navegador.");showToast("Sessão terminada.");}catch(error){cloudSetMessage(error.message,"bad");}finally{cloudSetBusy(false);cloudUpdateUi();}}
-  async function cloudPushState({silent=false}={}){if(!cloudSyncSession.authenticated){if(!silent)showToast("Inicia primeiro a sessão.");return;}cloudSetBusy(true);try{const data=await cloudRequest("/api/user/state",{method:"POST",body:JSON.stringify({state:cloudCollectState()})},true);cloudSyncSession.row_count=data.saved_count;localStorage.setItem(CLOUD_LAST_SYNC_KEY,new Date().toISOString());localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudUpdateUi();cloudSetMessage(`${data.saved_count} namespaces enviados para a conta. A sincronização automática ficou ativa.`);if(!silent)showToast("Dados enviados para a cloud.");}catch(error){cloudSetMessage(`Falha ao guardar: ${error.message}`,"bad");if(!silent)showToast("Falha ao enviar dados.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
-  async function cloudPullState({silent=false,confirmOverwrite=true}={}){if(!cloudSyncSession.authenticated){if(!silent)showToast("Inicia primeiro a sessão.");return;}if(confirmOverwrite&&cloudLocalHasData()&&!confirm("Restaurar da cloud vai substituir os dados locais sincronizáveis deste navegador. Continuar?"))return;cloudSetBusy(true);try{const data=await cloudRequest("/api/user/state",{method:"GET"},true);cloudSyncSession.row_count=data.row_count||0;if(data.row_count){cloudApplyState(data.state||{});localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage(`${data.row_count} namespaces restaurados da tua conta.`);if(!silent)showToast("Dados restaurados da cloud.");}else{cloudSetMessage("Esta conta ainda não contém dados. Envia a cópia local ou importa o workspace antigo.","warn");if(!silent)showToast("Cloud da conta vazia.");}}catch(error){cloudSetMessage(`Falha ao restaurar: ${error.message}`,"bad");if(!silent)showToast("Falha ao restaurar dados.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
-  async function cloudMigrateLegacy(){const password=$("#cloudLegacyPassword")?.value||"";if(!password){showToast("Introduz a antiga palavra-passe do Cloud Sync.");return;}const overwrite=(cloudSyncSession.row_count||0)>0?confirm("A conta já contém dados. Queres substituir/mesclar os mesmos namespaces com o workspace antigo?"):false;if((cloudSyncSession.row_count||0)>0&&!overwrite)return;cloudSetBusy(true);try{const data=await cloudRequest("/api/auth/migrate-legacy",{method:"POST",body:JSON.stringify({password,overwrite})},true);$("#cloudLegacyPassword").value="";cloudSetMessage(`${data.migrated_count} namespaces importados do workspace antigo. A tabela antiga foi mantida como backup.`);await cloudPullState({silent:true,confirmOverwrite:false});showToast("Workspace antigo importado.");}catch(error){cloudSetMessage(`Migração falhou: ${error.message}`,"bad");showToast("Falha na migração.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
+  async function cloudCheckStatus({autoPull=true}={}){try{const data=await cloudRequest("/api/sync/status",{method:"GET"});cloudSyncSession={...cloudSyncSession,...data};cloudUpdateUi();if(!data.configured){cloudSetMessage(`Configuração incompleta no servidor: ${(data.missing||[]).join(", ")}.`,"warn");return data;}if(data.authenticated&&autoPull&&localStorage.getItem(CLOUD_AUTOSYNC_KEY)==="1")await cloudPullState({silent:true,confirmOverwrite:false});else if(data.authenticated)cloudSetMessage("Sessão recuperada. Podes restaurar a cloud ou enviar os dados locais.");else cloudSetMessage("Supabase configurada. Introduz a palavra-passe do workspace para sincronizar.");return data;}catch(error){cloudSyncSession={configured:false,authenticated:false,workspace_id:null,row_count:null};cloudUpdateUi();cloudSetMessage(`Cloud Sync indisponível: ${error.message}`,"bad");return null;}}
+  async function cloudLogin(){const password=$("#cloudSyncPassword")?.value||"";if(!password){showToast("Introduz a palavra-passe do Cloud Sync.");return;}cloudSetBusy(true);try{const data=await cloudRequest("/api/sync/login",{method:"POST",body:JSON.stringify({password})});cloudSyncSession={...cloudSyncSession,configured:true,authenticated:true,workspace_id:data.workspace_id,row_count:data.cloud_row_count??0};$("#cloudSyncPassword").value="";cloudUpdateUi();const localHas=cloudLocalHasData(),cloudHas=(data.cloud_row_count||0)>0;if(cloudHas&&!localHas){await cloudPullState({silent:true,confirmOverwrite:false});localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Os dados cloud foram restaurados automaticamente porque este navegador estava vazio.");}else if(!cloudHas&&localHas){await cloudPushState({silent:true});localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Os dados locais foram enviados automaticamente porque a cloud estava vazia.");}else if(cloudHas&&localHas){localStorage.setItem(CLOUD_AUTOSYNC_KEY,"0");cloudSetMessage("Existem dados locais e dados cloud. Escolhe ‘Enviar dados locais’ ou ‘Restaurar da cloud’ antes de ativar a sincronização automática.","warn");}else{localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Workspace vazio e pronto para sincronizar.");}cloudUpdateUi();showToast("Sessão Cloud Sync iniciada.");}catch(error){cloudSetMessage(error.message,"bad");showToast("Falha no Cloud Sync.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
+  async function cloudLogout(){cloudSetBusy(true);try{await cloudRequest("/api/sync/logout",{method:"POST",body:"{}"});cloudSyncSession.authenticated=false;localStorage.setItem(CLOUD_AUTOSYNC_KEY,"0");cloudSetMessage("Sessão terminada. Os dados locais continuam disponíveis neste navegador.");showToast("Cloud Sync desligado.");}catch(error){cloudSetMessage(error.message,"bad");}finally{cloudSetBusy(false);cloudUpdateUi();}}
+  async function cloudPushState({silent=false}={}){if(!cloudSyncSession.authenticated){if(!silent)showToast("Inicia primeiro a sessão Cloud Sync.");return;}cloudSetBusy(true);try{const data=await cloudRequest("/api/sync/state",{method:"POST",body:JSON.stringify({state:cloudCollectState()})});cloudSyncSession.row_count=data.saved_count;localStorage.setItem(CLOUD_LAST_SYNC_KEY,new Date().toISOString());localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudUpdateUi();cloudSetMessage(`${data.saved_count} namespaces enviados para a cloud. A sincronização automática ficou ativa.`);if(!silent)showToast("Dados enviados para a cloud.");}catch(error){cloudSetMessage(`Falha ao guardar: ${error.message}`,"bad");if(!silent)showToast("Falha ao enviar dados.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
+  async function cloudPullState({silent=false,confirmOverwrite=true}={}){if(!cloudSyncSession.authenticated){if(!silent)showToast("Inicia primeiro a sessão Cloud Sync.");return;}if(confirmOverwrite&&cloudLocalHasData()&&!confirm("Restaurar da cloud vai substituir os dados locais sincronizáveis deste navegador. Continuar?"))return;cloudSetBusy(true);try{const data=await cloudRequest("/api/sync/state",{method:"GET"});cloudSyncSession.row_count=data.row_count||0;if(data.row_count){cloudApplyState(data.state||{});localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage(`${data.row_count} namespaces restaurados. A cloud passa a ser a cópia canónica para este navegador.`);if(!silent)showToast("Dados restaurados da cloud.");}else{cloudSetMessage("A cloud ainda não contém dados. Envia primeiro a cópia local.","warn");if(!silent)showToast("Cloud vazia.");}}catch(error){cloudSetMessage(`Falha ao restaurar: ${error.message}`,"bad");if(!silent)showToast("Falha ao restaurar dados.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
   function cloudSchedulePush(){if(cloudApplyingState||!cloudSyncSession.authenticated||localStorage.getItem(CLOUD_AUTOSYNC_KEY)!=="1")return;clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(()=>void cloudPushState({silent:true}),1200);}
 
-  $("#cloudAuthLoginTab")?.addEventListener("click",()=>cloudSwitchAuthMode("login"));$("#cloudAuthSignupTab")?.addEventListener("click",()=>cloudSwitchAuthMode("signup"));$("#cloudAuthResetTab")?.addEventListener("click",()=>cloudSwitchAuthMode("reset"));
-  $("#cloudSyncLoginBtn")?.addEventListener("click",cloudLogin);$("#cloudSyncSignupBtn")?.addEventListener("click",cloudSignup);$("#cloudSyncResetBtn")?.addEventListener("click",cloudSendRecovery);$("#cloudSyncLogoutBtn")?.addEventListener("click",cloudLogout);$("#cloudSyncRefreshBtn")?.addEventListener("click",()=>cloudRefreshAuthenticatedState({autoPull:false}));$("#cloudSyncPushBtn")?.addEventListener("click",()=>cloudPushState());$("#cloudSyncPullBtn")?.addEventListener("click",()=>cloudPullState());$("#cloudUpdatePasswordBtn")?.addEventListener("click",cloudUpdatePassword);$("#cloudLegacyMigrateBtn")?.addEventListener("click",cloudMigrateLegacy);$("#cloudSyncPassword")?.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();if(cloudAuthMode==="signup")void cloudSignup();else if(cloudAuthMode==="reset")void cloudSendRecovery();else void cloudLogin();}});$("#cloudSyncAuto")?.addEventListener("change",event=>{localStorage.setItem(CLOUD_AUTOSYNC_KEY,event.target.checked?"1":"0");cloudUpdateUi();if(event.target.checked)cloudSchedulePush();});
-  cloudSwitchAuthMode("login");cloudUpdateUi();void cloudInitializeAuth();
+  $("#cloudSyncLoginBtn")?.addEventListener("click",cloudLogin);$("#cloudSyncLogoutBtn")?.addEventListener("click",cloudLogout);$("#cloudSyncRefreshBtn")?.addEventListener("click",()=>cloudCheckStatus({autoPull:false}));$("#cloudSyncPushBtn")?.addEventListener("click",()=>cloudPushState());$("#cloudSyncPullBtn")?.addEventListener("click",()=>cloudPullState());$("#cloudSyncPassword")?.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();void cloudLogin();}});$("#cloudSyncAuto")?.addEventListener("change",event=>{localStorage.setItem(CLOUD_AUTOSYNC_KEY,event.target.checked?"1":"0");cloudUpdateUi();if(event.target.checked)cloudSchedulePush();});
+  cloudUpdateUi();void cloudCheckStatus();
 
 
 })();
