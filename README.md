@@ -14,6 +14,8 @@ ThesisOS is a functional academic prototype for evidence-based investment analys
 - Automated Opportunity Radar for configurable universes and the browser watchlist.
 - Persistent local watchlist.
 - Functional local Portfolio Manager with transactions, current prices, average monitoring cost, P&L, target weights, contribution optimisation and CSV import/export.
+- Functional Decision Journal with thesis versioning, snapshots, entry zones, review dates and CSV export.
+- Functional monitoring alerts for price, scores, RSI, pullback and thesis review dates.
 - Stock-to-stock and ETF-to-ETF comparison.
 - Printable analysis that can be saved as PDF from the browser.
 
@@ -72,13 +74,14 @@ python3 server.py
 4. Add an asset to **Watchlist**.
 5. Compare `MSFT` with `AAPL`.
 6. Add AAPL or VWCE to **My Portfolio**, refresh prices and calculate the next contribution.
-7. In an analysis, choose **Imprimir / PDF**.
+7. Save the current analysis in **Investment Journal**, create monitoring alerts and update them.
+8. In an analysis, choose **Imprimir / PDF**.
 
 ## Architecture and safety
 
 - All API keys stay server-side in environment variables.
 - The browser never receives broker credentials.
-- The watchlist and portfolio transactions are stored only in browser `localStorage`.
+- The watchlist, portfolio transactions, decision journal and alerts are stored only in browser `localStorage`.
 - No trading orders are created or sent.
 - Provider failures produce explicit unavailable states rather than fabricated values.
 - In-memory caches reduce repeated calls and rate-limit pressure.
