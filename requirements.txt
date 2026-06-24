@@ -1,1 +1,2 @@
 pypdf==6.14.2
+yfinance==1.4.1

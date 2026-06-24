@@ -1196,6 +1196,33 @@
       .etf-sector-layout{grid-template-columns:1fr}
     }
 
+  
+    .nav-count{margin-left:auto;min-width:21px;height:21px;padding:0 6px;border-radius:999px;display:inline-grid;place-items:center;background:#263d64;color:#fff;font-size:10px}
+    .page-action-row,.analysis-action-row{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+    .analysis-action-row{margin-top:10px}
+    #technicalEngineCard{display:none;margin-bottom:16px}
+    #analysis.stock-mode #technicalEngineCard,#analysis.etf-mode #technicalEngineCard{display:block}
+    .technical-engine-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+    .technical-metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:15px}
+    .technical-metric{padding:13px;border:1px solid var(--border);border-radius:14px;background:var(--panel-2)}
+    .technical-metric span,.technical-metric small{display:block;color:var(--muted);font-size:11px}.technical-metric strong{display:block;font-size:18px;margin:7px 0 4px}
+    .technical-signal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+    .technical-signal-grid>div{padding:14px;border:1px solid var(--border);border-radius:14px;background:#101d31}
+    .radar-config{margin-bottom:0}.radar-config-grid{display:grid;grid-template-columns:1fr 2fr .7fr 1fr;gap:12px;align-items:end}
+    .radar-loading{margin-top:16px;padding:26px;border:1px dashed #385174;border-radius:16px;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);text-align:center}
+    .radar-loading[hidden]{display:none}.radar-spinner{width:30px;height:30px;border-radius:50%;border:3px solid #2b4162;border-top-color:var(--accent);animation:radarSpin .8s linear infinite}@keyframes radarSpin{to{transform:rotate(360deg)}}
+    .radar-live-card .ticker-logo{font-size:12px}.radar-score-layout{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin:13px 0}.radar-score-box{padding:9px;border-radius:10px;background:#0f1a2c;border:1px solid #243650}.radar-score-box span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.radar-score-box strong{display:block;margin-top:4px}
+    .radar-reasons{display:grid;gap:6px;margin-top:10px}.radar-reason{font-size:11px;color:#bdc9da}.radar-reason.good:before{content:'✓ ';color:var(--success)}.radar-reason.warn:before{content:'! ';color:var(--warn)}
+    .watchlist-add-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}.watchlist-add-row input{margin:0}
+    .watchlist-card-meta{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}.watchlist-card-meta>div{padding:9px;border-radius:10px;background:#0f1a2c;border:1px solid #243650}.watchlist-card-meta span{display:block;color:var(--muted);font-size:9px}.watchlist-card-meta strong{display:block;margin-top:4px;font-size:12px}
+    .compare-form-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end}.compare-form-grid button{height:43px}
+    .compare-dynamic{display:grid;grid-template-columns:minmax(170px,.8fr) repeat(2,minmax(180px,1fr));gap:1px;background:#243650;border-radius:14px;overflow:hidden}.compare-dynamic>div{padding:12px;background:#111d30;font-size:12px}.compare-dynamic .head{background:#17263e;font-weight:900;font-size:14px}.compare-dynamic .label{color:#aebbd0}.compare-dynamic .winner{background:#153029;color:#89e4c9}
+    @media(max-width:900px){.radar-config-grid{grid-template-columns:1fr 1fr}.technical-metric-grid{grid-template-columns:repeat(2,1fr)}.compare-dynamic{overflow:auto}.compare-form-grid{grid-template-columns:1fr 1fr}.compare-form-grid button{grid-column:1/-1}}
+    @media(max-width:620px){.radar-config-grid,.technical-metric-grid,.technical-signal-grid,.watchlist-add-row,.compare-form-grid{grid-template-columns:1fr}.analysis-action-row{justify-content:flex-start}.compare-form-grid button{grid-column:auto}}
+    @media print{
+      body{background:#fff;color:#111}.sidebar,.topbar,.tabs,.chip-row,.analysis-action-row,.toast,.nav-btn{display:none!important}.app{display:block}.page{display:none!important}#analysis.page{display:block!important}main{padding:0}.card,section.card{box-shadow:none;background:#fff;color:#111;border-color:#ccc;break-inside:avoid}.sub,.metric-label,small{color:#555!important}#analysis{font-size:10pt}a{color:#111;text-decoration:none}
+    }
+
   </style>
 </head>
 <body>
@@ -1209,6 +1236,7 @@
     <div class="nav-title">Workspace</div>
     <button class="nav-btn active" data-page="dashboard"><span class="nav-icon">⌂</span>Dashboard</button>
     <button class="nav-btn" data-page="radar"><span class="nav-icon">◎</span>Opportunity Radar</button>
+    <button class="nav-btn" data-page="watchlist"><span class="nav-icon">☆</span>Watchlist <span class="nav-count" id="watchlistNavCount">0</span></button>
     <button class="nav-btn" data-page="analysis"><span class="nav-icon">◫</span>Analisar ativo</button>
     <button class="nav-btn" data-page="compare"><span class="nav-icon">⇄</span>Comparar ativos</button>
     <button class="nav-btn" data-page="portfolio"><span class="nav-icon">◔</span>Portfolio Builder</button>
@@ -1220,8 +1248,8 @@
     <button class="nav-btn" data-page="profile"><span class="nav-icon">⚙</span>Perfil de investidor</button>
 
     <div class="side-card">
-      <strong>Protótipo académico</strong>
-      <p>Dados simulados. O produto final ligará APIs financeiras, notícias, macroeconomia e documentos oficiais.</p>
+      <strong>Protótipo funcional</strong>
+      <p>Pesquisa, SEC, preços, câmbio, ETFs oficiais, análise técnica, Radar e comparação já usam dados reais. As decisões finais continuam condicionadas por valuation e carteira.</p>
     </div>
   </aside>
 
@@ -1356,204 +1384,46 @@
 
     <section id="radar" class="page">
       <div class="hero">
-        <div>
-          <h1>Opportunity Radar</h1>
-          <p class="sub">Sinais diferentes para hoje, 7 dias, 30 dias e investimento de longo prazo.</p>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <span class="freshness" id="radarUpdated">Atualizado há 2h</span>
-          <button class="ghost update-now-btn">Atualizar agora</button>
-          <button class="primary">+ Criar filtro</button>
-        </div>
+        <div><h1>Opportunity Radar</h1><p class="sub">Analisa automaticamente um universo configurável, aplica os frameworks e ordena candidatas — sem confundir ranking com recomendação de compra.</p></div>
+        <div class="page-action-row"><span class="freshness" id="radarUpdated">Ainda não executado</span><button class="primary" id="runRadarBtn" type="button">Executar Radar</button></div>
       </div>
-
-      <div class="status-banner" style="margin-bottom:14px">
-        <div>
-          <strong>Radar automático ativo</strong>
-          <div class="sub" style="font-size:12px">Preço: abertura e fecho · notícias: diária · fundamentais: após resultados · ETFs: mensal.</div>
-        </div>
-        <span class="freshness">70 instrumentos monitorizados</span>
+      <div class="status-banner" id="radarStatusBanner" style="margin-bottom:14px">
+        <div><strong id="radarStatusTitle">Radar pronto</strong><div class="sub" id="radarStatusDetail" style="font-size:12px">O universo base usa oito ações líquidas. Podes também analisar a tua watchlist ou uma lista personalizada.</div></div>
+        <span class="freshness" id="radarCoverage">0 analisados</span>
       </div>
-
-      <div class="horizon-tabs">
-        <button class="horizon-btn active" data-horizon="daily">Hoje<small>Eventos e zonas</small></button>
-        <button class="horizon-btn" data-horizon="weekly">7 dias<small>Pullbacks e tendência</small></button>
-        <button class="horizon-btn" data-horizon="monthly">30 dias<small>Fundamentais e revisões</small></button>
-        <button class="horizon-btn" data-horizon="long">Longo prazo<small>Framework completo</small></button>
+      <div class="card radar-config">
+        <div class="radar-config-grid">
+          <label>Universo<select id="radarUniverse"><option value="core_us">Core US</option><option value="quality_us">Quality US</option><option value="growth_us">Growth US</option><option value="watchlist">Watchlist</option><option value="custom">Lista personalizada</option></select></label>
+          <label>Tickers personalizados<input id="radarCustomSymbols" placeholder="MSFT, AAPL, MCD, KO" disabled /></label>
+          <label>Máximo de ativos<select id="radarLimit"><option value="6">6</option><option value="8" selected>8</option><option value="10">10</option><option value="12">12</option></select></label>
+          <label>Ordenação<select id="radarSort"><option value="score">Radar score</option><option value="quality">Qualidade</option><option value="technical">Técnica</option><option value="pullback">Maior pullback</option></select></label>
+        </div>
+        <div class="logic-note">Radar score = 70% qualidade estrutural/fundamental + 20% Technical Engine + 10% qualidade dos dados. Valuation, notícias e carteira continuam obrigatórios antes de uma decisão.</div>
       </div>
-
-      <div class="radar-controls">
-        <div class="market-filters">
-          <button class="market-filter active" data-market-filter="all">Todos os mercados</button>
-          <button class="market-filter" data-market-filter="amsterdam">Amsterdam</button>
-          <button class="market-filter" data-market-filter="london">Londres</button>
-          <button class="market-filter" data-market-filter="milan">Milão</button>
-          <button class="market-filter" data-market-filter="new-york">Nova Iorque</button>
-        </div>
-        <div class="filter-row" style="margin:0">
-          <button class="filter active" data-filter="all">Todas</button>
-          <button class="filter" data-filter="quality">Quality</button>
-          <button class="filter" data-filter="pullback">Pullback</button>
-          <button class="filter" data-filter="ai-infra">AI Infrastructure</button>
-          <button class="filter" data-filter="high-risk">High risk</button>
-        </div>
-      </div>
-
-      <div class="grid g3 opportunity-list" id="radarCards">
-
-        <div class="card opportunity radar-opportunity"
-             data-horizon="daily weekly"
-             data-market="amsterdam"
-             data-category="quality pullback ai-infra"
-             data-name="ASML Holding semicondutores Amsterdam">
-          <div class="ticker"><div class="ticker-logo">ASML</div><div class="ticker-meta"><strong>ASML Holding</strong><small>Amsterdam · EUR · Semicondutores</small></div></div>
-          <div class="score-line"><div><span class="metric-label">Sinal atual</span><div class="score">8,0/10</div></div><span class="session-label daily">Hoje</span></div>
-          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Queda diária relevante aproximou o preço da primeira zona de interesse, sem nova deterioração fundamental identificada.</div>
-          <div class="radar-card-meta">
-            <div class="radar-meta-item"><span>Último preço</span><strong>Snapshot Amsterdam</strong></div>
-            <div class="radar-meta-item"><span>Compatibilidade</span><strong>Boa · overlap moderado</strong></div>
-            <div class="radar-meta-item"><span>Gatilho</span><strong>Pullback + volume</strong></div>
-            <div class="radar-meta-item"><span>Ação</span><strong>Rever entrada</strong></div>
-          </div>
-          <div class="validity"><span>Gerado: fecho anterior</span><strong>Válido até ao próximo fecho</strong></div>
-          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
-        </div>
-
-        <div class="card opportunity radar-opportunity"
-             data-horizon="daily weekly"
-             data-market="new-york"
-             data-category="quality pullback"
-             data-name="ZTS Zoetis saúde animal New York">
-          <div class="ticker"><div class="ticker-logo">ZTS</div><div class="ticker-meta"><strong>Zoetis</strong><small>NYSE · USD · Saúde animal</small></div></div>
-          <div class="score-line"><div><span class="metric-label">Sinal atual</span><div class="score">8,2/10</div></div><span class="session-label daily">Hoje</span></div>
-          <div class="why-now"><strong>Porque apareceu agora?</strong><br>O preço entrou na zona superior de interesse e a tese continua intacta após a última atualização.</div>
-          <div class="radar-card-meta">
-            <div class="radar-meta-item"><span>Último preço</span><strong>NYSE abertura +15 min</strong></div>
-            <div class="radar-meta-item"><span>Compatibilidade</span><strong>Elevada</strong></div>
-            <div class="radar-meta-item"><span>Gatilho</span><strong>Zona de interesse</strong></div>
-            <div class="radar-meta-item"><span>Ação</span><strong>Simular 0,5–1%</strong></div>
-          </div>
-          <div class="validity"><span>Gerado: hoje 14:45</span><strong>Válido até nova informação</strong></div>
-          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
-        </div>
-
-        <div class="card opportunity radar-opportunity"
-             data-horizon="weekly monthly"
-             data-market="london"
-             data-category="quality pullback"
-             data-name="LSEG London Stock Exchange Group weekly">
-          <div class="ticker"><div class="ticker-logo">LSEG</div><div class="ticker-meta"><strong>London Stock Exchange Group</strong><small>Londres · GBP · Financial Data</small></div></div>
-          <div class="score-line"><div><span class="metric-label">Sinal semanal</span><div class="score">7,7/10</div></div><span class="session-label weekly">7 dias</span></div>
-          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Pullback semanal, força relativa estabilizada e ausência de alterações materiais no guidance.</div>
-          <div class="radar-card-meta">
-            <div class="radar-meta-item"><span>Janela</span><strong>5 sessões</strong></div>
-            <div class="radar-meta-item"><span>Moeda</span><strong>GBP · risco cambial</strong></div>
-            <div class="radar-meta-item"><span>Gatilho</span><strong>Tendência + valuation</strong></div>
-            <div class="radar-meta-item"><span>Ação</span><strong>Manter observação</strong></div>
-          </div>
-          <div class="validity"><span>Gerado: fecho semanal</span><strong>Válido por 7 dias</strong></div>
-          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
-        </div>
-
-        <div class="card opportunity radar-opportunity"
-             data-horizon="monthly long"
-             data-market="milan"
-             data-category="quality"
-             data-name="RACE Ferrari Milan monthly long term">
-          <div class="ticker"><div class="ticker-logo">RACE</div><div class="ticker-meta"><strong>Ferrari</strong><small>Milão · EUR · Luxury Automotive</small></div></div>
-          <div class="score-line"><div><span class="metric-label">Sinal mensal</span><div class="score">7,4/10</div></div><span class="session-label monthly">30 dias</span></div>
-          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Estimativas mantêm-se fortes, margens resilientes e o valuation normalizou ligeiramente no último mês.</div>
-          <div class="radar-card-meta">
-            <div class="radar-meta-item"><span>Fundamentais</span><strong>Em melhoria</strong></div>
-            <div class="radar-meta-item"><span>Valuation</span><strong>Ainda premium</strong></div>
-            <div class="radar-meta-item"><span>Carteira</span><strong>Baixo overlap</strong></div>
-            <div class="radar-meta-item"><span>Ação</span><strong>Aguardar margem</strong></div>
-          </div>
-          <div class="validity"><span>Gerado: revisão mensal</span><strong>Válido até resultados</strong></div>
-          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
-        </div>
-
-        <div class="card opportunity radar-opportunity"
-             data-horizon="monthly long"
-             data-market="new-york"
-             data-category="quality ai-infra"
-             data-name="PWR Quanta Services monthly long term">
-          <div class="ticker"><div class="ticker-logo">PWR</div><div class="ticker-meta"><strong>Quanta Services</strong><small>NYSE · USD · AI Infrastructure</small></div></div>
-          <div class="score-line"><div><span class="metric-label">Sinal estrutural</span><div class="score">8,4/10</div></div><span class="session-label long">Longo prazo</span></div>
-          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Qualidade e crescimento estrutural fortes; continua no radar, mas o preço exige maior margem de segurança.</div>
-          <div class="radar-card-meta">
-            <div class="radar-meta-item"><span>Qualidade</span><strong>Forte</strong></div>
-            <div class="radar-meta-item"><span>Valuation</span><strong>Exigente</strong></div>
-            <div class="radar-meta-item"><span>Peso máximo</span><strong>4% personalizado</strong></div>
-            <div class="radar-meta-item"><span>Ação</span><strong>Observar</strong></div>
-          </div>
-          <div class="validity"><span>Revisto: último 10-Q</span><strong>Válido até quebra da tese</strong></div>
-          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
-        </div>
-
-        <div class="card opportunity radar-opportunity"
-             data-horizon="long"
-             data-market="new-york"
-             data-category="quality"
-             data-name="ADP Automatic Data Processing long term">
-          <div class="ticker"><div class="ticker-logo">ADP</div><div class="ticker-meta"><strong>Automatic Data Processing</strong><small>Nasdaq · USD · Payroll Software</small></div></div>
-          <div class="score-line"><div><span class="metric-label">Qualidade estrutural</span><div class="score">8,5/10</div></div><span class="session-label long">Longo prazo</span></div>
-          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Receitas recorrentes, ROIC elevado e execução consistente; oportunidade dependente do preço de entrada.</div>
-          <div class="radar-card-meta">
-            <div class="radar-meta-item"><span>Moat</span><strong>Elevado</strong></div>
-            <div class="radar-meta-item"><span>FCF</span><strong>Consistente</strong></div>
-            <div class="radar-meta-item"><span>Encaixe</span><strong>Satélite quality</strong></div>
-            <div class="radar-meta-item"><span>Ação</span><strong>Quality watch</strong></div>
-          </div>
-          <div class="validity"><span>Revisão: trimestral</span><strong>Válido até novos resultados</strong></div>
-          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
-        </div>
-
-        <div class="card opportunity radar-opportunity"
-             data-horizon="weekly monthly"
-             data-market="new-york"
-             data-category="high-risk ai-infra"
-             data-name="IREN data centers speculative weekly monthly">
-          <div class="ticker"><div class="ticker-logo">IREN</div><div class="ticker-meta"><strong>IREN</strong><small>Nasdaq · USD · Data centers</small></div></div>
-          <div class="score-line"><div><span class="metric-label">Assimetria</span><div class="score">6,5/10</div></div><span class="pill bad glow-danger">Alto risco</span></div>
-          <div class="why-now"><strong>Porque apareceu agora?</strong><br>Momentum e crescimento elevados, mas com risco de capital, diluição e volatilidade incompatíveis com um peso elevado.</div>
-          <div class="radar-card-meta">
-            <div class="radar-meta-item"><span>Risco</span><strong>Muito elevado</strong></div>
-            <div class="radar-meta-item"><span>Limite</span><strong>0,5–2%</strong></div>
-            <div class="radar-meta-item"><span>Gatilho</span><strong>Momentum</strong></div>
-            <div class="radar-meta-item"><span>Ação</span><strong>Não reforçar</strong></div>
-          </div>
-          <div class="validity"><span>Gerado: 7 dias</span><strong>Expira se momentum quebrar</strong></div>
-          <div class="card-actions"><button class="ghost analyze-btn">Analisar</button><button class="primary watch-btn">Watchlist</button></div>
-        </div>
-
-      </div>
-      <div class="radar-empty" id="radarEmpty">Nenhuma oportunidade cumpre simultaneamente estes filtros e horizonte.</div>
-
+      <div class="radar-loading" id="radarLoading" hidden><div class="radar-spinner"></div><strong>A analisar ativos e a aplicar os frameworks…</strong><span>Na primeira execução pode demorar alguns segundos; os resultados ficam em cache.</span></div>
+      <div class="grid g3 opportunity-list" id="dynamicRadarCards" style="margin-top:16px"></div>
+      <div class="radar-empty" id="dynamicRadarEmpty">Ainda não existem resultados. Executa o Radar.</div>
       <div class="card" style="margin-top:16px">
-        <div class="section-head" style="margin:0 0 8px">
-          <div><h2>O que muda por horizonte?</h2><p class="sub">O mesmo ativo pode ser interessante estruturalmente e não ter um bom ponto de entrada hoje.</p></div>
-        </div>
-        <div class="automation-flow" style="grid-template-columns:repeat(4,1fr)">
-          <div class="automation-step"><strong>Hoje</strong><span>Preço, volume, gaps, resultados e notícias materiais.</span></div>
-          <div class="automation-step"><strong>7 dias</strong><span>Pullbacks, força relativa, revisões e rotação setorial.</span></div>
-          <div class="automation-step"><strong>30 dias</strong><span>Margens, estimativas, dívida, valuation e contexto macro.</span></div>
-          <div class="automation-step"><strong>Longo prazo</strong><span>Moat, ROIC, FCF, gestão, cenários e encaixe na carteira.</span></div>
-        </div>
+        <div class="section-head" style="margin:0 0 8px"><div><h2>Funil automático</h2><p class="sub">O Radar reduz o universo e encaminha os melhores candidatos para análise completa.</p></div></div>
+        <div class="automation-flow" style="grid-template-columns:repeat(5,1fr)"><div class="automation-step"><strong>Universo</strong><span>Core, quality, growth ou watchlist</span></div><div class="automation-step"><strong>Fontes</strong><span>Preço, SEC, BCE e histórico</span></div><div class="automation-step"><strong>Frameworks</strong><span>Qualidade, risco e estrutura</span></div><div class="automation-step"><strong>Técnica</strong><span>Tendência, pullback e volatilidade</span></div><div class="automation-step"><strong>Ranking</strong><span>Candidata, monitorizar ou aguardar</span></div></div>
       </div>
     </section>
-
 
 <section id="analysis" class="page">
       <div class="analysis-head">
         <div>
-          <div class="ticker"><div class="ticker-logo" id="assetLogo">PWR</div><div class="ticker-meta"><h1 id="assetName" style="margin:0">Quanta Services</h1><small id="assetMeta">NYSE · Infraestrutura elétrica · USD</small></div></div>
+          <div class="ticker"><div class="ticker-logo" id="assetLogo">—</div><div class="ticker-meta"><h1 id="assetName" style="margin:0">Pesquisa um ativo</h1><small id="assetMeta">Ticker, ETF ou ISIN</small></div></div>
         </div>
         <div style="text-align:right">
-      <div class="price" id="assetPrice">$421,80</div>
-      <div class="delta" id="assetChange">+1,24% hoje</div>
-      <div class="fx-note" id="assetFx">Dados demonstrativos até ser ligada a conversão cambial.</div>
-    </div>
+          <div class="price" id="assetPrice">—</div>
+          <div class="delta" id="assetChange">A aguardar pesquisa</div>
+          <div class="analysis-action-row">
+            <button class="ghost" id="analysisWatchBtn" type="button">☆ Watchlist</button>
+            <button class="ghost" id="analysisCompareBtn" type="button">⇄ Comparar</button>
+            <button class="primary" id="analysisPrintBtn" type="button">Imprimir / PDF</button>
+          </div>
+          <div class="fx-note" id="assetFx">A conversão para EUR aparecerá depois da pesquisa.</div>
+        </div>
       </div>
       <div class="tabs"><button class="tab active">Resumo</button><button class="tab">Financeiro</button><button class="tab">Valuation</button><button class="tab">Riscos</button><button class="tab">Fontes</button></div>
       <div class="chip-row">
@@ -1594,6 +1464,13 @@
               <span class="analysis-source-status">A aguardar</span>
             </div>
             <small>Finnhub ou EODHD</small>
+          </div>
+          <div class="analysis-source-item" id="analysisSourceTechnical" data-status="waiting">
+            <div class="analysis-source-item-head">
+              <strong>Técnica</strong>
+              <span class="analysis-source-status">A aguardar</span>
+            </div>
+            <small>Yahoo Finance</small>
           </div>
           <div class="analysis-source-item" id="analysisSourceFundamentals" data-status="waiting">
             <div class="analysis-source-item-head">
@@ -1695,6 +1572,32 @@
         <div class="framework-engine-note" id="frameworkMethodologyNote">
           O Framework Engine separa factos, cálculos e campos em falta. Um score parcial não equivale a uma recomendação de compra ou venda.
         </div>
+      </section>
+
+      <section class="card" id="technicalEngineCard">
+        <div class="technical-engine-top">
+          <div>
+            <h2 style="margin:0 0 6px">Technical Engine</h2>
+            <p class="sub" id="technicalScope">Histórico, tendência, pullback, RSI e volatilidade.</p>
+          </div>
+          <div style="text-align:right">
+            <div class="framework-engine-score"><strong id="technicalScore">—</strong><span class="sub">/100</span></div>
+            <span class="pill" id="technicalClassification">A aguardar</span>
+          </div>
+        </div>
+        <div class="technical-metric-grid">
+          <div class="technical-metric"><span>Pullback 52 semanas</span><strong id="technicalPullback">—</strong><small id="technicalRange">Intervalo indisponível</small></div>
+          <div class="technical-metric"><span>RSI 14</span><strong id="technicalRsi">—</strong><small>Momentum, não decisão</small></div>
+          <div class="technical-metric"><span>Médias 20 / 50 / 200</span><strong id="technicalAverages">—</strong><small id="technicalTrend">Tendência indisponível</small></div>
+          <div class="technical-metric"><span>Retorno 6M / 1A</span><strong id="technicalReturns">—</strong><small id="technicalAsOf">Sem data</small></div>
+          <div class="technical-metric"><span>Volatilidade anualizada</span><strong id="technicalVolatility">—</strong><small id="technicalMaxDrawdown">Drawdown indisponível</small></div>
+          <div class="technical-metric"><span>Volume médio 20 sessões</span><strong id="technicalVolume">—</strong><small>Yahoo Finance</small></div>
+        </div>
+        <div class="technical-signal-grid">
+          <div><h3>Sinais técnicos positivos</h3><ul class="framework-signal-list" id="technicalPositiveSignals"></ul></div>
+          <div><h3>Pontos técnicos a monitorizar</h3><ul class="framework-signal-list" id="technicalWarningSignals"></ul></div>
+        </div>
+        <div class="framework-engine-note" id="technicalMethodology">A análise técnica ajuda a fasear entradas e controlar risco; não substitui os fundamentos.</div>
       </section>
 
       <div class="card" id="realMarketDataCard" style="margin-bottom:16px">
@@ -2350,21 +2253,27 @@
     </section>
 
     
-    <section id="compare" class="page">
-      <div class="hero"><div><h1>Comparar ativos</h1><p class="sub">Qualidade, valuation, risco e encaixe na carteira sem uma nota mágica.</p></div><button class="primary">+ Adicionar ativo</button></div>
-      <div class="card"><div class="compare-grid">
-        <div class="head">Critério</div><div class="head">PWR</div><div class="head">KRMN</div><div class="head">IESC</div>
-        <div class="label">Qualidade</div><div>Forte</div><div>Adequada</div><div>Adequada</div>
-        <div class="label">Crescimento</div><div>Forte</div><div>Forte</div><div>Forte</div>
-        <div class="label">Balanço</div><div>Adequado</div><div>Adequado</div><div>Sob observação</div>
-        <div class="label">Valuation</div><div>Exigente</div><div>Muito exigente</div><div>Exigente</div>
-        <div class="label">Diluição</div><div>Baixa</div><div>Moderada</div><div>Elevada</div>
-        <div class="label">Volatilidade</div><div>Moderada</div><div>Elevada</div><div>Muito elevada</div>
-        <div class="label">Peso inicial</div><div>1%</div><div>0,5%</div><div>0,25%</div>
-        <div class="label">Limite absoluto</div><div>4%</div><div>2%</div><div>1%</div>
-      </div></div>
-      <div class="grid g3" style="margin-top:16px"><div class="card"><div class="metric-label">Melhor empresa</div><div class="metric">PWR</div><div class="delta">qualidade e execução</div></div><div class="card"><div class="metric-label">Melhor valuation</div><div class="metric">KRMN</div><div class="delta warn">ainda exigente</div></div><div class="card"><div class="metric-label">Maior potencial</div><div class="metric">IESC</div><div class="delta bad">risco muito superior</div></div></div>
+    <section id="watchlist" class="page">
+      <div class="hero"><div><h1>Watchlist</h1><p class="sub">Ativos guardados localmente neste navegador e disponíveis para o Opportunity Radar.</p></div><div class="page-action-row"><span class="freshness" id="watchlistCountLabel">0 ativos</span><button class="primary" id="watchlistRadarBtn" type="button">Analisar no Radar</button></div></div>
+      <div class="card">
+        <div class="watchlist-add-row"><input id="watchlistTickerInput" placeholder="Adicionar ticker, por exemplo MSFT" /><button class="primary" id="watchlistAddTickerBtn" type="button">Analisar e adicionar</button></div>
+        <div class="logic-note">A watchlist é guardada em localStorage. Não são guardadas credenciais, ordens ou dados bancários.</div>
+      </div>
+      <div class="grid g3" id="watchlistCards" style="margin-top:16px"></div>
+      <div class="radar-empty" id="watchlistEmpty">A watchlist está vazia. Adiciona um ativo a partir da análise ou do Radar.</div>
     </section>
+
+    <section id="compare" class="page">
+      <div class="hero"><div><h1>Comparar ativos</h1><p class="sub">Compara ações com ações ou ETFs com ETFs usando as mesmas fontes e frameworks.</p></div><button class="ghost" id="swapCompareBtn" type="button">⇄ Trocar</button></div>
+      <div class="card">
+        <div class="compare-form-grid"><label>Ativo A<input id="compareLeft" value="MSFT" placeholder="MSFT" /></label><label>Ativo B<input id="compareRight" value="AAPL" placeholder="AAPL" /></label><button class="primary" id="runCompareBtn" type="button">Comparar agora</button></div>
+        <div class="logic-note">Quando as classes são diferentes, o ThesisOS mostra um aviso e evita uma conclusão simplista.</div>
+      </div>
+      <div class="radar-loading" id="compareLoading" hidden><div class="radar-spinner"></div><strong>A construir as duas análises…</strong></div>
+      <div class="status-banner warn" id="compareWarning" style="display:none;margin-top:16px"><div><strong>Comparação entre classes diferentes</strong><div class="sub" id="compareWarningText" style="font-size:12px"></div></div></div>
+      <div class="card" id="compareResultCard" style="display:none;margin-top:16px"><div class="compare-dynamic" id="compareDynamicGrid"></div></div>
+    </section>
+
 <section id="portfolio" class="page">
       <div class="hero"><div><h1>Portfolio Builder</h1><p class="sub">Carteira ajustada ao horizonte, risco, objetivos e exposições existentes.</p></div><button class="primary" id="generatePortfolio">Gerar proposta</button></div>
 
@@ -2633,8 +2542,16 @@
     navButtons.forEach(button=>button.classList.toggle("active",button.dataset.page===id));
     window.scrollTo({top:0,behavior:"smooth"});
   }
-  navButtons.forEach(button=>button.addEventListener("click",()=>openPage(button.dataset.page)));
-  $$("[data-go]").forEach(button=>button.addEventListener("click",()=>openPage(button.dataset.go)));
+  function handlePageOpen(id){
+    openPage(id);
+    if(id==="radar" && !window.radarHasLoaded){
+      window.radarHasLoaded=true;
+      setTimeout(()=>loadOpportunityRadar(),120);
+    }
+    if(id==="watchlist") renderWatchlist();
+  }
+  navButtons.forEach(button=>button.addEventListener("click",()=>handlePageOpen(button.dataset.page)));
+  $$("[data-go]").forEach(button=>button.addEventListener("click",()=>handlePageOpen(button.dataset.go)));
 
   // ---------------------------------------------------------------
   // Simple / advanced mode
@@ -3237,6 +3154,7 @@
     [
       "#analysisSourceIdentification",
       "#analysisSourceMarket",
+      "#analysisSourceTechnical",
       "#analysisSourceFundamentals",
       "#analysisSourceFx",
       "#analysisSourceEtfStructure"
@@ -3290,6 +3208,10 @@
     updateAnalysisSourceCard(
       "#analysisSourceMarket",
       sources.market
+    );
+    updateAnalysisSourceCard(
+      "#analysisSourceTechnical",
+      sources.technical
     );
     updateAnalysisSourceCard(
       "#analysisSourceFundamentals",
@@ -3705,6 +3627,7 @@
     const labels={
       partial_assessment:"Avaliação parcial",
       insufficient_etf_fundamentals:"Dados estruturais insuficientes",
+      partial_etf_fundamentals:"Avaliação estrutural parcial",
       unsupported_asset_type:"Tipo de ativo ainda não suportado"
     };
 
@@ -3878,12 +3801,10 @@
       title.textContent=item.label || item.id || "Critério";
 
       const detail=document.createElement("small");
-      const available=Array.isArray(item.available_fields)
-        ? item.available_fields.length
-        : 0;
-      const missing=Array.isArray(item.missing_fields)
-        ? item.missing_fields.length
-        : 0;
+      const availableItems=item.available_data || item.available_fields || [];
+      const missingItems=item.missing_data || item.missing_fields || [];
+      const available=Array.isArray(availableItems) ? availableItems.length : 0;
+      const missing=Array.isArray(missingItems) ? missingItems.length : 0;
       detail.textContent=
         `${available} campo${available===1 ? "" : "s"} disponível${available===1 ? "" : "is"} · ${missing} em falta`;
 
@@ -4707,6 +4628,7 @@
   }
 
   function renderUnifiedAnalysis(payload){
+    window.currentAnalysisPayload=payload;
     const asset=payload.asset || {};
     const market=payload.market || {};
     const currency=market.currency || asset.currency || "";
@@ -4870,6 +4792,8 @@
 
     renderAnalysisQuality(payload);
     renderFrameworkEngine(payload.framework_engine);
+    renderTechnicalAnalysis(payload.technical);
+    syncAnalysisActionButtons();
 
     showToast(
       `${asset.symbol || payload.query} carregado através da API agregada.`
@@ -4877,6 +4801,8 @@
   }
 
   async function loadUnifiedAnalysis(identifier, options={}){
+    window.currentAnalysisPayload=null;
+    syncAnalysisActionButtons();
     const cleanIdentifier=String(identifier || "")
       .trim()
       .toUpperCase();
@@ -4894,6 +4820,7 @@
     resetRealAssetView(cleanIdentifier, "loading");
     resetAnalysisQuality("loading");
     resetFrameworkEngine("loading");
+    resetTechnicalAnalysis("loading");
     resetEtfOfficialProfile("loading");
 
     status.textContent="A construir análise agregada…";
@@ -4965,6 +4892,7 @@
       resetRealAssetView(cleanIdentifier, "error");
       resetAnalysisQuality();
       resetFrameworkEngine();
+      resetTechnicalAnalysis();
       status.textContent="Não foi possível carregar a análise";
       detail.textContent=error.message;
       updated.textContent="Erro da API";
@@ -5751,6 +5679,179 @@
     showToast("Preços e sinais atualizados na simulação.");
   }
   $$(".update-now-btn").forEach(button=>button.addEventListener("click",simulateUpdate));
+
+
+  // ---------------------------------------------------------------
+  // Technical Engine, Watchlist, live Radar, Comparison and Export
+  // ---------------------------------------------------------------
+  const WATCHLIST_KEY="thesisos_watchlist_v1";
+  window.currentAnalysisPayload=null;
+  window.radarHasLoaded=false;
+
+  function escapeHtml(value){
+    return String(value ?? "").replace(/[&<>'"]/g,char=>({
+      "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"
+    })[char]);
+  }
+
+  function formatCompactNumber(value){
+    const number=Number(value);
+    if(!Number.isFinite(number)) return "—";
+    return new Intl.NumberFormat("pt-PT",{notation:"compact",maximumFractionDigits:1}).format(number);
+  }
+
+  function resetTechnicalAnalysis(state="waiting"){
+    ["#technicalScore","#technicalPullback","#technicalRsi","#technicalAverages","#technicalReturns","#technicalVolatility","#technicalVolume"].forEach(selector=>{
+      if($(selector)) $(selector).textContent=state==="loading" ? "…" : "—";
+    });
+    if($("#technicalClassification")) $("#technicalClassification").textContent=state==="loading" ? "A calcular" : "A aguardar";
+    if($("#technicalRange")) $("#technicalRange").textContent="Intervalo indisponível";
+    if($("#technicalTrend")) $("#technicalTrend").textContent="Tendência indisponível";
+    if($("#technicalAsOf")) $("#technicalAsOf").textContent="Sem data";
+    if($("#technicalMaxDrawdown")) $("#technicalMaxDrawdown").textContent="Drawdown indisponível";
+    renderFrameworkSignals("#technicalPositiveSignals",[],state==="loading" ? "A calcular sinais…" : "Nenhum sinal carregado.");
+    renderFrameworkSignals("#technicalWarningSignals",[],state==="loading" ? "A calcular alertas…" : "Nenhum alerta carregado.");
+  }
+
+  function renderTechnicalAnalysis(technical){
+    if(!technical){resetTechnicalAnalysis();return;}
+    const indicators=technical.indicators || {};
+    const score=Number(technical.score);
+    $("#technicalScore").textContent=Number.isFinite(score) ? formatNumber(score,0) : "—";
+    $("#technicalClassification").textContent=technical.classification?.label || "Sem classificação";
+    $("#technicalPullback").textContent=Number.isFinite(Number(indicators.pullback_from_52w_high_percentage)) ? `${formatNumber(indicators.pullback_from_52w_high_percentage)}%` : "—";
+    $("#technicalRange").textContent=Number.isFinite(Number(indicators.low_52w)) && Number.isFinite(Number(indicators.high_52w)) ? `52S ${formatNumber(indicators.low_52w)} — ${formatNumber(indicators.high_52w)}` : "Intervalo indisponível";
+    $("#technicalRsi").textContent=Number.isFinite(Number(indicators.rsi_14)) ? formatNumber(indicators.rsi_14) : "—";
+    const averages=[indicators.sma_20,indicators.sma_50,indicators.sma_200].map(value=>Number.isFinite(Number(value)) ? formatNumber(value) : "—");
+    $("#technicalAverages").textContent=averages.join(" / ");
+    $("#technicalTrend").textContent=`Yahoo ${technical.symbol || ""} · ${technical.history_sessions || 0} sessões`;
+    const r6=Number(indicators.return_6m_percentage),r1=Number(indicators.return_1y_percentage);
+    $("#technicalReturns").textContent=`${Number.isFinite(r6)?formatNumber(r6)+"%":"—"} / ${Number.isFinite(r1)?formatNumber(r1)+"%":"—"}`;
+    $("#technicalAsOf").textContent=technical.as_of ? `Dados até ${technical.as_of}` : "Sem data";
+    $("#technicalVolatility").textContent=Number.isFinite(Number(indicators.annualized_volatility_percentage)) ? `${formatNumber(indicators.annualized_volatility_percentage)}%` : "—";
+    $("#technicalMaxDrawdown").textContent=Number.isFinite(Number(indicators.maximum_drawdown_percentage)) ? `Máx. drawdown ${formatNumber(indicators.maximum_drawdown_percentage)}%` : "Drawdown indisponível";
+    $("#technicalVolume").textContent=formatCompactNumber(indicators.average_volume_20);
+    $("#technicalMethodology").textContent=technical.methodology_note || "A análise técnica ajuda a fasear entradas e controlar risco.";
+    renderFrameworkSignals("#technicalPositiveSignals",technical.positive_signals,"Nenhum sinal técnico positivo identificado.");
+    renderFrameworkSignals("#technicalWarningSignals",technical.warning_signals,"Nenhum alerta técnico relevante identificado.");
+  }
+
+  function getWatchlist(){
+    try{return JSON.parse(localStorage.getItem(WATCHLIST_KEY) || "[]");}catch{return [];}
+  }
+  function saveWatchlist(items){localStorage.setItem(WATCHLIST_KEY,JSON.stringify(items));updateWatchlistCount();}
+  function updateWatchlistCount(){
+    const count=getWatchlist().length;
+    if($("#watchlistNavCount")) $("#watchlistNavCount").textContent=count;
+    if($("#watchlistCountLabel")) $("#watchlistCountLabel").textContent=`${count} ativo${count===1?"":"s"}`;
+  }
+  function analysisRecord(payload){
+    const asset=payload?.asset || {};
+    return {symbol:asset.symbol || payload?.query,name:asset.name || asset.symbol,asset_type:asset.asset_type,exchange:asset.exchange_code || asset.exchange || null,ticker:asset.symbol || null,price:asset.price ?? null,currency:asset.currency || null,added_at:new Date().toISOString()};
+  }
+  function addWatchlistRecord(record){
+    if(!record?.symbol) return;
+    const items=getWatchlist();
+    const key=`${record.symbol}|${record.exchange || ""}`;
+    const existing=items.findIndex(item=>`${item.symbol}|${item.exchange || ""}`===key);
+    if(existing>=0) items[existing]={...items[existing],...record}; else items.unshift(record);
+    saveWatchlist(items.slice(0,50));renderWatchlist();showToast(`${record.symbol} guardado na watchlist.`);
+  }
+  function removeWatchlistRecord(symbol,exchange){
+    saveWatchlist(getWatchlist().filter(item=>!(item.symbol===symbol && String(item.exchange||"")===String(exchange||""))));renderWatchlist();showToast(`${symbol} removido.`);
+  }
+  function syncAnalysisActionButtons(){
+    const payload=window.currentAnalysisPayload;
+    const button=$("#analysisWatchBtn");
+    if(!button) return;
+    const record=payload ? analysisRecord(payload) : null;
+    const exists=record && getWatchlist().some(item=>item.symbol===record.symbol && String(item.exchange||"")===String(record.exchange||""));
+    button.textContent=exists ? "★ Na watchlist" : "☆ Watchlist";
+  }
+  function renderWatchlist(){
+    const items=getWatchlist();const container=$("#watchlistCards");const empty=$("#watchlistEmpty");updateWatchlistCount();
+    if(!container) return;
+    empty.style.display=items.length ? "none" : "block";
+    container.innerHTML=items.map(item=>`<article class="card opportunity"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="watchlist-card-meta"><div><span>Último preço guardado</span><strong>${item.currency?escapeHtml(item.currency)+" ":""}${Number.isFinite(Number(item.price))?formatNumber(item.price):"Atualizar análise"}</strong></div><div><span>Adicionado</span><strong>${formatAssetDate(item.added_at)}</strong></div></div><div class="card-actions"><button class="ghost watchlist-analyze" data-symbol="${escapeHtml(item.symbol)}" data-exchange="${escapeHtml(item.exchange || "")}">Analisar</button><button class="ghost watchlist-compare" data-symbol="${escapeHtml(item.symbol)}">Comparar</button><button class="danger-btn watchlist-remove" data-symbol="${escapeHtml(item.symbol)}" data-exchange="${escapeHtml(item.exchange || "")}">Remover</button></div></article>`).join("");
+  }
+
+  async function loadOpportunityRadar(force=false){
+    const universe=$("#radarUniverse")?.value || "core_us";
+    const limit=$("#radarLimit")?.value || "8";
+    let symbols="";
+    if(universe==="watchlist") symbols=getWatchlist().map(item=>item.symbol).join(",");
+    if(universe==="custom") symbols=$("#radarCustomSymbols")?.value.trim() || "";
+    if((universe==="watchlist" || universe==="custom") && !symbols){showToast("A lista selecionada está vazia.");return;}
+    const params=new URLSearchParams({universe:universe==="watchlist"||universe==="custom"?"custom":universe,limit});
+    if(symbols) params.set("symbols",symbols);
+    if(force) params.set("refresh",Date.now());
+    $("#radarLoading").hidden=false;$("#dynamicRadarCards").innerHTML="";$("#dynamicRadarEmpty").style.display="none";$("#radarStatusTitle").textContent="Radar em execução";$("#radarStatusDetail").textContent="A recolher dados, calcular scores e ordenar candidatas.";
+    try{
+      const response=await fetch(`/api/radar?${params}`);const data=await response.json();if(!response.ok) throw new Error(data.detail||data.error||"Erro no Radar");window.lastRadarData=data;renderRadarResults(data);$("#radarUpdated").textContent=`Atualizado ${formatAssetDate(data.generated_at)}${data.cached?" · cache":""}`;$("#radarCoverage").textContent=`${data.analysed_count} analisados · ${data.error_count} erros`;$("#radarStatusTitle").textContent="Ranking concluído";$("#radarStatusDetail").textContent=data.methodology?.decision_limit || "Candidatas identificadas para análise aprofundada.";
+    }catch(error){$("#radarStatusTitle").textContent="Radar indisponível";$("#radarStatusDetail").textContent=error.message;$("#dynamicRadarEmpty").textContent="Não foi possível executar o Radar.";$("#dynamicRadarEmpty").style.display="block";showToast(error.message);}finally{$("#radarLoading").hidden=true;}
+  }
+  function sortedRadarResults(results){
+    const mode=$("#radarSort")?.value || "score";return [...results].sort((a,b)=>{
+      const value=item=>mode==="quality"?item.quality_score:mode==="technical"?item.technical_score:mode==="pullback"?item.pullback_percentage:item.radar_score;
+      return (Number(value(b))||-999)-(Number(value(a))||-999);
+    });
+  }
+  function renderRadarResults(data){
+    const container=$("#dynamicRadarCards");const empty=$("#dynamicRadarEmpty");const results=sortedRadarResults(data.results || []);empty.style.display=results.length?"none":"block";
+    container.innerHTML=results.map(item=>{
+      const statusClass=item.status?.code==="candidate"?"":item.status?.code==="monitor"?"warn":"bad";
+      const positives=(item.positive_reasons||[]).slice(0,2).map(text=>`<div class="radar-reason good">${escapeHtml(text)}</div>`).join("");
+      const warnings=(item.warning_reasons||[]).slice(0,2).map(text=>`<div class="radar-reason warn">${escapeHtml(text)}</div>`).join("");
+      return `<article class="card opportunity radar-live-card"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="score-line"><div><span class="metric-label">Radar score</span><div class="score">${Number.isFinite(Number(item.radar_score))?formatNumber(item.radar_score,0)+"/100":"—"}</div></div><span class="pill ${statusClass}">${escapeHtml(item.status?.label || "Sem estado")}</span></div><div class="radar-score-layout"><div class="radar-score-box"><span>Qualidade</span><strong>${Number.isFinite(Number(item.quality_score))?formatNumber(item.quality_score,0):"—"}</strong></div><div class="radar-score-box"><span>Técnica</span><strong>${Number.isFinite(Number(item.technical_score))?formatNumber(item.technical_score,0):"—"}</strong></div><div class="radar-score-box"><span>Pullback</span><strong>${Number.isFinite(Number(item.pullback_percentage))?formatNumber(item.pullback_percentage)+"%":"—"}</strong></div></div><div class="why-now"><strong>Próxima ação:</strong><br>${escapeHtml(item.status?.action || item.decision_label || "Analisar")}</div><div class="radar-reasons">${positives}${warnings}</div><div class="validity"><span>Dados ${formatNumber(item.data_completeness_percentage || 0,0)}%</span><strong>Framework ${formatNumber(item.framework_coverage_percentage || 0,0)}%</strong></div><div class="card-actions"><button class="ghost radar-analyze" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}" data-exchange="${escapeHtml(item.analysis_exchange || "")}" data-ticker="${escapeHtml(item.analysis_ticker || item.symbol)}">Analisar</button><button class="ghost radar-compare" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}">Comparar</button><button class="primary radar-watch" data-record="${encodeURIComponent(JSON.stringify(item))}">Watchlist</button></div></article>`;
+    }).join("");
+  }
+
+  function comparisonMetricRows(left,right){
+    const type=left.asset?.asset_type;const rows=[];const add=(label,a,b,format=value=>value??"—")=>rows.push([label,format(a),format(b)]);
+    const lf=left.framework_engine?.quantitative_snapshot || {},rf=right.framework_engine?.quantitative_snapshot || {};
+    const lt=left.technical || {},rt=right.technical || {};
+    add("Framework score",lf.score,rf.score,value=>Number.isFinite(Number(value))?`${formatNumber(value,0)}/100`:"—");
+    add("Technical score",lt.score,rt.score,value=>Number.isFinite(Number(value))?`${formatNumber(value,0)}/100`:"—");
+    add("Cobertura de dados",left.data_quality?.completeness_percentage,right.data_quality?.completeness_percentage,value=>Number.isFinite(Number(value))?`${formatNumber(value,0)}%`:"—");
+    if(type==="stock"){
+      const ld=left.fundamentals?.derived_metrics || {},rd=right.fundamentals?.derived_metrics || {};const ldur=left.fundamentals?.duration_metrics || {},rdur=right.fundamentals?.duration_metrics || {};
+      add("Receitas YoY",ldur.revenue?.quarter_yoy_percentage,rdur.revenue?.quarter_yoy_percentage,pct);add("Margem operacional",ld.operating_margin_quarter_percentage,rd.operating_margin_quarter_percentage,pct);add("Margem FCF",ld.free_cash_flow_margin_percentage,rd.free_cash_flow_margin_percentage,pct);add("Conversão lucro/caixa",ld.operating_cash_flow_to_net_income_percentage,rd.operating_cash_flow_to_net_income_percentage,pct);add("Dívida líquida / FCF",ld.net_debt_to_annual_free_cash_flow,rd.net_debt_to_annual_free_cash_flow,multiple);add("SBC / receitas",ld.stock_based_compensation_to_revenue_percentage,rd.stock_based_compensation_to_revenue_percentage,pct);
+    }else if(type==="etf"){
+      const lp=left.etf_profile || {},rp=right.etf_profile || {};
+      add("OCF / TER",lp.ongoing_charges_percentage,rp.ongoing_charges_percentage,pct);add("Tracking error 5A",lp.tracking_error?.five_year_percentage,rp.tracking_error?.five_year_percentage,pct);add("Número de posições",lp.number_of_stocks,rp.number_of_stocks,value=>Number.isFinite(Number(value))?formatNumber(value,0):"—");add("Peso top 10",lp.concentration?.top_10_weight_percentage,rp.concentration?.top_10_weight_percentage,pct);add("Maior país",lp.concentration?.largest_country_percentage,rp.concentration?.largest_country_percentage,pct);add("Maior setor",lp.largest_sector?.weight_percentage,rp.largest_sector?.weight_percentage,pct);add("P/E agregado",lp.characteristics?.price_to_earnings?.fund,rp.characteristics?.price_to_earnings?.fund,multiple);
+    }
+    const li=lt.indicators || {},ri=rt.indicators || {};add("Pullback 52S",li.pullback_from_52w_high_percentage,ri.pullback_from_52w_high_percentage,pct);add("RSI 14",li.rsi_14,ri.rsi_14,value=>Number.isFinite(Number(value))?formatNumber(value):"—");add("Volatilidade",li.annualized_volatility_percentage,ri.annualized_volatility_percentage,pct);
+    return rows;
+  }
+  function pct(value){return Number.isFinite(Number(value))?`${formatNumber(value)}%`:"—";}function multiple(value){return Number.isFinite(Number(value))?`${formatNumber(value)}x`:"—";}
+  function renderComparison(data){
+    const left=data.left,right=data.right;const grid=$("#compareDynamicGrid");$("#compareWarning").style.display=data.warning?"flex":"none";$("#compareWarningText").textContent=data.warning || "";
+    const rows=comparisonMetricRows(left,right);grid.innerHTML=`<div class="head">Critério</div><div class="head">${escapeHtml(left.asset?.symbol)}<br><small>${escapeHtml(left.asset?.name)}</small></div><div class="head">${escapeHtml(right.asset?.symbol)}<br><small>${escapeHtml(right.asset?.name)}</small></div>${rows.map(([label,a,b])=>`<div class="label">${escapeHtml(label)}</div><div>${escapeHtml(a)}</div><div>${escapeHtml(b)}</div>`).join("")}`;$("#compareResultCard").style.display="block";
+  }
+  async function runComparison(){
+    const left=$("#compareLeft").value.trim().toUpperCase(),right=$("#compareRight").value.trim().toUpperCase();if(!left||!right){showToast("Indica os dois ativos.");return;}$("#compareLoading").hidden=false;$("#compareResultCard").style.display="none";
+    try{const response=await fetch(`/api/compare?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}`);const data=await response.json();if(!response.ok) throw new Error(data.detail||data.error||"Comparação indisponível");window.lastComparison=data;renderComparison(data);}catch(error){showToast(error.message);}finally{$("#compareLoading").hidden=true;}
+  }
+
+  $("#analysisWatchBtn")?.addEventListener("click",()=>{if(window.currentAnalysisPayload)addWatchlistRecord(analysisRecord(window.currentAnalysisPayload));else showToast("Pesquisa primeiro um ativo.");});
+  $("#analysisCompareBtn")?.addEventListener("click",()=>{const symbol=window.currentAnalysisPayload?.query || window.currentAnalysisPayload?.asset?.symbol;if(symbol) $("#compareLeft").value=symbol;handlePageOpen("compare");});
+  $("#analysisPrintBtn")?.addEventListener("click",()=>window.print());
+  $("#runRadarBtn")?.addEventListener("click",()=>loadOpportunityRadar(true));
+  $("#radarSort")?.addEventListener("change",()=>{if(window.lastRadarData)renderRadarResults(window.lastRadarData);});
+  $("#radarUniverse")?.addEventListener("change",event=>{$("#radarCustomSymbols").disabled=event.target.value!=="custom";});
+  $("#watchlistRadarBtn")?.addEventListener("click",()=>{$("#radarUniverse").value="watchlist";handlePageOpen("radar");loadOpportunityRadar(true);});
+  $("#runCompareBtn")?.addEventListener("click",runComparison);
+  $("#swapCompareBtn")?.addEventListener("click",()=>{const left=$("#compareLeft").value;$("#compareLeft").value=$("#compareRight").value;$("#compareRight").value=left;});
+  $("#watchlistAddTickerBtn")?.addEventListener("click",async()=>{const symbol=$("#watchlistTickerInput").value.trim().toUpperCase();if(!symbol)return;await loadUnifiedAnalysis(symbol);if(window.currentAnalysisPayload?.asset?.symbol)addWatchlistRecord(analysisRecord(window.currentAnalysisPayload));});
+
+  document.addEventListener("click",event=>{
+    const analyze=event.target.closest(".radar-analyze,.watchlist-analyze");if(analyze){void loadUnifiedAnalysis(analyze.dataset.symbol,{exchange:analyze.dataset.exchange||undefined,ticker:analyze.dataset.ticker||undefined});return;}
+    const radarWatch=event.target.closest(".radar-watch");if(radarWatch){try{const item=JSON.parse(decodeURIComponent(radarWatch.dataset.record));addWatchlistRecord({symbol:item.symbol,name:item.name,asset_type:item.asset_type,exchange:item.analysis_exchange||item.exchange,ticker:item.analysis_ticker||item.symbol,price:item.price,currency:item.currency,added_at:new Date().toISOString()});}catch{showToast("Não foi possível guardar o ativo.");}return;}
+    const remove=event.target.closest(".watchlist-remove");if(remove){removeWatchlistRecord(remove.dataset.symbol,remove.dataset.exchange);return;}
+    const compare=event.target.closest(".radar-compare,.watchlist-compare");if(compare){$("#compareLeft").value=compare.dataset.symbol;handlePageOpen("compare");return;}
+  });
+  updateWatchlistCount();renderWatchlist();
+
 
   // ---------------------------------------------------------------
   // Opportunity Radar: horizon + market + category + search

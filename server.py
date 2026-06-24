@@ -2,10 +2,12 @@ import csv
 import gzip
 import io
 import json
+import math
 import os
 import re
 import time
 import zlib
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timezone
 from html.parser import HTMLParser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -42,11 +44,48 @@ EODHD_CACHE_TTL_SECONDS = 24 * 60 * 60
 SEC_CACHE_TTL_SECONDS = 24 * 60 * 60
 ECB_CACHE_TTL_SECONDS = 12 * 60 * 60
 ETF_PROFILE_CACHE_TTL_SECONDS = 24 * 60 * 60
+TECHNICAL_CACHE_TTL_SECONDS = 30 * 60
+RADAR_CACHE_TTL_SECONDS = 30 * 60
 OPENFIGI_CACHE = {}
 EODHD_CACHE = {}
 SEC_CACHE = {}
 ECB_CACHE = {}
 ETF_PROFILE_CACHE = {}
+TECHNICAL_CACHE = {}
+RADAR_CACHE = {}
+
+RADAR_UNIVERSES = {
+    "core_us": [
+        "MSFT", "AAPL", "GOOGL", "AMZN",
+        "MCD", "KO", "ADP", "ZTS",
+    ],
+    "quality_us": [
+        "MSFT", "AAPL", "GOOGL", "MCD",
+        "KO", "ADP", "ZTS", "PWR",
+    ],
+    "growth_us": [
+        "NVDA", "AMD", "AMZN", "META",
+        "PWR", "SMCI", "IREN", "KRMN",
+    ],
+}
+
+YAHOO_EXCHANGE_SUFFIX = {
+    "XETRA": ".DE",
+    "F": ".F",
+    "FRANKFURT": ".F",
+    "LSE": ".L",
+    "L": ".L",
+    "MIL": ".MI",
+    "MI": ".MI",
+    "AS": ".AS",
+    "AMS": ".AS",
+    "PA": ".PA",
+    "SW": ".SW",
+    "SIX": ".SW",
+    "BR": ".BR",
+    "MC": ".MC",
+    "LS": ".LS",
+}
 
 ETF_OFFICIAL_PROFILE_REGISTRY = {
     "IE00BK5BQT80": {
@@ -3190,7 +3229,536 @@ def analysis_source(
 
 
 
-FRAMEWORK_ENGINE_VERSION = "0.6"
+def yahoo_symbol_for_asset(asset: dict) -> str:
+    symbol = str(asset.get("symbol") or "").strip().upper()
+
+    if not symbol:
+        raise ValueError("O ativo não tem ticker para histórico técnico.")
+
+    if "." in symbol:
+        return symbol
+
+    exchange = str(
+        asset.get("exchange_code")
+        or asset.get("exchange")
+        or ""
+    ).strip().upper()
+
+    suffix = YAHOO_EXCHANGE_SUFFIX.get(exchange, "")
+    return f"{symbol}{suffix}"
+
+
+def finite_number(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    return number if math.isfinite(number) else None
+
+
+def calculate_latest_rsi(closes: list[float], period: int = 14):
+    if len(closes) <= period:
+        return None
+
+    deltas = [
+        closes[index] - closes[index - 1]
+        for index in range(1, len(closes))
+    ]
+
+    gains = [max(delta, 0.0) for delta in deltas]
+    losses = [max(-delta, 0.0) for delta in deltas]
+
+    average_gain = sum(gains[:period]) / period
+    average_loss = sum(losses[:period]) / period
+
+    for index in range(period, len(deltas)):
+        average_gain = (
+            (average_gain * (period - 1)) + gains[index]
+        ) / period
+        average_loss = (
+            (average_loss * (period - 1)) + losses[index]
+        ) / period
+
+    if average_loss == 0:
+        return 100.0
+
+    relative_strength = average_gain / average_loss
+    return round(100 - (100 / (1 + relative_strength)), 2)
+
+
+def simple_moving_average(values: list[float], sessions: int):
+    if len(values) < sessions:
+        return None
+
+    return round(sum(values[-sessions:]) / sessions, 4)
+
+
+def period_return(values: list[float], sessions: int):
+    if len(values) <= sessions or values[-sessions - 1] == 0:
+        return None
+
+    return round(
+        ((values[-1] / values[-sessions - 1]) - 1) * 100,
+        2,
+    )
+
+
+def annualized_volatility(values: list[float]):
+    if len(values) < 22:
+        return None
+
+    returns = []
+
+    for previous, current in zip(values, values[1:]):
+        if previous <= 0 or current <= 0:
+            continue
+        returns.append(math.log(current / previous))
+
+    if len(returns) < 20:
+        return None
+
+    mean = sum(returns) / len(returns)
+    variance = sum(
+        (value - mean) ** 2
+        for value in returns
+    ) / (len(returns) - 1)
+
+    return round(math.sqrt(variance) * math.sqrt(252) * 100, 2)
+
+
+def maximum_drawdown(values: list[float]):
+    if not values:
+        return None
+
+    peak = values[0]
+    worst = 0.0
+
+    for value in values:
+        peak = max(peak, value)
+        if peak > 0:
+            worst = min(worst, (value / peak) - 1)
+
+    return round(worst * 100, 2)
+
+
+def technical_rule(
+    rule_id: str,
+    label: str,
+    value,
+    unit: str,
+    points: int,
+    max_points: int,
+    status: str,
+    interpretation: str,
+) -> dict:
+    return {
+        "id": rule_id,
+        "label": label,
+        "value": value,
+        "unit": unit,
+        "points": points,
+        "max_points": max_points,
+        "status": status,
+        "interpretation": interpretation,
+        "source": "Yahoo Finance via yfinance",
+    }
+
+
+def unavailable_technical_rule(
+    rule_id: str,
+    label: str,
+    unit: str,
+    max_points: int,
+) -> dict:
+    return technical_rule(
+        rule_id,
+        label,
+        None,
+        unit,
+        0,
+        max_points,
+        "unavailable",
+        "Histórico insuficiente para este indicador.",
+    )
+
+
+def classify_technical_score(score):
+    if score is None:
+        return {
+            "code": "insufficient_data",
+            "label": "Dados técnicos insuficientes",
+        }
+
+    if score >= 80:
+        return {"code": "strong", "label": "Momento forte"}
+    if score >= 65:
+        return {"code": "positive", "label": "Tendência positiva"}
+    if score >= 45:
+        return {"code": "neutral", "label": "Momento neutro"}
+
+    return {"code": "weak", "label": "Tendência fraca"}
+
+
+def build_technical_rules(indicators: dict) -> list[dict]:
+    rules = []
+    close = indicators.get("last_close")
+    sma50 = indicators.get("sma_50")
+    sma200 = indicators.get("sma_200")
+    rsi = indicators.get("rsi_14")
+    return_6m = indicators.get("return_6m_percentage")
+    return_1y = indicators.get("return_1y_percentage")
+    pullback = indicators.get("pullback_from_52w_high_percentage")
+    volatility = indicators.get("annualized_volatility_percentage")
+
+    if close is None or sma200 is None:
+        rules.append(unavailable_technical_rule(
+            "price_vs_sma200", "Preço vs média de 200 sessões", "%", 20
+        ))
+    else:
+        distance = round(((close / sma200) - 1) * 100, 2)
+        if distance >= 5:
+            points, status, text = 20, "strong", "Preço claramente acima da tendência de longo prazo."
+        elif distance >= 0:
+            points, status, text = 15, "positive", "Preço acima da média de 200 sessões."
+        elif distance >= -10:
+            points, status, text = 7, "watch", "Preço ligeiramente abaixo da tendência de longo prazo."
+        else:
+            points, status, text = 0, "warning", "Preço muito abaixo da média de 200 sessões."
+        rules.append(technical_rule(
+            "price_vs_sma200", "Preço vs média de 200 sessões", distance, "%",
+            points, 20, status, text,
+        ))
+
+    if sma50 is None or sma200 is None:
+        rules.append(unavailable_technical_rule(
+            "sma50_vs_sma200", "Média 50 vs 200 sessões", "%", 15
+        ))
+    else:
+        distance = round(((sma50 / sma200) - 1) * 100, 2)
+        if distance >= 3:
+            points, status, text = 15, "strong", "Estrutura de tendência positiva."
+        elif distance >= 0:
+            points, status, text = 11, "positive", "Média de 50 acima da média de 200."
+        elif distance >= -3:
+            points, status, text = 6, "watch", "Tendência de médio prazo sem confirmação."
+        else:
+            points, status, text = 0, "warning", "Média de 50 abaixo da média de 200."
+        rules.append(technical_rule(
+            "sma50_vs_sma200", "Média 50 vs 200 sessões", distance, "%",
+            points, 15, status, text,
+        ))
+
+    if rsi is None:
+        rules.append(unavailable_technical_rule(
+            "rsi_14", "RSI 14 sessões", "", 15
+        ))
+    else:
+        if 45 <= rsi <= 68:
+            points, status, text = 15, "positive", "Momentum saudável sem sobrecompra extrema."
+        elif 35 <= rsi < 45:
+            points, status, text = 11, "watch", "Momentum moderado; possível zona de recuperação."
+        elif 25 <= rsi < 35:
+            points, status, text = 9, "watch", "Ativo tecnicamente pressionado; exige confirmação."
+        elif 68 < rsi <= 75:
+            points, status, text = 8, "watch", "Momentum forte, mas já esticado."
+        elif rsi > 75:
+            points, status, text = 3, "warning", "RSI elevado e risco de sobre-extensão."
+        else:
+            points, status, text = 3, "warning", "RSI muito baixo e tendência fragilizada."
+        rules.append(technical_rule(
+            "rsi_14", "RSI 14 sessões", rsi, "",
+            points, 15, status, text,
+        ))
+
+    for rule_id, label, value, max_points in [
+        ("return_6m", "Retorno a 6 meses", return_6m, 10),
+        ("return_1y", "Retorno a 1 ano", return_1y, 10),
+    ]:
+        if value is None:
+            rules.append(unavailable_technical_rule(rule_id, label, "%", max_points))
+        else:
+            if value >= 15:
+                points, status, text = max_points, "strong", "Momentum positivo no período."
+            elif value >= 0:
+                points, status, text = round(max_points * 0.7), "positive", "Retorno positivo no período."
+            elif value >= -10:
+                points, status, text = round(max_points * 0.35), "watch", "Retorno ligeiramente negativo."
+            else:
+                points, status, text = 0, "warning", "Retorno negativo relevante."
+            rules.append(technical_rule(
+                rule_id, label, value, "%", points, max_points, status, text,
+            ))
+
+    if pullback is None:
+        rules.append(unavailable_technical_rule(
+            "pullback_52w", "Pullback desde máximo de 52 semanas", "%", 20
+        ))
+    else:
+        if 5 <= pullback <= 18:
+            points, status, text = 20, "positive", "Correção relevante sem queda extrema."
+        elif 0 <= pullback < 5:
+            points, status, text = 13, "watch", "Preço próximo do máximo; margem técnica limitada."
+        elif 18 < pullback <= 30:
+            points, status, text = 12, "watch", "Pullback profundo; validar a tese e a tendência."
+        else:
+            points, status, text = 4, "warning", "Queda muito profunda face ao máximo anual."
+        rules.append(technical_rule(
+            "pullback_52w", "Pullback desde máximo de 52 semanas", pullback, "%",
+            points, 20, status, text,
+        ))
+
+    if volatility is None:
+        rules.append(unavailable_technical_rule(
+            "volatility", "Volatilidade anualizada", "%", 10
+        ))
+    else:
+        if volatility <= 20:
+            points, status, text = 10, "positive", "Volatilidade relativamente controlada."
+        elif volatility <= 35:
+            points, status, text = 7, "neutral", "Volatilidade moderada."
+        elif volatility <= 55:
+            points, status, text = 3, "watch", "Volatilidade elevada."
+        else:
+            points, status, text = 0, "warning", "Volatilidade muito elevada."
+        rules.append(technical_rule(
+            "volatility", "Volatilidade anualizada", volatility, "%",
+            points, 10, status, text,
+        ))
+
+    return rules
+
+
+def get_technical_snapshot(asset: dict) -> dict:
+    yahoo_symbol = yahoo_symbol_for_asset(asset)
+    cache_key = yahoo_symbol.upper()
+    cached = TECHNICAL_CACHE.get(cache_key)
+
+    if cached:
+        age = time.time() - cached["created_at"]
+        if age < TECHNICAL_CACHE_TTL_SECONDS:
+            return cached["data"]
+
+    try:
+        import yfinance as yf
+    except ImportError as error:
+        raise RuntimeError(
+            "A dependência yfinance não está instalada."
+        ) from error
+
+    history = yf.Ticker(yahoo_symbol).history(
+        period="2y",
+        interval="1d",
+        auto_adjust=False,
+        actions=False,
+    )
+
+    if history is None or history.empty or "Close" not in history:
+        raise ValueError("O Yahoo Finance não devolveu histórico suficiente.")
+
+    history = history.dropna(subset=["Close"])
+    closes = [
+        float(value)
+        for value in history["Close"].tolist()
+        if finite_number(value) is not None
+    ]
+
+    if len(closes) < 20:
+        raise ValueError("Histórico técnico insuficiente.")
+
+    volumes = []
+    if "Volume" in history:
+        volumes = [
+            finite_number(value)
+            for value in history["Volume"].tolist()
+        ]
+        volumes = [value for value in volumes if value is not None]
+
+    last_close = closes[-1]
+    window_52 = closes[-252:] if len(closes) >= 252 else closes
+    high_52 = max(window_52)
+    low_52 = min(window_52)
+    pullback = round((1 - (last_close / high_52)) * 100, 2) if high_52 else None
+    distance_low = round(((last_close / low_52) - 1) * 100, 2) if low_52 else None
+
+    indicators = {
+        "last_close": round(last_close, 4),
+        "sma_20": simple_moving_average(closes, 20),
+        "sma_50": simple_moving_average(closes, 50),
+        "sma_200": simple_moving_average(closes, 200),
+        "rsi_14": calculate_latest_rsi(closes, 14),
+        "return_1m_percentage": period_return(closes, 21),
+        "return_3m_percentage": period_return(closes, 63),
+        "return_6m_percentage": period_return(closes, 126),
+        "return_1y_percentage": period_return(closes, 252),
+        "high_52w": round(high_52, 4),
+        "low_52w": round(low_52, 4),
+        "pullback_from_52w_high_percentage": pullback,
+        "distance_from_52w_low_percentage": distance_low,
+        "annualized_volatility_percentage": annualized_volatility(window_52),
+        "maximum_drawdown_percentage": maximum_drawdown(window_52),
+        "average_volume_20": (
+            round(sum(volumes[-20:]) / len(volumes[-20:]))
+            if volumes else None
+        ),
+    }
+
+    rules = build_technical_rules(indicators)
+    available_rules = [rule for rule in rules if rule["status"] != "unavailable"]
+    achieved = sum(rule["points"] for rule in available_rules)
+    available_max = sum(rule["max_points"] for rule in available_rules)
+    total_max = sum(rule["max_points"] for rule in rules)
+    score = round((achieved / available_max) * 100) if available_max else None
+    coverage = round((available_max / total_max) * 100) if total_max else 0
+
+    positive_signals = [
+        {
+            "rule_id": rule["id"],
+            "label": rule["label"],
+            "value": rule["value"],
+            "unit": rule["unit"],
+            "interpretation": rule["interpretation"],
+        }
+        for rule in rules
+        if rule["status"] in {"strong", "positive"}
+    ]
+
+    warning_signals = [
+        {
+            "rule_id": rule["id"],
+            "label": rule["label"],
+            "value": rule["value"],
+            "unit": rule["unit"],
+            "interpretation": rule["interpretation"],
+        }
+        for rule in rules
+        if rule["status"] in {"watch", "warning"}
+    ]
+
+    as_of = None
+    try:
+        latest_index = history.index[-1]
+        as_of = latest_index.date().isoformat()
+    except Exception:
+        as_of = None
+
+    result = {
+        "symbol": yahoo_symbol,
+        "provider": "Yahoo Finance via yfinance",
+        "as_of": as_of,
+        "history_sessions": len(closes),
+        "score": score,
+        "classification": classify_technical_score(score),
+        "coverage_percentage": coverage,
+        "indicators": indicators,
+        "rules": rules,
+        "positive_signals": positive_signals,
+        "warning_signals": warning_signals,
+        "methodology_note": (
+            "Indicadores de preço e tendência usados para timing, pullback e risco. "
+            "Não substituem análise fundamental, valuation ou contexto da carteira."
+        ),
+    }
+
+    TECHNICAL_CACHE[cache_key] = {
+        "created_at": time.time(),
+        "data": result,
+    }
+
+    return result
+
+
+def enrich_framework_engine_with_technical(
+    engine: dict,
+    technical: dict | None,
+) -> dict:
+    if not isinstance(engine, dict) or not technical:
+        return engine
+
+    checklist = engine.get("framework_checklist", {}).get("items", [])
+    technical_item = next(
+        (item for item in checklist if item.get("id") == "technical"),
+        None,
+    )
+
+    indicators = technical.get("indicators", {})
+    available_labels = [
+        label
+        for key, label in [
+            ("sma_20", "média móvel de 20 sessões"),
+            ("sma_50", "média móvel de 50 sessões"),
+            ("sma_200", "média móvel de 200 sessões"),
+            ("rsi_14", "RSI 14 sessões"),
+            ("pullback_from_52w_high_percentage", "pullback de 52 semanas"),
+            ("annualized_volatility_percentage", "volatilidade anualizada"),
+            ("maximum_drawdown_percentage", "drawdown histórico"),
+            ("return_1y_percentage", "retorno a 1 ano"),
+        ]
+        if indicators.get(key) is not None
+    ]
+
+    if technical_item:
+        technical_item["status"] = (
+            "available"
+            if technical.get("coverage_percentage", 0) >= 80
+            else "partial"
+        )
+        technical_item["available_data"] = list(dict.fromkeys(
+            technical_item.get("available_data", []) + available_labels
+        ))
+        technical_item["missing_data"] = [
+            value
+            for value in technical_item.get("missing_data", [])
+            if not any(
+                token in value.casefold()
+                for token in (
+                    "pullback", "média", "rsi", "volatil", "máximo", "mínimo"
+                )
+            )
+        ]
+
+    framework = engine.get("framework_checklist", {})
+    if checklist:
+        available_count = sum(
+            1 for item in checklist
+            if item.get("status") in {"available", "partial"}
+        )
+        coverage = round((available_count / len(checklist)) * 100)
+        framework["coverage_percentage"] = coverage
+        framework["confidence"] = (
+            "high" if coverage >= 70 else
+            "moderate" if coverage >= 40 else
+            "low"
+        )
+
+    engine["technical_snapshot"] = technical
+    engine["next_required_data"] = [
+        item
+        for item in engine.get("next_required_data", [])
+        if not any(
+            token in str(item).casefold()
+            for token in (
+                "análise técnica", "pullback", "médias móveis", "rsi"
+            )
+        )
+    ]
+
+    decision = engine.get("decision", {})
+    if decision and technical.get("classification"):
+        decision["technical_context"] = {
+            "score": technical.get("score"),
+            "classification": technical.get("classification"),
+            "pullback_percentage": indicators.get(
+                "pullback_from_52w_high_percentage"
+            ),
+            "rsi_14": indicators.get("rsi_14"),
+        }
+
+    return engine
+
+
+
+FRAMEWORK_ENGINE_VERSION = "0.7"
 
 
 def fact_value(fact):
@@ -5448,6 +6016,29 @@ def build_analysis_payload(
                 "temporariamente indisponível."
             )
 
+    technical = None
+
+    try:
+        technical = get_technical_snapshot(asset)
+        sources["technical"] = analysis_source(
+            "Yahoo Finance via yfinance",
+            "ok",
+            symbol=technical.get("symbol"),
+            as_of=technical.get("as_of"),
+            coverage_percentage=technical.get(
+                "coverage_percentage"
+            ),
+        )
+    except Exception as error:
+        sources["technical"] = analysis_source(
+            "Yahoo Finance via yfinance",
+            "unavailable",
+            detail=str(error),
+        )
+        warnings.append(
+            "A análise técnica está temporariamente indisponível."
+        )
+
     fx = None
     price = asset.get("price")
     currency = asset.get("currency")
@@ -5494,6 +6085,7 @@ def build_analysis_payload(
         "identification",
         "market",
         "fx",
+        "technical",
     ]
 
     if asset.get("asset_type") == "stock":
@@ -5541,6 +6133,7 @@ def build_analysis_payload(
         },
         "fundamentals": fundamentals,
         "etf_profile": etf_profile,
+        "technical": technical,
         "fx": fx,
         "sources": sources,
         "data_quality": {
@@ -5566,7 +6159,339 @@ def build_analysis_payload(
         data_quality=payload["data_quality"],
     )
 
+    payload["framework_engine"] = enrich_framework_engine_with_technical(
+        payload["framework_engine"],
+        technical,
+    )
+
     return payload, 200
+
+
+def resolve_analysis_payload(
+    identifier: str,
+    base_currency: str = "EUR",
+    exchange: str | None = None,
+    ticker: str | None = None,
+) -> tuple[dict, int]:
+    payload, status = build_analysis_payload(
+        identifier,
+        base_currency=base_currency,
+        exchange=exchange,
+        ticker=ticker,
+    )
+
+    if status != 409 or not payload.get("requires_selection"):
+        return payload, status
+
+    options = payload.get("selection_options", [])
+
+    if not options:
+        return payload, status
+
+    preferred_order = {
+        "XETRA": 0,
+        "US": 1,
+        "NYSE": 2,
+        "NASDAQ": 3,
+        "LSE": 4,
+    }
+
+    selected = sorted(
+        options,
+        key=lambda item: (
+            preferred_order.get(
+                str(item.get("exchange_code") or "").upper(),
+                99,
+            ),
+            0 if str(item.get("currency") or "").upper() == "EUR" else 1,
+        ),
+    )[0]
+
+    return build_analysis_payload(
+        identifier,
+        base_currency=base_currency,
+        exchange=selected.get("exchange_code"),
+        ticker=selected.get("ticker"),
+    )
+
+
+def radar_composite_score(payload: dict):
+    engine = payload.get("framework_engine", {})
+    snapshot = engine.get("quantitative_snapshot", {})
+    technical = payload.get("technical") or {}
+    quality_score = finite_number(snapshot.get("score"))
+    technical_score = finite_number(technical.get("score"))
+    source_coverage = finite_number(
+        payload.get("data_quality", {}).get("completeness_percentage")
+    )
+
+    weighted = []
+
+    if quality_score is not None:
+        weighted.append((quality_score, 0.7))
+    if technical_score is not None:
+        weighted.append((technical_score, 0.2))
+    if source_coverage is not None:
+        weighted.append((source_coverage, 0.1))
+
+    if not weighted:
+        return None
+
+    total_weight = sum(weight for _, weight in weighted)
+    return round(sum(value * weight for value, weight in weighted) / total_weight)
+
+
+def radar_status(score, payload):
+    coverage = payload.get("data_quality", {}).get(
+        "completeness_percentage", 0
+    )
+
+    if score is None or coverage < 50:
+        return {
+            "code": "insufficient_data",
+            "label": "Dados insuficientes",
+            "action": "Completar fontes",
+        }
+    if score >= 82:
+        return {
+            "code": "candidate",
+            "label": "Candidata forte",
+            "action": "Análise aprofundada",
+        }
+    if score >= 68:
+        return {
+            "code": "monitor",
+            "label": "Monitorizar",
+            "action": "Rever valuation e entrada",
+        }
+
+    return {
+        "code": "caution",
+        "label": "Baixa prioridade",
+        "action": "Aguardar melhoria",
+    }
+
+
+def radar_result_from_payload(payload: dict) -> dict:
+    asset = payload.get("asset", {})
+    engine = payload.get("framework_engine", {})
+    snapshot = engine.get("quantitative_snapshot", {})
+    technical = payload.get("technical") or {}
+    indicators = technical.get("indicators", {})
+    score = radar_composite_score(payload)
+    status = radar_status(score, payload)
+
+    positives = []
+    warnings = []
+
+    for source in (
+        snapshot.get("positive_signals", []),
+        technical.get("positive_signals", []),
+    ):
+        for item in source:
+            label = item.get("label")
+            if label and label not in positives:
+                positives.append(label)
+
+    for source in (
+        snapshot.get("warning_signals", []),
+        technical.get("warning_signals", []),
+    ):
+        for item in source:
+            label = item.get("label")
+            if label and label not in warnings:
+                warnings.append(label)
+
+    return {
+        "symbol": asset.get("symbol"),
+        "name": asset.get("name"),
+        "asset_type": asset.get("asset_type"),
+        "exchange": asset.get("exchange"),
+        "currency": asset.get("currency"),
+        "price": asset.get("price"),
+        "market_change_percentage": asset.get("change_percentage"),
+        "radar_score": score,
+        "status": status,
+        "quality_score": snapshot.get("score"),
+        "quality_classification": snapshot.get("classification"),
+        "technical_score": technical.get("score"),
+        "technical_classification": technical.get("classification"),
+        "framework_coverage_percentage": engine.get(
+            "framework_checklist", {}
+        ).get("coverage_percentage"),
+        "data_completeness_percentage": payload.get(
+            "data_quality", {}
+        ).get("completeness_percentage"),
+        "pullback_percentage": indicators.get(
+            "pullback_from_52w_high_percentage"
+        ),
+        "rsi_14": indicators.get("rsi_14"),
+        "return_6m_percentage": indicators.get(
+            "return_6m_percentage"
+        ),
+        "volatility_percentage": indicators.get(
+            "annualized_volatility_percentage"
+        ),
+        "positive_reasons": positives[:4],
+        "warning_reasons": warnings[:4],
+        "decision_label": engine.get("decision", {}).get("label"),
+        "analysis_query": payload.get("query"),
+        "analysis_exchange": asset.get("exchange_code"),
+        "analysis_ticker": asset.get("symbol"),
+    }
+
+
+def parse_radar_symbols(
+    universe: str,
+    symbols_value: str | None,
+    limit: int,
+) -> list[str]:
+    if symbols_value:
+        candidates = re.split(r"[,;\s]+", symbols_value.upper())
+        symbols = [
+            symbol
+            for symbol in candidates
+            if re.fullmatch(r"[A-Z0-9.\-]{1,20}", symbol)
+        ]
+    else:
+        symbols = list(
+            RADAR_UNIVERSES.get(universe, RADAR_UNIVERSES["core_us"])
+        )
+
+    unique = []
+    for symbol in symbols:
+        if symbol not in unique:
+            unique.append(symbol)
+
+    return unique[:limit]
+
+
+def build_opportunity_radar(
+    universe: str = "core_us",
+    symbols_value: str | None = None,
+    limit: int = 8,
+) -> dict:
+    symbols = parse_radar_symbols(universe, symbols_value, limit)
+    cache_key = json.dumps(
+        {"universe": universe, "symbols": symbols},
+        sort_keys=True,
+    )
+    cached = RADAR_CACHE.get(cache_key)
+
+    if cached:
+        age = time.time() - cached["created_at"]
+        if age < RADAR_CACHE_TTL_SECONDS:
+            return {**cached["data"], "cached": True}
+
+    results = []
+    errors = []
+
+    def analyze(symbol):
+        return symbol, resolve_analysis_payload(symbol)
+
+    with ThreadPoolExecutor(max_workers=min(4, max(1, len(symbols)))) as executor:
+        futures = {
+            executor.submit(analyze, symbol): symbol
+            for symbol in symbols
+        }
+
+        for future in as_completed(futures):
+            symbol = futures[future]
+            try:
+                _, (payload, status) = future.result()
+                if status == 200:
+                    results.append(radar_result_from_payload(payload))
+                else:
+                    errors.append({
+                        "symbol": symbol,
+                        "status": status,
+                        "error": payload.get("error", "Análise indisponível."),
+                    })
+            except Exception as error:
+                errors.append({
+                    "symbol": symbol,
+                    "status": 500,
+                    "error": str(error),
+                })
+
+    results.sort(
+        key=lambda item: (
+            item.get("radar_score") is not None,
+            item.get("radar_score") or -1,
+            item.get("data_completeness_percentage") or -1,
+        ),
+        reverse=True,
+    )
+
+    data = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "universe": universe,
+        "symbols_requested": symbols,
+        "analysed_count": len(results),
+        "error_count": len(errors),
+        "results": results,
+        "errors": errors,
+        "cached": False,
+        "methodology": {
+            "quality_weight": 0.7,
+            "technical_weight": 0.2,
+            "data_quality_weight": 0.1,
+            "decision_limit": (
+                "O ranking identifica candidatas para análise. "
+                "Não substitui valuation, notícias, carteira ou plano de entrada."
+            ),
+        },
+    }
+
+    RADAR_CACHE[cache_key] = {
+        "created_at": time.time(),
+        "data": data,
+    }
+    return data
+
+
+def build_comparison(
+    left: str,
+    right: str,
+    left_exchange: str | None = None,
+    right_exchange: str | None = None,
+) -> tuple[dict, int]:
+    left_payload, left_status = resolve_analysis_payload(
+        left,
+        exchange=left_exchange,
+    )
+    right_payload, right_status = resolve_analysis_payload(
+        right,
+        exchange=right_exchange,
+    )
+
+    if left_status != 200 or right_status != 200:
+        return {
+            "error": "Não foi possível analisar os dois ativos.",
+            "left_status": left_status,
+            "right_status": right_status,
+            "left": left_payload,
+            "right": right_payload,
+        }, 400
+
+    left_type = left_payload.get("asset", {}).get("asset_type")
+    right_type = right_payload.get("asset", {}).get("asset_type")
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "same_asset_type": left_type == right_type,
+        "warning": (
+            None
+            if left_type == right_type
+            else (
+                "Os ativos pertencem a categorias diferentes. "
+                "As métricas devem ser interpretadas separadamente."
+            )
+        ),
+        "left": left_payload,
+        "right": right_payload,
+    }, 200
+
 
 
 class ThesisOSHandler(SimpleHTTPRequestHandler):
@@ -5604,6 +6529,7 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
                         "EODHD",
                         "SEC EDGAR",
                         "ECB Data Portal",
+                        "Yahoo Finance via yfinance",
                     ],
                 }
             )
@@ -5611,6 +6537,18 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
 
         if parsed_url.path.startswith("/api/analysis/"):
             self.handle_analysis_request(parsed_url)
+            return
+
+        if parsed_url.path == "/api/radar":
+            self.handle_radar_request(parsed_url)
+            return
+
+        if parsed_url.path == "/api/compare":
+            self.handle_compare_request(parsed_url)
+            return
+
+        if parsed_url.path.startswith("/api/technical/"):
+            self.handle_technical_request(parsed_url)
             return
 
         if parsed_url.path.startswith("/api/fx/"):
@@ -5630,6 +6568,87 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             return
 
         super().do_GET()
+
+    def handle_radar_request(self, parsed_url) -> None:
+        query = parse_qs(parsed_url.query)
+        universe = query.get("universe", ["core_us"])[0]
+        symbols_value = query.get("symbols", [None])[0]
+
+        try:
+            limit = int(query.get("limit", ["8"])[0])
+        except ValueError:
+            limit = 8
+
+        limit = max(1, min(limit, 15))
+
+        try:
+            payload = build_opportunity_radar(
+                universe=universe,
+                symbols_value=symbols_value,
+                limit=limit,
+            )
+            self.send_json(payload)
+        except Exception as error:
+            self.send_json(
+                {
+                    "error": "Erro ao executar o Opportunity Radar.",
+                    "detail": str(error),
+                },
+                status=500,
+            )
+
+    def handle_compare_request(self, parsed_url) -> None:
+        query = parse_qs(parsed_url.query)
+        left = query.get("left", [""])[0].strip().upper()
+        right = query.get("right", [""])[0].strip().upper()
+
+        if not left or not right:
+            self.send_json(
+                {"error": "Indica os dois ativos a comparar."},
+                status=400,
+            )
+            return
+
+        try:
+            payload, status = build_comparison(
+                left,
+                right,
+                left_exchange=query.get("left_exchange", [None])[0],
+                right_exchange=query.get("right_exchange", [None])[0],
+            )
+            self.send_json(payload, status=status)
+        except Exception as error:
+            self.send_json(
+                {
+                    "error": "Erro ao comparar os ativos.",
+                    "detail": str(error),
+                },
+                status=500,
+            )
+
+    def handle_technical_request(self, parsed_url) -> None:
+        identifier = unquote(
+            parsed_url.path.removeprefix("/api/technical/")
+        ).strip().upper()
+
+        if not identifier:
+            self.send_json({"error": "Identificador inválido."}, status=400)
+            return
+
+        try:
+            payload, status = resolve_analysis_payload(identifier)
+            if status != 200:
+                self.send_json(payload, status=status)
+                return
+            self.send_json(payload.get("technical") or {})
+        except Exception as error:
+            self.send_json(
+                {
+                    "error": "Erro ao calcular análise técnica.",
+                    "detail": str(error),
+                },
+                status=500,
+            )
 
     def handle_analysis_request(self, parsed_url) -> None:
         identifier = unquote(
@@ -6091,15 +7110,21 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             )
 
 
-server = ThreadingHTTPServer(
-    (HOST, PORT),
-    ThesisOSHandler,
-)
+def run_server():
+    server = ThreadingHTTPServer(
+        (HOST, PORT),
+        ThesisOSHandler,
+    )
 
-print(f"ThesisOS disponível na porta {PORT}")
+    print(f"ThesisOS disponível na porta {PORT}")
 
-try:
-    server.serve_forever()
-except KeyboardInterrupt:
-    print("\nServidor encerrado.")
-    server.server_close()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nServidor encerrado.")
+    finally:
+        server.server_close()
+
+
+if __name__ == "__main__":
+    run_server()
