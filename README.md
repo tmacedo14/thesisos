@@ -13,6 +13,7 @@ ThesisOS is a functional academic prototype for evidence-based investment analys
 - Technical Engine using Yahoo Finance history through `yfinance`: moving averages, RSI, returns, pullback, volatility and drawdown.
 - Automated Opportunity Radar for configurable universes and the browser watchlist.
 - Persistent local watchlist.
+- Functional local Portfolio Manager with transactions, current prices, average monitoring cost, P&L, target weights, contribution optimisation and CSV import/export.
 - Stock-to-stock and ETF-to-ETF comparison.
 - Printable analysis that can be saved as PDF from the browser.
 
@@ -70,13 +71,14 @@ python3 server.py
 3. Open **Opportunity Radar** and execute the Core US universe.
 4. Add an asset to **Watchlist**.
 5. Compare `MSFT` with `AAPL`.
-6. In an analysis, choose **Imprimir / PDF**.
+6. Add AAPL or VWCE to **My Portfolio**, refresh prices and calculate the next contribution.
+7. In an analysis, choose **Imprimir / PDF**.
 
 ## Architecture and safety
 
 - All API keys stay server-side in environment variables.
 - The browser never receives broker credentials.
-- The watchlist is stored only in browser `localStorage`.
+- The watchlist and portfolio transactions are stored only in browser `localStorage`.
 - No trading orders are created or sent.
 - Provider failures produce explicit unavailable states rather than fabricated values.
 - In-memory caches reduce repeated calls and rate-limit pressure.
@@ -86,7 +88,7 @@ python3 server.py
 - Yahoo Finance access through `yfinance` is unofficial and can occasionally be unavailable.
 - The Radar scans configured universes, not every listed security worldwide.
 - Deep official ETF adapters are issuer/product specific; the current full example is Vanguard FTSE All-World UCITS ETF.
-- Valuation scenarios, live news, portfolio overlap and broker synchronisation remain future work.
+- Full tax accounting, historical FX, live news, portfolio overlap look-through and broker synchronisation remain future work.
 - XTB no longer provides a public trading API; IBKR integration would require a separately authenticated local gateway and is intentionally outside this Replit prototype.
 
 ## Disclaimer
