@@ -3190,7 +3190,7 @@ def analysis_source(
 
 
 
-FRAMEWORK_ENGINE_VERSION = "0.5"
+FRAMEWORK_ENGINE_VERSION = "0.6"
 
 
 def fact_value(fact):
@@ -4162,6 +4162,308 @@ def build_stock_framework_engine(
     }
 
 
+def classify_etf_structural_score(score):
+    if score is None:
+        return {
+            "code": "insufficient_data",
+            "label": "Dados insuficientes",
+        }
+
+    if score >= 85:
+        return {
+            "code": "very_strong_etf_structure",
+            "label": "Estrutura muito forte",
+        }
+
+    if score >= 70:
+        return {
+            "code": "strong_etf_structure",
+            "label": "Estrutura forte",
+        }
+
+    if score >= 55:
+        return {
+            "code": "reasonable_etf_structure",
+            "label": "Estrutura razoável",
+        }
+
+    if score >= 40:
+        return {
+            "code": "weak_etf_structure",
+            "label": "Estrutura frágil",
+        }
+
+    return {
+        "code": "insufficient_etf_structure",
+        "label": "Estrutura insuficiente",
+    }
+
+
+def evaluate_etf_cost_rule(value):
+    if value is None:
+        return unavailable_rule(
+            "etf_ongoing_charges",
+            "costs",
+            "OCF/TER oficial",
+            "%",
+            20,
+            "Official issuer documents",
+        )
+
+    if value <= 0.15:
+        points, status, text = 20, "strong", "Custo anual muito reduzido."
+    elif value <= 0.25:
+        points, status, text = 18, "positive", "Custo anual reduzido."
+    elif value <= 0.40:
+        points, status, text = 14, "neutral", "Custo anual moderado."
+    elif value <= 0.60:
+        points, status, text = 8, "watch", "Custo anual acima da média de ETFs simples."
+    else:
+        points, status, text = 2, "warning", "Custo anual elevado."
+
+    return rule_result(
+        "etf_ongoing_charges",
+        "costs",
+        "OCF/TER oficial",
+        value,
+        "%",
+        points,
+        20,
+        status,
+        text,
+        "Official issuer documents",
+    )
+
+
+def evaluate_etf_tracking_rule(value):
+    if value is None:
+        return unavailable_rule(
+            "etf_tracking_error_5y",
+            "tracking",
+            "Tracking error a 5 anos",
+            "%",
+            20,
+            "Official issuer documents",
+        )
+
+    if value <= 0.10:
+        points, status, text = 20, "strong", "Tracking histórico muito próximo do índice."
+    elif value <= 0.20:
+        points, status, text = 17, "positive", "Tracking histórico eficiente."
+    elif value <= 0.40:
+        points, status, text = 12, "neutral", "Tracking histórico aceitável."
+    elif value <= 0.75:
+        points, status, text = 6, "watch", "Tracking error material."
+    else:
+        points, status, text = 1, "warning", "Tracking error elevado."
+
+    return rule_result(
+        "etf_tracking_error_5y",
+        "tracking",
+        "Tracking error a 5 anos",
+        value,
+        "%",
+        points,
+        20,
+        status,
+        text,
+        "Official issuer documents",
+    )
+
+
+def evaluate_etf_positions_rule(value):
+    if value is None:
+        return unavailable_rule(
+            "etf_number_of_positions",
+            "diversification",
+            "Número de posições",
+            "",
+            15,
+            "Official issuer documents",
+        )
+
+    if value >= 1000:
+        points, status, text = 15, "strong", "Diversificação nominal muito elevada."
+    elif value >= 500:
+        points, status, text = 13, "positive", "Diversificação nominal elevada."
+    elif value >= 100:
+        points, status, text = 9, "neutral", "Diversificação nominal razoável."
+    elif value >= 50:
+        points, status, text = 5, "watch", "Número de posições relativamente reduzido."
+    else:
+        points, status, text = 2, "warning", "ETF concentrado em poucas posições."
+
+    return rule_result(
+        "etf_number_of_positions",
+        "diversification",
+        "Número de posições",
+        value,
+        "",
+        points,
+        15,
+        status,
+        text,
+        "Official issuer documents",
+    )
+
+
+def evaluate_etf_top10_rule(value):
+    if value is None:
+        return unavailable_rule(
+            "etf_top10_concentration",
+            "concentration",
+            "Peso das 10 maiores posições",
+            "%",
+            10,
+            "Official issuer documents + ThesisOS calculation",
+        )
+
+    if value <= 20:
+        points, status, text = 10, "strong", "Concentração reduzida nas maiores posições."
+    elif value <= 30:
+        points, status, text = 8, "positive", "Concentração moderada nas maiores posições."
+    elif value <= 40:
+        points, status, text = 6, "neutral", "Concentração relevante nas maiores posições."
+    elif value <= 55:
+        points, status, text = 3, "watch", "Top 10 com peso elevado."
+    else:
+        points, status, text = 0, "warning", "Top 10 excessivamente concentrado."
+
+    return rule_result(
+        "etf_top10_concentration",
+        "concentration",
+        "Peso das 10 maiores posições",
+        value,
+        "%",
+        points,
+        10,
+        status,
+        text,
+        "Official issuer documents + ThesisOS calculation",
+    )
+
+
+def evaluate_etf_country_concentration_rule(value):
+    if value is None:
+        return unavailable_rule(
+            "etf_largest_country",
+            "concentration",
+            "Peso do maior país",
+            "%",
+            10,
+            "Official issuer documents",
+        )
+
+    if value <= 35:
+        points, status, text = 10, "strong", "Exposição geográfica muito distribuída."
+    elif value <= 50:
+        points, status, text = 8, "positive", "Exposição geográfica equilibrada."
+    elif value <= 65:
+        points, status, text = 5, "watch", "Existe concentração material no maior país."
+    elif value <= 80:
+        points, status, text = 2, "watch", "Concentração geográfica elevada."
+    else:
+        points, status, text = 0, "warning", "Concentração geográfica muito elevada."
+
+    return rule_result(
+        "etf_largest_country",
+        "concentration",
+        "Peso do maior país",
+        value,
+        "%",
+        points,
+        10,
+        status,
+        text,
+        "Official issuer documents",
+    )
+
+
+def evaluate_etf_sector_concentration_rule(value, sector_name):
+    if value is None:
+        return unavailable_rule(
+            "etf_largest_sector",
+            "concentration",
+            "Peso do maior setor",
+            "%",
+            10,
+            "Official issuer documents",
+        )
+
+    if value <= 20:
+        points, status, text = 10, "strong", "Exposição setorial muito distribuída."
+    elif value <= 30:
+        points, status, text = 8, "positive", "Exposição setorial equilibrada."
+    elif value <= 40:
+        points, status, text = 5, "watch", "Existe concentração material no maior setor."
+    elif value <= 50:
+        points, status, text = 2, "watch", "Concentração setorial elevada."
+    else:
+        points, status, text = 0, "warning", "Concentração setorial muito elevada."
+
+    label = (
+        f"Maior setor — {sector_name}"
+        if sector_name
+        else "Peso do maior setor"
+    )
+
+    return rule_result(
+        "etf_largest_sector",
+        "concentration",
+        label,
+        value,
+        "%",
+        points,
+        10,
+        status,
+        text,
+        "Official issuer documents",
+    )
+
+
+def evaluate_etf_structure_rule(profile):
+    checks = [
+        bool(profile.get("benchmark")),
+        bool(profile.get("factsheet_url")),
+        bool(profile.get("kiid_url")),
+        bool(profile.get("total_assets") or profile.get("share_class_assets")),
+        bool(profile.get("investment_method")),
+        bool(profile.get("domicile")),
+        bool(profile.get("share_class_inception") or profile.get("listing_date")),
+    ]
+
+    weights = [3, 2, 2, 3, 2, 1, 2]
+    points = sum(
+        weight
+        for available, weight in zip(checks, weights)
+        if available
+    )
+
+    if points >= 13:
+        status, text = "strong", "Estrutura e documentação oficial muito completas."
+    elif points >= 10:
+        status, text = "positive", "Estrutura e documentação oficial sólidas."
+    elif points >= 7:
+        status, text = "neutral", "Estrutura parcialmente documentada."
+    elif points >= 4:
+        status, text = "watch", "Faltam elementos estruturais importantes."
+    else:
+        status, text = "warning", "Estrutura insuficientemente documentada."
+
+    return rule_result(
+        "etf_structure_documentation",
+        "structure",
+        "Estrutura e documentação",
+        f"{points}/15",
+        "",
+        points,
+        15,
+        status,
+        text,
+        "Official issuer documents + ThesisOS checks",
+    )
+
+
 def build_etf_framework_engine(
     asset: dict,
     etf_profile: dict | None,
@@ -4497,6 +4799,101 @@ def build_etf_framework_engine(
 
     profile_available = bool(etf_profile)
 
+    etf_rules = [
+        evaluate_etf_cost_rule(ongoing_charges),
+        evaluate_etf_tracking_rule(
+            tracking_error.get("five_year_percentage")
+        ),
+        evaluate_etf_positions_rule(
+            etf_profile.get("number_of_stocks")
+        ),
+        evaluate_etf_top10_rule(
+            concentration.get("top_10_weight_percentage")
+        ),
+        evaluate_etf_country_concentration_rule(
+            concentration.get("largest_country_percentage")
+        ),
+        evaluate_etf_sector_concentration_rule(
+            largest_sector.get("weight_percentage"),
+            largest_sector.get("sector"),
+        ),
+        evaluate_etf_structure_rule(etf_profile),
+    ] if profile_available else []
+
+    etf_available_rules = [
+        rule
+        for rule in etf_rules
+        if rule["status"] != "unavailable"
+    ]
+
+    etf_achieved_points = sum(
+        rule["points"]
+        for rule in etf_available_rules
+    )
+
+    etf_available_max_points = sum(
+        rule["max_points"]
+        for rule in etf_available_rules
+    )
+
+    etf_total_max_points = sum(
+        rule["max_points"]
+        for rule in etf_rules
+    )
+
+    etf_structural_score = None
+
+    if etf_available_max_points:
+        etf_structural_score = round(
+            (
+                etf_achieved_points
+                / etf_available_max_points
+            )
+            * 100
+        )
+
+    etf_structural_coverage = (
+        round(
+            (
+                etf_available_max_points
+                / etf_total_max_points
+            )
+            * 100
+        )
+        if etf_total_max_points
+        else 0
+    )
+
+    etf_structural_classification = (
+        classify_etf_structural_score(
+            etf_structural_score
+        )
+    )
+
+    etf_positive_signals = [
+        {
+            "rule_id": rule["id"],
+            "label": rule["label"],
+            "value": rule["value"],
+            "unit": rule["unit"],
+            "interpretation": rule["interpretation"],
+        }
+        for rule in etf_rules
+        if rule["status"] in {"strong", "positive"}
+    ]
+
+    etf_warning_signals = [
+        {
+            "rule_id": rule["id"],
+            "label": rule["label"],
+            "value": rule["value"],
+            "unit": rule["unit"],
+            "interpretation": rule["interpretation"],
+        }
+        for rule in etf_rules
+        if rule["status"] in {"watch", "warning"}
+    ]
+
     checklist = [
         framework_item(
             "asset_identity",
@@ -4635,8 +5032,8 @@ def build_etf_framework_engine(
         "scope": (
             (
                 "Identificação, preço, moeda, composição, custos, "
-                "alocação setorial, tracking error, concentração e "
-                "valuation agregado já estão parcialmente ligados. "
+                "alocação setorial, tracking error, concentração, "
+                "valuation agregado e score estrutural já estão ligados. "
                 "Tracking difference, liquidez, análise técnica e "
                 "carteira continuam incompletos."
             )
@@ -4674,162 +5071,12 @@ def build_etf_framework_engine(
             },
         ],
         "quantitative_snapshot": {
-            "score": None,
-            "classification": {
-                "code": (
-                    "partial_etf_profile"
-                    if profile_available
-                    else "insufficient_data"
-                ),
-                "label": (
-                    "Perfil estrutural parcial"
-                    if profile_available
-                    else "Dados insuficientes"
-                ),
-            },
-            "coverage_percentage": (
-                etf_profile.get("coverage", {}).get(
-                    "percentage",
-                    0,
-                )
-                if profile_available
-                else 0
-            ),
-            "rules": [],
-            "positive_signals": [
-                signal
-                for signal in [
-                    (
-                        {
-                            "label": "Tracking error a 5 anos",
-                            "value": tracking_error.get(
-                                "five_year_percentage"
-                            ),
-                            "unit": "%",
-                            "interpretation": (
-                                "Desvio histórico reduzido face "
-                                "ao benchmark."
-                            ),
-                        }
-                        if tracking_error.get(
-                            "five_year_percentage"
-                        ) is not None
-                        else None
-                    ),
-                    (
-                        {
-                            "label": "OCF/TER oficial",
-                            "value": ongoing_charges,
-                            "unit": "%",
-                            "interpretation": (
-                                "Custo anual reduzido para um ETF "
-                                "global e amplamente diversificado."
-                            ),
-                        }
-                        if ongoing_charges is not None
-                        and ongoing_charges <= 0.25
-                        else None
-                    ),
-                    (
-                        {
-                            "label": "Número de posições",
-                            "value": etf_profile.get(
-                                "number_of_stocks"
-                            ),
-                            "unit": "",
-                            "interpretation": (
-                                "Elevada diversificação nominal "
-                                "do fundo."
-                            ),
-                        }
-                        if isinstance(
-                            etf_profile.get(
-                                "number_of_stocks"
-                            ),
-                            (int, float),
-                        )
-                        else None
-                    ),
-                    (
-                        {
-                            "label": "Peso do top 10",
-                            "value": concentration.get(
-                                "top_10_weight_percentage"
-                            ),
-                            "unit": "%",
-                            "interpretation": (
-                                "A concentração nas maiores "
-                                "posições permanece moderada."
-                            ),
-                        }
-                        if concentration.get(
-                            "top_10_weight_percentage"
-                        ) is not None
-                        else None
-                    ),
-                ]
-                if signal
-            ],
-            "warning_signals": [
-                signal
-                for signal in [
-                    (
-                        {
-                            "label": "Maior país",
-                            "value": concentration.get(
-                                "largest_country_percentage"
-                            ),
-                            "unit": "%",
-                            "interpretation": (
-                                "A exposição geográfica está "
-                                "fortemente concentrada nos EUA."
-                            ),
-                        }
-                        if concentration.get(
-                            "largest_country_percentage"
-                        ) is not None
-                        else None
-                    ),
-                    (
-                        {
-                            "label": (
-                                largest_sector.get("sector")
-                                or "Maior setor"
-                            ),
-                            "value": largest_sector.get(
-                                "weight_percentage"
-                            ),
-                            "unit": "%",
-                            "interpretation": (
-                                "A exposição setorial está concentrada "
-                                "e deve ser considerada no overlap da "
-                                "carteira."
-                            ),
-                        }
-                        if largest_sector.get(
-                            "weight_percentage"
-                        ) is not None
-                        and largest_sector.get(
-                            "weight_percentage"
-                        ) >= 30
-                        else None
-                    ),
-                    (
-                        {
-                            "label": "TER/OCF",
-                            "value": None,
-                            "unit": "",
-                            "interpretation": (
-                                "O custo oficial ainda não foi "
-                                "extraído com segurança."
-                            ),
-                        }
-                        if not etf_profile.get("ocf_ter")
-                        else None
-                    ),
-                ]
-                if signal
-            ],
+            "score": etf_structural_score,
+            "classification": etf_structural_classification,
+            "coverage_percentage": etf_structural_coverage,
+            "rules": etf_rules,
+            "positive_signals": etf_positive_signals,
+            "warning_signals": etf_warning_signals,
             "etf_metrics": {
                 "tracking_error": tracking_error,
                 "characteristics": characteristics,
@@ -4842,9 +5089,10 @@ def build_etf_framework_engine(
                 "largest_sector": largest_sector,
             },
             "methodology_note": (
-                "O ThesisOS não aplica um score empresarial a ETFs. "
-                "Os sinais representam estrutura, diversificação, "
-                "tracking e concentração, não uma recomendação final."
+                "Score estrutural de ETF baseado em custos, tracking, "
+                "diversificação, concentração, estrutura e qualidade "
+                "documental. Não avalia o momento de compra, retorno "
+                "esperado nem o encaixe na carteira."
             ),
         },
         "framework_checklist": {
