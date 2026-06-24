@@ -1483,6 +1483,24 @@
     @media(max-width:1100px){.construction-layout,.stress-grid{grid-template-columns:1fr}.construction-kpis{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:720px){.construction-kpis,.construction-form-grid,.construction-policy-summary,.stress-input-grid,.stress-result-grid,.position-sim-grid,.position-sim-results{grid-template-columns:1fr}.construction-actions{width:100%}.construction-actions button{flex:1}.construction-plan-row{grid-template-columns:1fr 90px}.construction-plan-row small{grid-column:1/-1}.stress-bar-row{grid-template-columns:90px 1fr 55px}}
 
+  
+    /* ThesisOS secure Supabase persistence */
+    .cloud-sync-card{margin-top:16px}
+    .cloud-sync-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+    .cloud-sync-layout{display:grid;grid-template-columns:minmax(280px,.75fr) minmax(0,1.25fr);gap:14px;margin-top:14px}
+    .cloud-sync-auth,.cloud-sync-state{padding:15px;border:1px solid #263a59;border-radius:14px;background:#101b2d}
+    .cloud-sync-form{display:grid;grid-template-columns:1fr auto;gap:9px;align-items:end;margin-top:12px}
+    .cloud-sync-form input{margin:0}
+    .cloud-sync-buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .cloud-sync-status-list{display:grid;gap:8px;margin-top:12px}
+    .cloud-sync-status-row{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid #22344d;border-radius:10px;background:#0f1a2c;font-size:12px}
+    .cloud-sync-status-row span{color:var(--muted)}
+    .cloud-sync-toggle{display:flex;gap:9px;align-items:flex-start;margin-top:12px;color:#b8c5d8;font-size:12px}
+    .cloud-sync-toggle input{width:auto;margin:2px 0 0}
+    .cloud-sync-message{margin-top:12px;padding:11px 12px;border:1px solid #304968;border-radius:11px;background:#132139;color:#c4d2e7;font-size:12px;line-height:1.5}
+    .cloud-sync-message.warn{border-color:#6a4f25;background:#2c2417}.cloud-sync-message.bad{border-color:#6a3340;background:#2b1d24}
+    @media(max-width:850px){.cloud-sync-layout{grid-template-columns:1fr}.cloud-sync-form{grid-template-columns:1fr}}
+
   </style>
 </head>
 <body>
@@ -2553,7 +2571,7 @@
       <div class="hero"><div><h1>Watchlist</h1><p class="sub">Ativos guardados localmente neste navegador e disponíveis para o Opportunity Radar.</p></div><div class="page-action-row"><span class="freshness" id="watchlistCountLabel">0 ativos</span><button class="primary" id="watchlistRadarBtn" type="button">Analisar no Radar</button></div></div>
       <div class="card">
         <div class="watchlist-add-row"><input id="watchlistTickerInput" placeholder="Adicionar ticker, por exemplo MSFT" /><button class="primary" id="watchlistAddTickerBtn" type="button">Analisar e adicionar</button></div>
-        <div class="logic-note">A watchlist é guardada em localStorage. Não são guardadas credenciais, ordens ou dados bancários.</div>
+        <div class="logic-note">A watchlist usa localStorage como cache e pode ser sincronizada com Supabase quando o Cloud Sync está configurado. Não são guardadas credenciais de corretora, ordens ou dados bancários.</div>
       </div>
       <div class="grid g3" id="watchlistCards" style="margin-top:16px"></div>
       <div class="radar-empty" id="watchlistEmpty">A watchlist está vazia. Adiciona um ativo a partir da análise ou do Radar.</div>
@@ -2662,7 +2680,7 @@
         </div>
       </div>
       <div class="sync-strip" id="portfolioSyncStrip">
-        <div class="sync-left"><div class="sync-icon">↻</div><div><strong>Carteira consolidada no navegador</strong><small id="portfolioSyncText">As transações ficam em localStorage; as cotações vêm das APIs já ligadas.</small></div></div>
+        <div class="sync-left"><div class="sync-icon">↻</div><div><strong>Carteira consolidada no navegador</strong><small id="portfolioSyncText">As transações usam localStorage como cache e podem ser persistidas na Supabase; as cotações vêm das APIs já ligadas.</small></div></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="freshness warn" id="portfolioUpdated">Ainda não atualizada</span><button class="link-btn" id="portfolioRefreshBtn" type="button">Atualizar preços</button><button class="danger-btn" id="portfolioClearBtn" type="button">Limpar</button></div>
       </div>
       <div class="portfolio-kpi-grid">
@@ -2803,6 +2821,33 @@
           <div class="policy-status-list" style="margin-top:14px" id="policyAllocationStatus"></div>
         </div>
       </div>
+      <section class="card cloud-sync-card" id="cloudSyncCard">
+        <div class="cloud-sync-head">
+          <div><h2 style="margin:0 0 6px">Cloud Sync · Supabase</h2><p class="sub">Persistência opcional e segura para carteira, Journal, alertas, política, planos, Radar e Evidence Feed.</p></div>
+          <span class="freshness warn" id="cloudSyncBadge">A verificar</span>
+        </div>
+        <div class="cloud-sync-layout">
+          <div class="cloud-sync-auth">
+            <h3>Autenticação do workspace</h3>
+            <p class="sub" style="font-size:12px;margin-top:6px">A chave da Supabase permanece no servidor. O navegador recebe apenas um cookie de sessão HttpOnly.</p>
+            <div class="cloud-sync-form"><input id="cloudSyncPassword" type="password" autocomplete="current-password" placeholder="Palavra-passe do Cloud Sync"><button class="primary" id="cloudSyncLoginBtn" type="button">Entrar</button></div>
+            <div class="cloud-sync-buttons"><button class="ghost" id="cloudSyncLogoutBtn" type="button">Terminar sessão</button><button class="ghost" id="cloudSyncRefreshBtn" type="button">Verificar estado</button></div>
+            <label class="cloud-sync-toggle"><input id="cloudSyncAuto" type="checkbox"><span>Sincronizar automaticamente depois de cada alteração local, após escolher a origem inicial dos dados.</span></label>
+          </div>
+          <div class="cloud-sync-state">
+            <h3>Estado e controlo de conflitos</h3>
+            <div class="cloud-sync-status-list">
+              <div class="cloud-sync-status-row"><span>Configuração</span><strong id="cloudSyncConfigured">A verificar</strong></div>
+              <div class="cloud-sync-status-row"><span>Sessão</span><strong id="cloudSyncSession">Desligada</strong></div>
+              <div class="cloud-sync-status-row"><span>Workspace</span><strong id="cloudSyncWorkspace">—</strong></div>
+              <div class="cloud-sync-status-row"><span>Última sincronização</span><strong id="cloudSyncLastSync">Nunca</strong></div>
+              <div class="cloud-sync-status-row"><span>Dados cloud</span><strong id="cloudSyncRows">—</strong></div>
+            </div>
+            <div class="cloud-sync-buttons"><button class="primary" id="cloudSyncPushBtn" type="button">Enviar dados locais</button><button class="ghost" id="cloudSyncPullBtn" type="button">Restaurar da cloud</button></div>
+            <div class="cloud-sync-message" id="cloudSyncMessage">O localStorage continua a funcionar como cache e fallback offline. Na primeira ligação, escolhe explicitamente qual cópia deve prevalecer quando existirem dados dos dois lados.</div>
+          </div>
+        </div>
+      </section>
     </section>
 
     <p class="prototype-note">ThesisOS Preview V4 · dados, custos e recomendações demonstrativos · sem execução de ordens ou aconselhamento fiscal.</p>
@@ -2856,7 +2901,7 @@
 
 <div class="portfolio-modal-overlay" id="portfolioTransactionModal" aria-hidden="true">
   <section class="portfolio-modal" role="dialog" aria-modal="true" aria-labelledby="portfolioTransactionTitle">
-    <div class="portfolio-modal-head"><div><h2 id="portfolioTransactionTitle">Registar transação</h2><p class="sub">Os dados ficam apenas neste navegador.</p></div><button class="portfolio-modal-close" id="portfolioTransactionClose" type="button" aria-label="Fechar">×</button></div>
+    <div class="portfolio-modal-head"><div><h2 id="portfolioTransactionTitle">Registar transação</h2><p class="sub">Os dados ficam neste navegador e podem ser sincronizados com a Supabase quando o Cloud Sync estiver ativo.</p></div><button class="portfolio-modal-close" id="portfolioTransactionClose" type="button" aria-label="Fechar">×</button></div>
     <form class="portfolio-modal-body" id="portfolioTransactionForm">
       <div class="form-grid">
         <label>Tipo<select id="portfolioTxType"><option value="BUY">Compra</option><option value="SELL">Venda</option><option value="DIVIDEND">Dividendo</option><option value="DEPOSIT">Depósito</option><option value="WITHDRAWAL">Levantamento</option></select></label>
@@ -6259,7 +6304,7 @@
   function getWatchlist(){
     try{return JSON.parse(localStorage.getItem(WATCHLIST_KEY) || "[]");}catch{return [];}
   }
-  function saveWatchlist(items){localStorage.setItem(WATCHLIST_KEY,JSON.stringify(items));updateWatchlistCount();renderLiveDashboard();}
+  function saveWatchlist(items){localStorage.setItem(WATCHLIST_KEY,JSON.stringify(items));cloudSchedulePush();updateWatchlistCount();renderLiveDashboard();}
   function updateWatchlistCount(){
     const count=getWatchlist().length;
     if($("#watchlistNavCount")) $("#watchlistNavCount").textContent=count;
@@ -6307,7 +6352,7 @@
     if(force) params.set("refresh",Date.now());
     $("#radarLoading").hidden=false;$("#dynamicRadarCards").innerHTML="";$("#dynamicRadarEmpty").style.display="none";$("#radarStatusTitle").textContent="Radar em execução";$("#radarStatusDetail").textContent="A recolher dados, calcular scores e ordenar candidatas.";
     try{
-      const response=await fetch(`/api/radar?${params}`);const data=await response.json();if(!response.ok) throw new Error(data.detail||data.error||"Erro no Radar");window.lastRadarData=data;try{localStorage.setItem(DASHBOARD_RADAR_KEY,JSON.stringify(data));}catch{}renderRadarResults(data);renderLiveDashboard();$("#radarUpdated").textContent=`Atualizado ${formatAssetDate(data.generated_at)}${data.cached?" · cache":""}`;$("#radarCoverage").textContent=`${data.analysed_count} analisados · ${data.error_count} erros`;$("#radarStatusTitle").textContent="Ranking concluído";$("#radarStatusDetail").textContent=data.methodology?.decision_limit || "Candidatas identificadas para análise aprofundada.";
+      const response=await fetch(`/api/radar?${params}`);const data=await response.json();if(!response.ok) throw new Error(data.detail||data.error||"Erro no Radar");window.lastRadarData=data;try{localStorage.setItem(DASHBOARD_RADAR_KEY,JSON.stringify(data));cloudSchedulePush();}catch{}renderRadarResults(data);renderLiveDashboard();$("#radarUpdated").textContent=`Atualizado ${formatAssetDate(data.generated_at)}${data.cached?" · cache":""}`;$("#radarCoverage").textContent=`${data.analysed_count} analisados · ${data.error_count} erros`;$("#radarStatusTitle").textContent="Ranking concluído";$("#radarStatusDetail").textContent=data.methodology?.decision_limit || "Candidatas identificadas para análise aprofundada.";
     }catch(error){$("#radarStatusTitle").textContent="Radar indisponível";$("#radarStatusDetail").textContent=error.message;$("#dynamicRadarEmpty").textContent="Não foi possível executar o Radar.";$("#dynamicRadarEmpty").style.display="block";showToast(error.message);}finally{$("#radarLoading").hidden=true;}
   }
   function sortedRadarResults(results){
@@ -6428,7 +6473,7 @@
   const PORTFOLIO_TX_KEY="thesisos_portfolio_transactions_v1";
   const PORTFOLIO_QUOTES_KEY="thesisos_portfolio_quotes_v1";
   function portfolioRead(key,fallback){try{return JSON.parse(localStorage.getItem(key)||JSON.stringify(fallback));}catch{return fallback;}}
-  function portfolioWrite(key,value){localStorage.setItem(key,JSON.stringify(value));}
+  function portfolioWrite(key,value){localStorage.setItem(key,JSON.stringify(value));cloudSchedulePush();}
   function getPortfolioTransactions(){return portfolioRead(PORTFOLIO_TX_KEY,[]);}
   function savePortfolioTransactions(items){portfolioWrite(PORTFOLIO_TX_KEY,items);renderPortfolioManager();renderLiveDashboard();}
   function getPortfolioQuotes(){return portfolioRead(PORTFOLIO_QUOTES_KEY,{});}
@@ -6472,7 +6517,7 @@
 
   $("#portfolioAddTransactionBtn")?.addEventListener("click",()=>portfolioOpenModal());$("#portfolioTransactionClose")?.addEventListener("click",portfolioCloseModal);$("#portfolioTransactionCancel")?.addEventListener("click",portfolioCloseModal);$("#portfolioTransactionModal")?.addEventListener("click",e=>{if(e.target.id==="portfolioTransactionModal")portfolioCloseModal();});$("#portfolioTxType")?.addEventListener("change",portfolioUpdateModalFields);
   $("#portfolioTransactionForm")?.addEventListener("submit",e=>{e.preventDefault();const type=$("#portfolioTxType").value,cash=["DEPOSIT","WITHDRAWAL"].includes(type),trade=["BUY","SELL"].includes(type),symbol=$("#portfolioTxSymbol").value.trim().toUpperCase(),quantity=Number($("#portfolioTxQuantity").value)||0,total=Number($("#portfolioTxTotalEur").value)||0;if(!cash&&!symbol){showToast("Indica o ticker do ativo.");return;}if(trade&&quantity<=0){showToast("Indica uma quantidade válida.");return;}if(type==="SELL"){const held=portfolioSnapshot().positions.find(item=>item.key===portfolioKey(symbol,$("#portfolioTxExchange").value.trim().toUpperCase()))?.quantity||0;if(quantity>held+0.0000001){showToast(`A venda excede a quantidade disponível (${portfolioNumber(held,6)}).`);return;}}if(total<=0){showToast("Indica o total da operação em EUR.");return;}const tx={id:portfolioId(),type,date:$("#portfolioTxDate").value||portfolioToday(),symbol,name:$("#portfolioTxName").value.trim()||symbol,exchange:$("#portfolioTxExchange").value.trim().toUpperCase(),ticker:symbol,asset_type:$("#portfolioTxAssetType").value,currency:$("#portfolioTxCurrency").value.trim().toUpperCase()||"EUR",quantity,unit_price:Number($("#portfolioTxUnitPrice").value)||0,total_eur:total,fee_eur:Number($("#portfolioTxFeeEur").value)||0,category:$("#portfolioTxCategory").value,target_weight:Number($("#portfolioTxTargetWeight").value)||0,note:$("#portfolioTxNote").value.trim()};savePortfolioTransactions([...getPortfolioTransactions(),tx]);portfolioCloseModal();showToast("Transação guardada.");});
-  $("#portfolioRefreshBtn")?.addEventListener("click",portfolioRefreshQuotes);$("#portfolioContributionBtn")?.addEventListener("click",()=>renderPortfolioContribution());$("#portfolioContributionInput")?.addEventListener("input",()=>renderPortfolioContribution());$("#portfolioExportBtn")?.addEventListener("click",portfolioExportCsv);$("#portfolioImportBtn")?.addEventListener("click",()=>$("#portfolioImportFile").click());$("#portfolioImportFile")?.addEventListener("change",async e=>{const file=e.target.files?.[0];if(!file)return;try{await portfolioImportCsv(file);}catch(error){showToast(error.message);}e.target.value="";});$("#portfolioDemoBtn")?.addEventListener("click",portfolioLoadDemo);$("#portfolioClearBtn")?.addEventListener("click",()=>{if(confirm("Eliminar todas as transações e cotações guardadas neste navegador?")){localStorage.removeItem(PORTFOLIO_TX_KEY);localStorage.removeItem(PORTFOLIO_QUOTES_KEY);renderPortfolioManager();showToast("Carteira limpa.");}});
+  $("#portfolioRefreshBtn")?.addEventListener("click",portfolioRefreshQuotes);$("#portfolioContributionBtn")?.addEventListener("click",()=>renderPortfolioContribution());$("#portfolioContributionInput")?.addEventListener("input",()=>renderPortfolioContribution());$("#portfolioExportBtn")?.addEventListener("click",portfolioExportCsv);$("#portfolioImportBtn")?.addEventListener("click",()=>$("#portfolioImportFile").click());$("#portfolioImportFile")?.addEventListener("change",async e=>{const file=e.target.files?.[0];if(!file)return;try{await portfolioImportCsv(file);}catch(error){showToast(error.message);}e.target.value="";});$("#portfolioDemoBtn")?.addEventListener("click",portfolioLoadDemo);$("#portfolioClearBtn")?.addEventListener("click",()=>{if(confirm("Eliminar todas as transações e cotações guardadas neste navegador?")){localStorage.removeItem(PORTFOLIO_TX_KEY);localStorage.removeItem(PORTFOLIO_QUOTES_KEY);cloudSchedulePush();renderPortfolioManager();showToast("Carteira limpa.");}});
   $("#analysisPortfolioBtn")?.addEventListener("click",()=>{const payload=window.currentAnalysisPayload;if(!payload){showToast("Pesquisa primeiro um ativo.");return;}const record=analysisRecord(payload);portfolioOpenModal({type:"BUY",symbol:record.symbol,name:record.name,exchange:record.exchange,ticker:record.ticker,asset_type:record.asset_type,currency:record.currency,unit_price:payload.market?.price,category:record.asset_type==="etf"?"ETF Core":"Quality"});});
   document.addEventListener("change",e=>{const input=e.target.closest("[data-portfolio-target]");if(!input)return;const key=input.dataset.portfolioTarget,target=Math.max(0,Math.min(100,Number(input.value)||0)),transactions=getPortfolioTransactions();for(let i=transactions.length-1;i>=0;i--){if(portfolioKey(transactions[i].symbol,transactions[i].exchange)===key){transactions[i].target_weight=target;break;}}savePortfolioTransactions(transactions);showToast("Peso-alvo atualizado.");});
   document.addEventListener("click",e=>{const del=e.target.closest(".portfolio-delete-tx");if(del){if(confirm("Eliminar esta transação?"))savePortfolioTransactions(getPortfolioTransactions().filter(tx=>tx.id!==del.dataset.id));return;}const analyze=e.target.closest(".portfolio-analyze-position");if(analyze){void loadUnifiedAnalysis(analyze.dataset.symbol,{exchange:analyze.dataset.exchange||undefined,ticker:analyze.dataset.ticker||undefined});return;}const add=e.target.closest(".portfolio-add-position-tx");if(add){const p=portfolioSnapshot().positions.find(item=>item.key===add.dataset.key);if(p)portfolioOpenModal({type:"BUY",symbol:p.symbol,name:p.name,exchange:p.exchange,ticker:p.ticker,asset_type:p.asset_type,currency:p.currency,category:p.category,target_weight:p.target_weight,unit_price:p.quote?.price||""});}});
@@ -6526,7 +6571,7 @@
 
   function renderEvidenceSnapshot(evidence){
     if(!evidence){resetEvidenceSnapshot();return;}
-    try{localStorage.setItem(DASHBOARD_EVIDENCE_KEY,JSON.stringify(evidence));}catch{}
+    try{localStorage.setItem(DASHBOARD_EVIDENCE_KEY,JSON.stringify(evidence));cloudSchedulePush();}catch{}
     renderLiveDashboard();
     $("#evidenceStatus").textContent=evidenceStatusLabel(evidence.status);
     $("#evidenceGeneratedAt").textContent=evidence.generated_at?`Atualizado ${formatAssetDate(evidence.generated_at)}`:"Sem data";
@@ -6552,7 +6597,7 @@
 
   function renderEvidenceFeed(evidence){
     currentEvidenceFeed=evidence;
-    if(evidence){try{localStorage.setItem(DASHBOARD_EVIDENCE_KEY,JSON.stringify(evidence));}catch{}renderLiveDashboard();}
+    if(evidence){try{localStorage.setItem(DASHBOARD_EVIDENCE_KEY,JSON.stringify(evidence));cloudSchedulePush();}catch{}renderLiveDashboard();}
     $("#feedOfficialCount").textContent=evidence?.official_filings_count??0;
     $("#feedNewsCount").textContent=evidence?.news_count??0;
     $("#feedMaterialCount").textContent=evidence?.material_events_count??0;
@@ -6617,7 +6662,7 @@
   const ALERT_LABELS={price_below:"Preço abaixo de",price_above:"Preço acima de",quality_below:"Score de qualidade abaixo de",technical_below:"Score técnico abaixo de",pullback_above:"Pullback acima de",rsi_above:"RSI acima de",rsi_below:"RSI abaixo de",review_due:"Data de revisão"};
 
   function decisionRead(key,fallback=[]){try{const value=JSON.parse(localStorage.getItem(key));return value??fallback;}catch{return fallback;}}
-  function decisionWrite(key,value){localStorage.setItem(key,JSON.stringify(value));}
+  function decisionWrite(key,value){localStorage.setItem(key,JSON.stringify(value));cloudSchedulePush();}
   function decisionId(){return `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;}
   function decisionDateOffset(days){const date=new Date();date.setDate(date.getDate()+days);return date.toISOString().slice(0,10);}
   function decisionEsc(value){return String(value??"").replace(/[&<>'"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));}
@@ -6730,7 +6775,7 @@
     $("#policyComplianceList").innerHTML=compliance.map(item=>`<div class="policy-status-item ${item.level}"><strong>${portfolioEscape(item.title)}</strong><p>${portfolioEscape(item.detail)}</p></div>`).join("");renderPolicyAllocationStatus(live);if($("#topbarPolicyLabel"))$("#topbarPolicyLabel").textContent=`Perfil ${live.label.toLowerCase()} · ${live.score}/100`;
   }
   function applyRecommendedPolicy(){const input=policyFormInput(),score=policyRiskScore(input),recommended={...input,...policyRecommendedValues(score,input),score,label:policyLabel(score),updated_at:null};fillPolicyForm(recommended);renderInvestorPolicy();showToast("Limites recomendados aplicados. Revê e guarda a política.");}
-  function saveInvestorPolicy(){const policy=policyFromForm(),total=policyAllocationTotal(policy);if(Math.abs(total-100)>.01){showToast("A alocação estratégica deve somar 100%.");return;}if(policy.initial_position_weight>policy.max_stock_weight){showToast("O peso inicial não pode exceder o máximo por ação.");return;}localStorage.setItem(INVESTOR_POLICY_KEY,JSON.stringify(policy));investorPolicyFormLoaded=false;fillPolicyForm(policy);renderInvestorPolicy();syncPortfolioBuilderFromPolicy();if(window.currentAnalysisPayload)renderPolicySizing(window.currentAnalysisPayload);renderLiveDashboard();showToast("Investment Policy guardada.");}
+  function saveInvestorPolicy(){const policy=policyFromForm(),total=policyAllocationTotal(policy);if(Math.abs(total-100)>.01){showToast("A alocação estratégica deve somar 100%.");return;}if(policy.initial_position_weight>policy.max_stock_weight){showToast("O peso inicial não pode exceder o máximo por ação.");return;}localStorage.setItem(INVESTOR_POLICY_KEY,JSON.stringify(policy));cloudSchedulePush();investorPolicyFormLoaded=false;fillPolicyForm(policy);renderInvestorPolicy();syncPortfolioBuilderFromPolicy();if(window.currentAnalysisPayload)renderPolicySizing(window.currentAnalysisPayload);renderLiveDashboard();showToast("Investment Policy guardada.");}
   function exportInvestorPolicy(){const policy=getInvestorPolicy(),blob=new Blob([JSON.stringify(policy,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=`thesisos_investor_policy_${new Date().toISOString().slice(0,10)}.json`;link.click();URL.revokeObjectURL(url);}
   function syncPortfolioBuilderFromPolicy(){const policy=getInvestorPolicy();if($("#constructionMonthly"))$("#constructionMonthly").value=policy.monthly_contribution;if($("#constructionNewCapital")&&!Number($("#constructionNewCapital").value))$("#constructionNewCapital").value=policy.monthly_contribution;renderPortfolioConstruction();}
   function policyPositionForPayload(payload){
@@ -6910,7 +6955,7 @@
   function constructionDiagnostics(policy,snapshot,current,totalAfter,projected,targetWeights){const rows=[],positionMax=snapshot.positions.length?Math.max(...snapshot.positions.map(item=>Number(item.weight)||0)):0,specWeight=totalAfter>0?(projected.speculative/totalAfter*100):0,cashWeight=totalAfter>0?(projected.cash/totalAfter*100):0,directUsd=snapshot.positions.filter(item=>String(item.currency).toUpperCase()==="USD").reduce((sum,item)=>sum+(Number(item.market_value_eur)||0),0),usdWeight=totalAfter>0?directUsd/totalAfter*100:0;if(positionMax>Math.max(policy.max_stock_weight,policy.max_etf_weight))rows.push({level:"warn",title:`Maior posição: ${constructionPercent(positionMax)}`,detail:"Compara o tipo do ativo com o respetivo limite individual da política."});else rows.push({level:"good",title:"Concentração individual controlada",detail:`Maior posição ${constructionPercent(positionMax)}.`});if(specWeight>policy.max_speculative+.05)rows.push({level:"bad",title:`Especulativas ${constructionPercent(specWeight)}`,detail:`Ultrapassa o máximo pessoal de ${constructionPercent(policy.max_speculative)}.`});else rows.push({level:"good",title:`Especulativas ${constructionPercent(specWeight)}`,detail:`Dentro do máximo de ${constructionPercent(policy.max_speculative)}.`});if(cashWeight+0.05<policy.min_cash)rows.push({level:"bad",title:`Caixa ${constructionPercent(cashWeight)}`,detail:`Abaixo da caixa mínima de ${constructionPercent(policy.min_cash)}.`});else rows.push({level:"good",title:`Caixa ${constructionPercent(cashWeight)}`,detail:`Mínimo pessoal: ${constructionPercent(policy.min_cash)}.`});if(usdWeight>policy.max_currency)rows.push({level:"warn",title:`USD direto ${constructionPercent(usdWeight)}`,detail:`Acima do limite cambial de ${constructionPercent(policy.max_currency)}; não inclui look-through dos ETFs.`});else rows.push({level:"good",title:`USD direto ${constructionPercent(usdWeight)}`,detail:"Não inclui exposição cambial interna dos ETFs."});const targetTotal=Object.values(targetWeights).reduce((sum,value)=>sum+Number(value||0),0);if(Math.abs(targetTotal-100)>.01)rows.push({level:"bad",title:`Alvos somam ${constructionPercent(targetTotal)}`,detail:"A proposta deve somar 100%."});return rows;}
   function renderPortfolioConstruction(){if(!$("#portfolioConstructionEngine"))return;const policy=getInvestorPolicy(),plan=buildPortfolioConstruction();currentConstructionPlan=plan;$("#constructionPolicyProfile").textContent=policy.label;$("#constructionPolicyScore").textContent=`Risk capacity ${policy.score}/100`;$("#constructionTotalCapital").textContent=constructionEuro(plan.totalAfter);$("#constructionCapitalDetail").textContent=plan.input.mode==="existing"?`${constructionEuro(plan.capitalBefore)} atuais + ${constructionEuro(plan.input.newCapital)} novos`:`Capital inicial ${constructionEuro(plan.input.newCapital)}`;$("#constructionDeployable").textContent=constructionEuro(plan.deployable);$("#constructionDeployableDetail").textContent=`Caixa-alvo ${constructionPercent(plan.targetWeights.cash)}`;const issues=plan.diagnostics.filter(item=>item.level!=="good");$("#constructionIssueCount").textContent=String(issues.length);$("#constructionIssueDetail").textContent=issues.length?`${issues.filter(item=>item.level==="bad").length} críticas / ${issues.filter(item=>item.level==="warn").length} avisos`:"Sem violações críticas";$("#constructionPolicySummary").innerHTML=[["Máx. ação",constructionPercent(policy.max_stock_weight)],["Máx. ETF",constructionPercent(policy.max_etf_weight)],["Máx. especulativo",constructionPercent(policy.max_speculative)],["Caixa mínima",constructionPercent(policy.min_cash)]].map(([label,value])=>`<div class="construction-policy-item"><span>${label}</span><strong>${value}</strong></div>`).join("");const body=$("#constructionAllocationBody");body.innerHTML=CONSTRUCTION_BUCKETS.map(bucket=>{const currentValue=Number(plan.current[bucket.id])+(bucket.id==="cash"?plan.input.newCapital:0),currentWeight=plan.totalAfter>0?currentValue/plan.totalAfter*100:0,gap=plan.targetAmounts[bucket.id]-currentValue,status=Math.abs(gap)<Math.max(1,plan.totalAfter*.005)?["Próximo do alvo","good"]:gap>0?["Abaixo do alvo","warn"]:["Acima do alvo","bad"];return `<tr><td><strong>${portfolioEscape(bucket.label)}</strong></td><td class="numeric">${constructionEuro(currentValue)}</td><td class="numeric">${constructionPercent(currentWeight)}</td><td class="numeric">${constructionPercent(plan.targetWeights[bucket.id])}</td><td class="numeric">${constructionEuro(plan.targetAmounts[bucket.id])}</td><td class="numeric ${gap>=0?"construction-gap-positive":"construction-gap-negative"}">${gap>=0?"+":""}${constructionEuro(gap)}</td><td><span class="tag ${status[1]}">${status[0]}</span></td></tr>`;}).join("");const labels=Object.fromEntries(CONSTRUCTION_BUCKETS.map(item=>[item.id,item.label]));const actionLabels={BUY:"Comprar / direcionar",SELL:"Reduzir (simulação)",HOLD:"Manter em caixa"};const actionable=plan.actions.filter(item=>item.amount>.01||item.action==="HOLD");$("#constructionPlanList").innerHTML=actionable.length?actionable.map(item=>`<div class="construction-plan-row"><span><strong>${portfolioEscape(labels[item.bucket])}</strong><small>${portfolioEscape(actionLabels[item.action]||item.action)}</small></span><strong>${constructionEuro(item.amount)}</strong><small>${item.action==="SELL"?"Não executado":"Plano calculado"}</small></div>`).join(""):'<div class="construction-empty">Não existem movimentos relevantes para esta configuração.</div>';$("#constructionDiagnostics").innerHTML=plan.diagnostics.map(item=>`<div class="construction-diagnostic ${item.level}"><strong>${portfolioEscape(item.title)}</strong><p>${portfolioEscape(item.detail)}</p></div>`).join("");$("#constructionUpdated").textContent=`Calculado ${new Date().toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"})}`;$("#constructionUpdated").className="freshness";renderConstructionSavedSnapshot();runConstructionStressTest();}
   function renderConstructionSavedSnapshot(){const container=$("#constructionSavedSnapshot");let saved=null;try{saved=JSON.parse(localStorage.getItem(PORTFOLIO_CONSTRUCTION_KEY));}catch{}if(!saved){container.className="construction-empty";container.innerHTML="Ainda não existe um plano guardado.";return;}container.className="";container.innerHTML=`<div class="impact-list"><div class="impact-item"><span>Guardado</span><strong>${portfolioEscape(formatAssetDate(saved.generated_at)||saved.generated_at)}</strong></div><div class="impact-item"><span>Perfil</span><strong>${portfolioEscape(saved.policy?.label||"—")}</strong></div><div class="impact-item"><span>Capital</span><strong>${constructionEuro(saved.totalAfter)}</strong></div><div class="impact-item"><span>Método</span><strong>${saved.input?.method==="rebalance"?"Rebalanceamento":"Contribuições"}</strong></div></div><div class="source-note">O snapshot documenta a proposta; não modifica transações nem envia ordens.</div>`;}
-  function savePortfolioConstruction(){if(!currentConstructionPlan)renderPortfolioConstruction();localStorage.setItem(PORTFOLIO_CONSTRUCTION_KEY,JSON.stringify(currentConstructionPlan));renderConstructionSavedSnapshot();renderLiveDashboard();showToast("Plano de construção guardado.");}
+  function savePortfolioConstruction(){if(!currentConstructionPlan)renderPortfolioConstruction();localStorage.setItem(PORTFOLIO_CONSTRUCTION_KEY,JSON.stringify(currentConstructionPlan));cloudSchedulePush();renderConstructionSavedSnapshot();renderLiveDashboard();showToast("Plano de construção guardado.");}
   function exportPortfolioConstruction(){if(!currentConstructionPlan)renderPortfolioConstruction();const blob=new Blob([JSON.stringify(currentConstructionPlan,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=`thesisos_portfolio_plan_${new Date().toISOString().slice(0,10)}.json`;link.click();URL.revokeObjectURL(url);}
   function stressPresetValues(preset){return preset==="recession"?{core:-28,quality:-35,dividend:-22,speculative:-55}:preset==="rates"?{core:-12,quality:-20,dividend:-10,speculative:-30}:{core:-20,quality:-25,dividend:-15,speculative:-40};}
   function applyStressPreset(){const preset=$("#stressPreset").value;if(preset==="custom")return;const values=stressPresetValues(preset);for(const [key,value] of Object.entries(values))$("#stress"+key[0].toUpperCase()+key.slice(1)).value=value;runConstructionStressTest();}
@@ -6926,6 +6971,48 @@
   $("#stressPreset")?.addEventListener("change",applyStressPreset);["stressCore","stressQuality","stressDividend","stressSpeculative"].forEach(id=>$("#"+id)?.addEventListener("input",runConstructionStressTest));$("#runStressTestBtn")?.addEventListener("click",runConstructionStressTest);
   $("#constructionUseAnalysisBtn")?.addEventListener("click",useCurrentAnalysisInConstruction);$("#constructionSimulateBtn")?.addEventListener("click",simulateConstructionPosition);
   if($("#constructionMonthly"))$("#constructionMonthly").value=getInvestorPolicy().monthly_contribution;if($("#constructionNewCapital"))$("#constructionNewCapital").value=getInvestorPolicy().monthly_contribution;renderPortfolioConstruction();
+
+
+  // ---------------------------------------------------------------
+  // Secure Supabase persistence with localStorage fallback
+  // ---------------------------------------------------------------
+  const CLOUD_AUTOSYNC_KEY="thesisos_cloud_autosync_v1";
+  const CLOUD_LAST_SYNC_KEY="thesisos_cloud_last_sync_v1";
+  let cloudSyncSession={configured:false,authenticated:false,workspace_id:null,row_count:null};
+  let cloudSyncTimer=null;
+  let cloudApplyingState=false;
+  let cloudSyncBusy=false;
+
+  function cloudStorageMap(){return {
+    watchlist:WATCHLIST_KEY,
+    portfolio_transactions:PORTFOLIO_TX_KEY,
+    portfolio_quotes:PORTFOLIO_QUOTES_KEY,
+    decision_journal:DECISION_JOURNAL_KEY,
+    monitoring_alerts:MONITORING_ALERTS_KEY,
+    investor_policy:INVESTOR_POLICY_KEY,
+    portfolio_construction:PORTFOLIO_CONSTRUCTION_KEY,
+    last_radar:DASHBOARD_RADAR_KEY,
+    last_evidence:DASHBOARD_EVIDENCE_KEY,
+  };}
+  function cloudDefaultFor(namespace){return ["watchlist","portfolio_transactions","decision_journal","monitoring_alerts"].includes(namespace)?[]:["portfolio_quotes"].includes(namespace)?{}:null;}
+  function cloudCollectState(){const state={};for(const [namespace,key] of Object.entries(cloudStorageMap())){const raw=localStorage.getItem(key);if(raw===null){state[namespace]=cloudDefaultFor(namespace);continue;}try{state[namespace]=JSON.parse(raw);}catch{state[namespace]=cloudDefaultFor(namespace);}}return state;}
+  function cloudLocalHasData(){const state=cloudCollectState();return Object.values(state).some(value=>Array.isArray(value)?value.length>0:value&&typeof value==="object"?Object.keys(value).length>0:value!==null&&value!=="");}
+  function cloudSetMessage(text,tone=""){const element=$("#cloudSyncMessage");if(!element)return;element.textContent=text;element.className=`cloud-sync-message ${tone}`.trim();}
+  function cloudSetBusy(value){cloudSyncBusy=value;["cloudSyncLoginBtn","cloudSyncLogoutBtn","cloudSyncRefreshBtn","cloudSyncPushBtn","cloudSyncPullBtn"].forEach(id=>{const el=$("#"+id);if(el)el.disabled=value;});}
+  function cloudUpdateUi(){const configured=cloudSyncSession.configured,authenticated=cloudSyncSession.authenticated,badge=$("#cloudSyncBadge");if(badge){badge.textContent=!configured?"Não configurado":authenticated?"Ligado":"Sessão desligada";badge.className=`freshness ${!configured?"bad":authenticated?"":"warn"}`.trim();}if($("#cloudSyncConfigured"))$("#cloudSyncConfigured").textContent=configured?"Supabase pronta":"Faltam Secrets";if($("#cloudSyncSession"))$("#cloudSyncSession").textContent=authenticated?"Autenticada":"Desligada";if($("#cloudSyncWorkspace"))$("#cloudSyncWorkspace").textContent=cloudSyncSession.workspace_id||"—";if($("#cloudSyncRows"))$("#cloudSyncRows").textContent=cloudSyncSession.row_count===null?"—":`${cloudSyncSession.row_count} namespaces`;const last=localStorage.getItem(CLOUD_LAST_SYNC_KEY);if($("#cloudSyncLastSync"))$("#cloudSyncLastSync").textContent=last?new Date(last).toLocaleString("pt-PT"):"Nunca";if($("#cloudSyncAuto"))$("#cloudSyncAuto").checked=localStorage.getItem(CLOUD_AUTOSYNC_KEY)==="1";const password=$("#cloudSyncPassword");if(password)password.disabled=authenticated;const login=$("#cloudSyncLoginBtn");if(login)login.style.display=authenticated?"none":"inline-block";const logout=$("#cloudSyncLogoutBtn");if(logout)logout.style.display=authenticated?"inline-block":"none";["cloudSyncPushBtn","cloudSyncPullBtn","cloudSyncAuto"].forEach(id=>{const el=$("#"+id);if(el)el.disabled=!authenticated||cloudSyncBusy;});}
+  async function cloudRequest(path,options={}){const response=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}}),data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||data.error||`Erro HTTP ${response.status}`);return data;}
+  function cloudRenderAll(){updateWatchlistCount();renderWatchlist();renderPortfolioManager();renderDecisionJournal();renderMonitoringAlerts();investorPolicyFormLoaded=false;fillPolicyForm(getInvestorPolicy());renderInvestorPolicy();renderPortfolioConstruction();renderLiveDashboard();const radar=dashboardRead(DASHBOARD_RADAR_KEY,null);if(radar){window.lastRadarData=radar;renderRadarResults(radar);}const evidence=dashboardRead(DASHBOARD_EVIDENCE_KEY,null);if(evidence)renderEvidenceFeed(evidence);if(window.currentAnalysisPayload)renderPolicySizing(window.currentAnalysisPayload);}
+  function cloudApplyState(state){cloudApplyingState=true;try{for(const [namespace,key] of Object.entries(cloudStorageMap())){if(!Object.prototype.hasOwnProperty.call(state,namespace))continue;const value=state[namespace];if(value===null||value===undefined)localStorage.removeItem(key);else localStorage.setItem(key,JSON.stringify(value));}localStorage.setItem(CLOUD_LAST_SYNC_KEY,new Date().toISOString());}finally{cloudApplyingState=false;}cloudRenderAll();cloudUpdateUi();}
+  async function cloudCheckStatus({autoPull=true}={}){try{const data=await cloudRequest("/api/sync/status",{method:"GET"});cloudSyncSession={...cloudSyncSession,...data};cloudUpdateUi();if(!data.configured){cloudSetMessage(`Configuração incompleta no servidor: ${(data.missing||[]).join(", ")}.`,"warn");return data;}if(data.authenticated&&autoPull&&localStorage.getItem(CLOUD_AUTOSYNC_KEY)==="1")await cloudPullState({silent:true,confirmOverwrite:false});else if(data.authenticated)cloudSetMessage("Sessão recuperada. Podes restaurar a cloud ou enviar os dados locais.");else cloudSetMessage("Supabase configurada. Introduz a palavra-passe do workspace para sincronizar.");return data;}catch(error){cloudSyncSession={configured:false,authenticated:false,workspace_id:null,row_count:null};cloudUpdateUi();cloudSetMessage(`Cloud Sync indisponível: ${error.message}`,"bad");return null;}}
+  async function cloudLogin(){const password=$("#cloudSyncPassword")?.value||"";if(!password){showToast("Introduz a palavra-passe do Cloud Sync.");return;}cloudSetBusy(true);try{const data=await cloudRequest("/api/sync/login",{method:"POST",body:JSON.stringify({password})});cloudSyncSession={...cloudSyncSession,configured:true,authenticated:true,workspace_id:data.workspace_id,row_count:data.cloud_row_count??0};$("#cloudSyncPassword").value="";cloudUpdateUi();const localHas=cloudLocalHasData(),cloudHas=(data.cloud_row_count||0)>0;if(cloudHas&&!localHas){await cloudPullState({silent:true,confirmOverwrite:false});localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Os dados cloud foram restaurados automaticamente porque este navegador estava vazio.");}else if(!cloudHas&&localHas){await cloudPushState({silent:true});localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Os dados locais foram enviados automaticamente porque a cloud estava vazia.");}else if(cloudHas&&localHas){localStorage.setItem(CLOUD_AUTOSYNC_KEY,"0");cloudSetMessage("Existem dados locais e dados cloud. Escolhe ‘Enviar dados locais’ ou ‘Restaurar da cloud’ antes de ativar a sincronização automática.","warn");}else{localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Workspace vazio e pronto para sincronizar.");}cloudUpdateUi();showToast("Sessão Cloud Sync iniciada.");}catch(error){cloudSetMessage(error.message,"bad");showToast("Falha no Cloud Sync.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
+  async function cloudLogout(){cloudSetBusy(true);try{await cloudRequest("/api/sync/logout",{method:"POST",body:"{}"});cloudSyncSession.authenticated=false;localStorage.setItem(CLOUD_AUTOSYNC_KEY,"0");cloudSetMessage("Sessão terminada. Os dados locais continuam disponíveis neste navegador.");showToast("Cloud Sync desligado.");}catch(error){cloudSetMessage(error.message,"bad");}finally{cloudSetBusy(false);cloudUpdateUi();}}
+  async function cloudPushState({silent=false}={}){if(!cloudSyncSession.authenticated){if(!silent)showToast("Inicia primeiro a sessão Cloud Sync.");return;}cloudSetBusy(true);try{const data=await cloudRequest("/api/sync/state",{method:"POST",body:JSON.stringify({state:cloudCollectState()})});cloudSyncSession.row_count=data.saved_count;localStorage.setItem(CLOUD_LAST_SYNC_KEY,new Date().toISOString());localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudUpdateUi();cloudSetMessage(`${data.saved_count} namespaces enviados para a cloud. A sincronização automática ficou ativa.`);if(!silent)showToast("Dados enviados para a cloud.");}catch(error){cloudSetMessage(`Falha ao guardar: ${error.message}`,"bad");if(!silent)showToast("Falha ao enviar dados.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
+  async function cloudPullState({silent=false,confirmOverwrite=true}={}){if(!cloudSyncSession.authenticated){if(!silent)showToast("Inicia primeiro a sessão Cloud Sync.");return;}if(confirmOverwrite&&cloudLocalHasData()&&!confirm("Restaurar da cloud vai substituir os dados locais sincronizáveis deste navegador. Continuar?"))return;cloudSetBusy(true);try{const data=await cloudRequest("/api/sync/state",{method:"GET"});cloudSyncSession.row_count=data.row_count||0;if(data.row_count){cloudApplyState(data.state||{});localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage(`${data.row_count} namespaces restaurados. A cloud passa a ser a cópia canónica para este navegador.`);if(!silent)showToast("Dados restaurados da cloud.");}else{cloudSetMessage("A cloud ainda não contém dados. Envia primeiro a cópia local.","warn");if(!silent)showToast("Cloud vazia.");}}catch(error){cloudSetMessage(`Falha ao restaurar: ${error.message}`,"bad");if(!silent)showToast("Falha ao restaurar dados.");}finally{cloudSetBusy(false);cloudUpdateUi();}}
+  function cloudSchedulePush(){if(cloudApplyingState||!cloudSyncSession.authenticated||localStorage.getItem(CLOUD_AUTOSYNC_KEY)!=="1")return;clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(()=>void cloudPushState({silent:true}),1200);}
+
+  $("#cloudSyncLoginBtn")?.addEventListener("click",cloudLogin);$("#cloudSyncLogoutBtn")?.addEventListener("click",cloudLogout);$("#cloudSyncRefreshBtn")?.addEventListener("click",()=>cloudCheckStatus({autoPull:false}));$("#cloudSyncPushBtn")?.addEventListener("click",()=>cloudPushState());$("#cloudSyncPullBtn")?.addEventListener("click",()=>cloudPullState());$("#cloudSyncPassword")?.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();void cloudLogin();}});$("#cloudSyncAuto")?.addEventListener("change",event=>{localStorage.setItem(CLOUD_AUTOSYNC_KEY,event.target.checked?"1":"0");cloudUpdateUi();if(event.target.checked)cloudSchedulePush();});
+  cloudUpdateUi();void cloudCheckStatus();
+
 
 })();
 </script>

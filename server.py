@@ -1,15 +1,19 @@
 import csv
 import gzip
+import hmac
 import io
 import json
 import math
 import os
 import re
+import secrets
+import threading
 import time
 import zlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timezone
 from html.parser import HTMLParser
+from http.cookies import SimpleCookie
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.parse import (
@@ -64,6 +68,275 @@ TECHNICAL_CACHE = {}
 RADAR_CACHE = {}
 EVIDENCE_CACHE = {}
 SEC_SUBMISSIONS_CACHE = {}
+
+SYNC_SESSION_COOKIE = "thesisos_sync_session"
+SYNC_SESSION_TTL_SECONDS = 12 * 60 * 60
+SYNC_MAX_REQUEST_BYTES = 2_500_000
+SYNC_MAX_NAMESPACE_BYTES = 750_000
+SYNC_ALLOWED_NAMESPACES = {
+    "watchlist",
+    "portfolio_transactions",
+    "portfolio_quotes",
+    "decision_journal",
+    "monitoring_alerts",
+    "investor_policy",
+    "portfolio_construction",
+    "last_radar",
+    "last_evidence",
+}
+SYNC_SESSIONS = {}
+SYNC_SESSION_LOCK = threading.Lock()
+
+
+def sync_workspace_id():
+    value = os.getenv("THESISOS_WORKSPACE_ID", "primary").strip()
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", value)[:80] or "primary"
+
+
+def sync_supabase_key():
+    return (
+        os.getenv("SUPABASE_SECRET_KEY")
+        or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        or ""
+    ).strip()
+
+
+def sync_configuration():
+    url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+    key = sync_supabase_key()
+    password = os.getenv("THESISOS_SYNC_PASSWORD", "")
+    missing = []
+    if not url:
+        missing.append("SUPABASE_URL")
+    if not key:
+        missing.append("SUPABASE_SECRET_KEY ou SUPABASE_SERVICE_ROLE_KEY")
+    if not password:
+        missing.append("THESISOS_SYNC_PASSWORD")
+    return {
+        "configured": not missing,
+        "url": url,
+        "key": key,
+        "password": password,
+        "workspace_id": sync_workspace_id(),
+        "missing": missing,
+        "key_type": (
+            "secret"
+            if key.startswith("sb_secret_")
+            else "service_role"
+            if key
+            else None
+        ),
+    }
+
+
+def cleanup_sync_sessions():
+    now = time.time()
+    with SYNC_SESSION_LOCK:
+        expired = [
+            token
+            for token, expires_at in SYNC_SESSIONS.items()
+            if expires_at <= now
+        ]
+        for token in expired:
+            SYNC_SESSIONS.pop(token, None)
+
+
+def create_sync_session():
+    cleanup_sync_sessions()
+    token = secrets.token_urlsafe(32)
+    with SYNC_SESSION_LOCK:
+        SYNC_SESSIONS[token] = time.time() + SYNC_SESSION_TTL_SECONDS
+    return token
+
+
+def delete_sync_session(token):
+    if not token:
+        return
+    with SYNC_SESSION_LOCK:
+        SYNC_SESSIONS.pop(token, None)
+
+
+def sync_session_from_headers(headers):
+    cleanup_sync_sessions()
+    cookie_header = headers.get("Cookie", "")
+    if not cookie_header:
+        return None
+    cookie = SimpleCookie()
+    try:
+        cookie.load(cookie_header)
+    except Exception:
+        return None
+    morsel = cookie.get(SYNC_SESSION_COOKIE)
+    if not morsel:
+        return None
+    token = morsel.value
+    with SYNC_SESSION_LOCK:
+        expires_at = SYNC_SESSIONS.get(token)
+        if not expires_at or expires_at <= time.time():
+            SYNC_SESSIONS.pop(token, None)
+            return None
+        SYNC_SESSIONS[token] = time.time() + SYNC_SESSION_TTL_SECONDS
+    return token
+
+
+def sync_cookie_header(token=None, clear=False):
+    cookie = SimpleCookie()
+    cookie[SYNC_SESSION_COOKIE] = "" if clear else token
+    morsel = cookie[SYNC_SESSION_COOKIE]
+    morsel["path"] = "/"
+    morsel["httponly"] = True
+    morsel["samesite"] = "Strict"
+    if os.getenv("THESISOS_COOKIE_SECURE", "0") == "1":
+        morsel["secure"] = True
+    if clear:
+        morsel["max-age"] = 0
+    else:
+        morsel["max-age"] = SYNC_SESSION_TTL_SECONDS
+    return morsel.OutputString()
+
+
+def supabase_state_request(method="GET", query="", payload=None, prefer=None):
+    config = sync_configuration()
+    if not config["configured"]:
+        raise RuntimeError(
+            "Cloud Sync não configurado: " + ", ".join(config["missing"])
+        )
+    url = f'{config["url"]}/rest/v1/thesisos_state'
+    if query:
+        url += "?" + query
+    headers = {
+        "apikey": config["key"],
+        "Authorization": f'Bearer {config["key"]}',
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "ThesisOS/1.0 CloudSync",
+    }
+    if prefer:
+        headers["Prefer"] = prefer
+    body = None if payload is None else json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    request = Request(url, data=body, headers=headers, method=method)
+    try:
+        with urlopen(request, timeout=25) as response:
+            raw = response.read()
+            if not raw:
+                return None
+            return json.loads(raw.decode("utf-8"))
+    except HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Supabase respondeu HTTP {error.code}: {detail[:500]}"
+        ) from error
+
+
+def fetch_cloud_state():
+    config = sync_configuration()
+    query = urlencode({
+        "select": "namespace,payload,version,updated_at",
+        "workspace_id": f'eq.{config["workspace_id"]}',
+        "order": "namespace.asc",
+    })
+    rows = supabase_state_request("GET", query=query) or []
+    state = {}
+    metadata = {}
+    for row in rows:
+        namespace = row.get("namespace")
+        if namespace not in SYNC_ALLOWED_NAMESPACES:
+            continue
+        state[namespace] = row.get("payload")
+        metadata[namespace] = {
+            "version": row.get("version"),
+            "updated_at": row.get("updated_at"),
+        }
+    return {"state": state, "metadata": metadata, "row_count": len(state)}
+
+
+def validate_cloud_state(raw_state):
+    if not isinstance(raw_state, dict):
+        raise ValueError("O estado de sincronização deve ser um objeto JSON.")
+    cleaned = {}
+    for namespace, payload in raw_state.items():
+        if namespace not in SYNC_ALLOWED_NAMESPACES:
+            continue
+        encoded = json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        if len(encoded) > SYNC_MAX_NAMESPACE_BYTES:
+            raise ValueError(
+                f"O namespace {namespace} excede o limite de sincronização."
+            )
+        cleaned[namespace] = payload
+    if not cleaned:
+        raise ValueError("Não foram recebidos namespaces válidos.")
+    return cleaned
+
+
+def upsert_cloud_state(raw_state):
+    state = validate_cloud_state(raw_state)
+    config = sync_configuration()
+    version = int(time.time() * 1000)
+
+    # A ausência deliberada de um valor no localStorage chega como null.
+    # Como a coluna payload é NOT NULL, null significa apagar o namespace
+    # existente na cloud, e não inserir SQL NULL.
+    delete_namespaces = sorted(
+        namespace
+        for namespace, payload in state.items()
+        if payload is None
+    )
+
+    upsert_state = {
+        namespace: payload
+        for namespace, payload in state.items()
+        if payload is not None
+    }
+
+    if delete_namespaces:
+        namespace_filter = "in.(" + ",".join(delete_namespaces) + ")"
+        delete_query = urlencode({
+            "workspace_id": f'eq.{config["workspace_id"]}',
+            "namespace": namespace_filter,
+        })
+        supabase_state_request(
+            "DELETE",
+            query=delete_query,
+            prefer="return=minimal",
+        )
+
+    rows = [
+        {
+            "workspace_id": config["workspace_id"],
+            "namespace": namespace,
+            "payload": payload,
+            "version": version,
+        }
+        for namespace, payload in upsert_state.items()
+    ]
+
+    result = []
+
+    if rows:
+        query = urlencode({"on_conflict": "workspace_id,namespace"})
+        result = supabase_state_request(
+            "POST",
+            query=query,
+            payload=rows,
+            prefer="resolution=merge-duplicates,return=representation",
+        ) or []
+
+    return {
+        "saved_namespaces": sorted(state),
+        "saved_count": len(state),
+        "upserted_count": len(upsert_state),
+        "deleted_count": len(delete_namespaces),
+        "version": version,
+        "rows": result,
+    }
 
 RADAR_UNIVERSES = {
     "core_us": [
@@ -7891,7 +8164,12 @@ def build_comparison(
 
 
 class ThesisOSHandler(SimpleHTTPRequestHandler):
-    def send_json(self, payload: dict, status: int = 200) -> None:
+    def send_json(
+        self,
+        payload: dict,
+        status: int = 200,
+        extra_headers: dict | None = None,
+    ) -> None:
         body = json.dumps(
             payload,
             ensure_ascii=False,
@@ -7908,11 +8186,66 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             str(len(body)),
         )
         self.send_header("Cache-Control", "no-store")
+        for name, value in (extra_headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
 
+    def read_json_body(self) -> dict:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError as error:
+            raise ValueError("Content-Length inválido.") from error
+        if length <= 0:
+            return {}
+        if length > SYNC_MAX_REQUEST_BYTES:
+            raise ValueError("Pedido demasiado grande.")
+        raw = self.rfile.read(length)
+        try:
+            value = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError("Corpo JSON inválido.") from error
+        if not isinstance(value, dict):
+            raise ValueError("O corpo do pedido deve ser um objeto JSON.")
+        return value
+
+    def sync_authenticated(self) -> bool:
+        return sync_session_from_headers(self.headers) is not None
+
     def do_GET(self) -> None:
         parsed_url = urlparse(self.path)
+
+        if parsed_url.path == "/api/sync/status":
+            config = sync_configuration()
+            self.send_json({
+                "status": "ok",
+                "configured": config["configured"],
+                "authenticated": self.sync_authenticated(),
+                "workspace_id": config["workspace_id"],
+                "provider": "Supabase Postgres / Data REST API",
+                "key_type": config["key_type"],
+                "missing": config["missing"],
+                "allowed_namespaces": sorted(SYNC_ALLOWED_NAMESPACES),
+            })
+            return
+
+        if parsed_url.path == "/api/sync/state":
+            if not self.sync_authenticated():
+                self.send_json({"error": "Sessão Cloud Sync não autenticada."}, status=401)
+                return
+            try:
+                payload = fetch_cloud_state()
+                self.send_json({
+                    "status": "ok",
+                    "workspace_id": sync_workspace_id(),
+                    **payload,
+                })
+            except Exception as error:
+                self.send_json({
+                    "error": "Não foi possível ler o estado cloud.",
+                    "detail": str(error),
+                }, status=502)
+            return
 
         if parsed_url.path == "/api/health":
             self.send_json(
@@ -7973,6 +8306,74 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             return
 
         super().do_GET()
+
+
+    def do_POST(self) -> None:
+        parsed_url = urlparse(self.path)
+
+        if parsed_url.path == "/api/sync/login":
+            try:
+                body = self.read_json_body()
+                config = sync_configuration()
+                if not config["configured"]:
+                    self.send_json({
+                        "error": "Cloud Sync ainda não está configurado.",
+                        "missing": config["missing"],
+                    }, status=503)
+                    return
+                supplied = str(body.get("password") or "")
+                if not hmac.compare_digest(supplied, config["password"]):
+                    self.send_json({"error": "Palavra-passe incorreta."}, status=401)
+                    return
+                token = create_sync_session()
+                cloud = fetch_cloud_state()
+                self.send_json({
+                    "status": "ok",
+                    "authenticated": True,
+                    "workspace_id": config["workspace_id"],
+                    "cloud_row_count": cloud["row_count"],
+                    "cloud_metadata": cloud["metadata"],
+                }, extra_headers={"Set-Cookie": sync_cookie_header(token)})
+            except ValueError as error:
+                self.send_json({"error": str(error)}, status=400)
+            except Exception as error:
+                self.send_json({
+                    "error": "Não foi possível iniciar a sessão Cloud Sync.",
+                    "detail": str(error),
+                }, status=502)
+            return
+
+        if parsed_url.path == "/api/sync/logout":
+            token = sync_session_from_headers(self.headers)
+            delete_sync_session(token)
+            self.send_json({
+                "status": "ok",
+                "authenticated": False,
+            }, extra_headers={"Set-Cookie": sync_cookie_header(clear=True)})
+            return
+
+        if parsed_url.path == "/api/sync/state":
+            if not self.sync_authenticated():
+                self.send_json({"error": "Sessão Cloud Sync não autenticada."}, status=401)
+                return
+            try:
+                body = self.read_json_body()
+                result = upsert_cloud_state(body.get("state"))
+                self.send_json({
+                    "status": "ok",
+                    "workspace_id": sync_workspace_id(),
+                    **result,
+                })
+            except ValueError as error:
+                self.send_json({"error": str(error)}, status=400)
+            except Exception as error:
+                self.send_json({
+                    "error": "Não foi possível guardar o estado cloud.",
+                    "detail": str(error),
+                }, status=502)
+            return
+
+        self.send_json({"error": "Endpoint POST não encontrado."}, status=404)
 
     def handle_radar_request(self, parsed_url) -> None:
         query = parse_qs(parsed_url.query)

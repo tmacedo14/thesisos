@@ -124,3 +124,47 @@ O modelo é deliberadamente parcial e não substitui múltiplos históricos, com
 ## Portfolio construction methodology
 
 The Portfolio Construction Engine converts the saved Investment Policy into target category weights, compares them with the transaction-based portfolio, and proposes either contribution-only funding or a full simulated rebalance. Stress tests apply transparent shocks to policy buckets and are not forecasts or Value-at-Risk estimates. Direct currency concentration excludes ETF look-through unless official holdings data is available.
+
+## Secure Cloud Sync with Supabase
+
+ThesisOS can optionally persist browser state in a Supabase Postgres table while keeping all database credentials on the server.
+
+Synchronized namespaces:
+
+- watchlist;
+- portfolio transactions and cached quotes;
+- Decision Journal;
+- monitoring alerts;
+- Investor Policy;
+- saved Portfolio Construction plan;
+- latest Radar result;
+- latest Evidence Feed.
+
+### Supabase setup
+
+1. Create a Supabase project.
+2. Open **SQL Editor** and execute `supabase_schema.sql` once.
+3. Add the following server-side environment variables / Replit Secrets:
+
+```text
+SUPABASE_URL
+SUPABASE_SECRET_KEY
+THESISOS_SYNC_PASSWORD
+THESISOS_WORKSPACE_ID
+THESISOS_COOKIE_SECURE
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` remains supported as a legacy fallback when `SUPABASE_SECRET_KEY` is absent. Neither key may be placed in `index.html` or exposed to the browser.
+
+The table has Row Level Security enabled and grants no access to `anon` or `authenticated`. All reads and writes pass through the ThesisOS server. The browser authenticates to ThesisOS using the workspace password and receives only an HttpOnly, SameSite=Strict session cookie.
+
+### Conflict strategy
+
+- localStorage remains the offline cache and fallback;
+- if the browser is empty and cloud data exists, the cloud copy is restored after login;
+- if the cloud is empty and local data exists, the local copy is uploaded after login;
+- if both contain data, ThesisOS does not overwrite either automatically: the user must choose **Enviar dados locais** or **Restaurar da cloud**;
+- after that first choice, automatic synchronization can remain enabled.
+
+Cloud Sync persists application state only. It does not store broker credentials, place orders or replace tax records.
+

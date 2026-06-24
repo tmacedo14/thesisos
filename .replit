@@ -10,3 +10,7 @@ externalPort = 80
 expertMode = true
 
 [nix]
+
+[deployment]
+run = ["python3", "server.py"]
+deploymentTarget = "cloudrun"
