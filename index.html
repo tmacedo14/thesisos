@@ -1140,6 +1140,62 @@
       }
     }
 
+  
+    /* ThesisOS ETF costs and sector allocation */
+    .etf-sector-layout{
+      display:grid;
+      grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr);
+      gap:12px;
+      margin-top:12px;
+    }
+    .etf-sector-list{
+      padding:12px 14px 14px;
+    }
+    .etf-sector-row{
+      display:grid;
+      grid-template-columns:minmax(130px,1fr) minmax(120px,1.5fr) 72px;
+      gap:10px;
+      align-items:center;
+      padding:9px 0;
+      border-bottom:1px solid var(--border);
+      font-size:12px;
+    }
+    .etf-sector-row:last-child{border-bottom:0}
+    .etf-sector-row strong{
+      line-height:1.3;
+      overflow-wrap:anywhere;
+    }
+    .etf-sector-track{
+      height:8px;
+      overflow:hidden;
+      border-radius:999px;
+      background:rgba(131,145,168,.2);
+    }
+    .etf-sector-track span{
+      display:block;
+      height:100%;
+      border-radius:inherit;
+      background:var(--accent);
+    }
+    .etf-sector-value{
+      text-align:right;
+      font-variant-numeric:tabular-nums;
+    }
+    .etf-cost-notice{
+      padding:14px;
+      color:var(--muted);
+      line-height:1.55;
+      font-size:12px;
+    }
+    .etf-cost-notice strong{
+      display:block;
+      color:var(--text);
+      margin-bottom:6px;
+    }
+    @media (max-width:900px){
+      .etf-sector-layout{grid-template-columns:1fr}
+    }
+
   </style>
 </head>
 <body>
@@ -2038,6 +2094,60 @@
               <span>Crescimento dos lucros</span>
               <strong id="etfAggregateGrowth">—</strong>
               <small id="etfAggregateGrowthBenchmark">Benchmark indisponível</small>
+            </div>
+          </div>
+
+          <div class="etf-portfolio-summary">
+            <div class="etf-portfolio-metric">
+              <span>OCF / TER oficial</span>
+              <strong id="etfOfficialOcf">—</strong>
+              <small id="etfOfficialOcfSource">Documento oficial indisponível</small>
+            </div>
+            <div class="etf-portfolio-metric">
+              <span>Dividend yield agregado</span>
+              <strong id="etfAggregateYield">—</strong>
+              <small>Yield das empresas subjacentes; não é distribuição do ETF.</small>
+            </div>
+            <div class="etf-portfolio-metric">
+              <span>Turnover reportado</span>
+              <strong id="etfPortfolioTurnover">—</strong>
+              <small>Valor do emitente; ainda não influencia a avaliação.</small>
+            </div>
+            <div class="etf-portfolio-metric">
+              <span>Maior setor</span>
+              <strong id="etfLargestSectorWeight">—</strong>
+              <small id="etfLargestSectorName">Setor indisponível</small>
+            </div>
+          </div>
+
+          <div class="etf-sector-layout">
+            <div class="etf-portfolio-block">
+              <div class="etf-portfolio-block-head">
+                <strong>Exposição por setores</strong>
+                <small id="etfSectorAllocationMeta">Alocação setorial indisponível</small>
+              </div>
+              <div class="etf-sector-list" id="etfSectorAllocationBody">
+                <div class="etf-portfolio-empty">
+                  Dados setoriais ainda não ligados.
+                </div>
+              </div>
+            </div>
+
+            <div class="etf-portfolio-block">
+              <div class="etf-portfolio-block-head">
+                <strong>Leitura estrutural</strong>
+                <small>Sem recomendação automática</small>
+              </div>
+              <div class="etf-cost-notice">
+                <strong id="etfSectorInterpretationTitle">
+                  A aguardar composição setorial.
+                </strong>
+                <div id="etfSectorInterpretation">
+                  O ThesisOS irá destacar concentração, mas não classificará
+                  automaticamente um setor como bom ou mau sem considerar
+                  carteira, objetivo e valuation.
+                </div>
+              </div>
             </div>
           </div>
 
@@ -3928,6 +4038,10 @@
       "#etfAggregatePb",
       "#etfAggregateRoe",
       "#etfAggregateGrowth",
+      "#etfOfficialOcf",
+      "#etfAggregateYield",
+      "#etfPortfolioTurnover",
+      "#etfLargestSectorWeight",
       "#etfOutstandingShares",
       "#etfBaseCurrency",
       "#etfListedCurrencies",
@@ -3946,6 +4060,9 @@
       "#etfAggregatePbBenchmark":"Benchmark indisponível",
       "#etfAggregateRoeBenchmark":"Benchmark indisponível",
       "#etfAggregateGrowthBenchmark":"Benchmark indisponível",
+      "#etfOfficialOcfSource":"Documento oficial indisponível",
+      "#etfLargestSectorName":"Setor indisponível",
+      "#etfSectorAllocationMeta":"Alocação setorial indisponível",
       "#etfHoldingsTableMeta":"Top holdings indisponíveis",
       "#etfCountriesTableMeta":"Alocação geográfica indisponível"
     };
@@ -3983,6 +4100,100 @@
             ? "A carregar países…"
             : "Dados ainda não ligados."
         }</td></tr>`;
+    }
+
+    if($("#etfSectorAllocationBody")){
+      $("#etfSectorAllocationBody").innerHTML=
+        `<div class="etf-portfolio-empty">${
+          state==="loading"
+            ? "A carregar setores…"
+            : "Dados setoriais ainda não ligados."
+        }</div>`;
+    }
+
+    if($("#etfSectorInterpretationTitle")){
+      $("#etfSectorInterpretationTitle").textContent=
+        state==="loading"
+          ? "A analisar a concentração setorial."
+          : "A aguardar composição setorial.";
+    }
+
+    if($("#etfSectorInterpretation")){
+      $("#etfSectorInterpretation").textContent=
+        "O ThesisOS irá destacar concentração, mas não classificará " +
+        "automaticamente um setor como bom ou mau sem considerar " +
+        "carteira, objetivo e valuation.";
+    }
+  }
+
+  function renderEtfSectorAllocation(sectors, largestSector){
+    const body=$("#etfSectorAllocationBody");
+
+    if(!body) return;
+
+    if(!Array.isArray(sectors) || !sectors.length){
+      body.innerHTML=
+        '<div class="etf-portfolio-empty">Alocação setorial indisponível.</div>';
+      return;
+    }
+
+    const maxWeight=Math.max(
+      ...sectors.map(item=>Number(item.weight_percentage)||0),
+      1
+    );
+
+    body.innerHTML=sectors.map(item=>{
+      const weight=Number(item.weight_percentage);
+      const barWidth=Number.isFinite(weight)
+        ? Math.max(2, Math.min(100, weight/maxWeight*100))
+        : 0;
+
+      return `
+        <div class="etf-sector-row">
+          <strong>${escapeEtfHtml(item.sector || "—")}</strong>
+          <div class="etf-sector-track">
+            <span style="width:${barWidth}%"></span>
+          </div>
+          <div class="etf-sector-value">
+            ${formatEtfNumber(weight, "%")}
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    const total=sectors.reduce(
+      (sum,item)=>sum+(Number(item.weight_percentage)||0),
+      0
+    );
+
+    if($("#etfSectorAllocationMeta")){
+      $("#etfSectorAllocationMeta").textContent=
+        `${sectors.length} setores · soma ${formatNumber(total)}%`;
+    }
+
+    const largestWeight=Number(largestSector?.weight_percentage);
+    const largestName=largestSector?.sector || sectors[0]?.sector;
+
+    if($("#etfSectorInterpretationTitle")){
+      $("#etfSectorInterpretationTitle").textContent=
+        largestName && Number.isFinite(largestWeight)
+          ? `${largestName} representa ${formatNumber(largestWeight)}%`
+          : "Composição setorial disponível.";
+    }
+
+    if($("#etfSectorInterpretation")){
+      $("#etfSectorInterpretation").textContent=
+        Number.isFinite(largestWeight) && largestWeight>=30
+          ? (
+              "Existe concentração material no maior setor. " +
+              "Isto não invalida o ETF, mas deve ser considerado " +
+              "ao medir overlap e concentração total da carteira."
+            )
+          : (
+              "A distribuição setorial não apresenta um setor acima " +
+              "do limiar genérico de 30%. A análise da carteira " +
+              "continua necessária."
+            );
     }
   }
 
@@ -4075,6 +4286,10 @@
     const countries=Array.isArray(profile.market_allocation)
       ? profile.market_allocation
       : [];
+    const sectors=Array.isArray(profile.sector_allocation)
+      ? profile.sector_allocation
+      : [];
+    const largestSector=profile.largest_sector || sectors[0] || null;
     const largestHolding=holdings[0] || null;
     const largestCountry=countries[0] || null;
     const outstanding=structure.outstanding_shares || {};
@@ -4160,6 +4375,50 @@
     });
 
     setEtfProfileText(
+      "#etfOfficialOcf",
+      Number.isFinite(Number(profile.ongoing_charges_percentage))
+        ? `${formatNumber(Number(profile.ongoing_charges_percentage))}%`
+        : profile.ocf_ter
+    );
+    setEtfProfileText(
+      "#etfOfficialOcfSource",
+      profile.factsheet_date || profile.kiid_date
+        ? [
+            profile.factsheet_date
+              ? `Factsheet ${profile.factsheet_date}`
+              : null,
+            profile.kiid_date
+              ? `KIID ${profile.kiid_date}`
+              : null
+          ].filter(Boolean).join(" · ")
+        : null,
+      "Documento oficial indisponível"
+    );
+    setEtfProfileText(
+      "#etfAggregateYield",
+      Number.isFinite(Number(profile.equity_yield_percentage))
+        ? `${formatNumber(Number(profile.equity_yield_percentage))}%`
+        : null
+    );
+    setEtfProfileText(
+      "#etfPortfolioTurnover",
+      Number.isFinite(Number(profile.portfolio_turnover_percentage))
+        ? `${formatNumber(Number(profile.portfolio_turnover_percentage))}%`
+        : null
+    );
+    setEtfProfileText(
+      "#etfLargestSectorWeight",
+      Number.isFinite(Number(largestSector?.weight_percentage))
+        ? `${formatNumber(Number(largestSector.weight_percentage))}%`
+        : null
+    );
+    setEtfProfileText(
+      "#etfLargestSectorName",
+      largestSector?.sector,
+      "Setor indisponível"
+    );
+
+    setEtfProfileText(
       "#etfOutstandingShares",
       Number.isFinite(Number(outstanding.value))
         ? `${formatNumber(Number(outstanding.value))}${
@@ -4191,8 +4450,8 @@
 
     if($("#etfPortfolioBadge")){
       $("#etfPortfolioBadge").textContent=
-        holdings.length && countries.length
-          ? "Composição oficial"
+        holdings.length && countries.length && sectors.length
+          ? "Dados oficiais"
           : "Dados parciais";
     }
 
@@ -4210,6 +4469,10 @@
           : "Alocação geográfica indisponível";
     }
 
+    renderEtfSectorAllocation(
+      sectors,
+      largestSector
+    );
     renderEtfHoldingsTable(holdings);
     renderEtfCountriesTable(countries);
 
@@ -4403,7 +4666,7 @@
 
     if($("#etfProfileStatus")){
       $("#etfProfileStatus").innerHTML=
-        "<strong>Estado atual:</strong> benchmark, replicação, dimensão, composição, tracking error, concentração e valuation agregado estão parcialmente ligados. TER/OCF, tracking difference, liquidez, análise técnica e encaixe na carteira continuam incompletos.";
+        "<strong>Estado atual:</strong> benchmark, replicação, dimensão, composição, OCF/TER, setores, tracking error, concentração e valuation agregado estão parcialmente ligados. Tracking difference, liquidez, análise técnica, overlap e encaixe na carteira continuam incompletos.";
     }
 
     setEtfProfileLink(

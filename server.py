@@ -1865,6 +1865,416 @@ def parse_vanguard_prices_and_structure(text):
     }
 
 
+
+VANGUARD_FACTSHEET_SECTORS = [
+    "Consumer Discretionary",
+    "Consumer Staples",
+    "Telecommunications",
+    "Basic Materials",
+    "Technology",
+    "Financials",
+    "Industrials",
+    "Health Care",
+    "Real Estate",
+    "Utilities",
+    "Energy",
+]
+
+
+def fetch_official_bytes(url: str) -> bytes:
+    request = Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/149.0 Safari/537.36 ThesisOS/0.5"
+            ),
+            "Accept": "*/*",
+            "Accept-Language": "en-GB,en;q=0.9",
+            "Cache-Control": "no-cache",
+        },
+    )
+
+    with urlopen(request, timeout=60) as response:
+        return response.read()
+
+
+def extract_official_pdf_text(
+    pdf_bytes: bytes,
+    mode: str = "plain",
+) -> str:
+    try:
+        import logging
+        from pypdf import PdfReader
+    except ImportError:
+        try:
+            import logging
+            from PyPDF2 import PdfReader
+        except ImportError as error:
+            raise RuntimeError(
+                "A biblioteca pypdf não está instalada."
+            ) from error
+
+    logging.getLogger("pypdf").setLevel(logging.ERROR)
+    logging.getLogger("pypdf._page").setLevel(logging.ERROR)
+
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    pages = []
+
+    for page in reader.pages:
+        if mode == "layout":
+            try:
+                page_text = page.extract_text(
+                    extraction_mode="layout"
+                )
+            except TypeError:
+                page_text = page.extract_text()
+        else:
+            page_text = page.extract_text()
+
+        pages.append(page_text or "")
+
+    return "\n".join(pages)
+
+
+def first_vanguard_document_number(text, patterns):
+    for pattern in patterns:
+        match = re.search(
+            pattern,
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        if match:
+            return float(match.group(1))
+
+    return None
+
+
+def first_vanguard_document_text(text, patterns):
+    for pattern in patterns:
+        match = re.search(
+            pattern,
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        if match:
+            return clean_official_text(match.group(1))
+
+    return None
+
+
+def isolate_vanguard_sector_section(text):
+    normalized = clean_official_text(text)
+    start = normalized.casefold().find("weighted exposure")
+
+    if start < 0:
+        return ""
+
+    section = normalized[start:]
+    marker_positions = []
+
+    for marker in (
+        "Market allocation",
+        "Source: Vanguard",
+        "Glossary for ETF attributes",
+    ):
+        marker_index = section.casefold().find(
+            marker.casefold()
+        )
+
+        if marker_index > 0:
+            marker_positions.append(marker_index)
+
+    if marker_positions:
+        section = section[:min(marker_positions)]
+
+    return section
+
+
+def vanguard_sector_names_in_order(section):
+    found = []
+
+    for sector in VANGUARD_FACTSHEET_SECTORS:
+        match = re.search(
+            re.escape(sector),
+            section,
+            flags=re.IGNORECASE,
+        )
+
+        if match:
+            found.append((match.start(), sector))
+
+    found.sort(key=lambda item: item[0])
+    return [sector for _, sector in found]
+
+
+def vanguard_sector_numbers_in_order(section):
+    values = []
+
+    for match in re.finditer(
+        r"(?<![\d.])(\d{1,2}(?:\.\d+)?)(?:\s*%)?(?![\d.])",
+        section,
+    ):
+        value = float(match.group(1))
+
+        if 0 <= value <= 100:
+            values.append(value)
+
+    return values
+
+
+def parse_vanguard_sector_allocation(text):
+    section = isolate_vanguard_sector_section(text)
+
+    if not section:
+        return []
+
+    direct_rows = []
+
+    for sector in sorted(
+        VANGUARD_FACTSHEET_SECTORS,
+        key=len,
+        reverse=True,
+    ):
+        match = re.search(
+            (
+                re.escape(sector)
+                + r"[\s:–—-]{1,40}"
+                + r"(\d{1,2}(?:\.\d+)?)\s*%?"
+            ),
+            section,
+            flags=re.IGNORECASE,
+        )
+
+        if match:
+            direct_rows.append(
+                {
+                    "sector": sector,
+                    "weight_percentage": float(match.group(1)),
+                }
+            )
+
+    direct_total = sum(
+        item["weight_percentage"]
+        for item in direct_rows
+    )
+
+    if len(direct_rows) >= 8 and 95 <= direct_total <= 105:
+        direct_rows.sort(
+            key=lambda item: item["weight_percentage"],
+            reverse=True,
+        )
+        return direct_rows
+
+    ordered_sectors = vanguard_sector_names_in_order(section)
+    ordered_values = vanguard_sector_numbers_in_order(section)
+
+    if (
+        len(ordered_sectors) >= 8
+        and len(ordered_values) >= len(ordered_sectors)
+    ):
+        candidate_values = ordered_values[:len(ordered_sectors)]
+        candidate_total = sum(candidate_values)
+
+        if 95 <= candidate_total <= 105:
+            rows = [
+                {
+                    "sector": sector,
+                    "weight_percentage": value,
+                }
+                for sector, value in zip(
+                    ordered_sectors,
+                    candidate_values,
+                )
+            ]
+            rows.sort(
+                key=lambda item: item["weight_percentage"],
+                reverse=True,
+            )
+            return rows
+
+    return direct_rows
+
+
+def parse_vanguard_official_documents(
+    factsheet_plain_text: str,
+    factsheet_layout_text: str,
+    kiid_text: str,
+) -> dict:
+    combined_text = (
+        clean_official_text(factsheet_plain_text)
+        + " "
+        + clean_official_text(factsheet_layout_text)
+        + " "
+        + clean_official_text(kiid_text)
+    )
+
+    ongoing_charges = first_vanguard_document_number(
+        combined_text,
+        [
+            (
+                r"Ongoing\s+Charges\s+Figure"
+                r"[^\d]{0,40}(\d+(?:\.\d+)?)\s*%"
+            ),
+            (
+                r"Ongoing\s+charges"
+                r"[^\d]{0,40}(\d+(?:\.\d+)?)\s*%"
+            ),
+        ],
+    )
+
+    factsheet_date = first_vanguard_document_text(
+        factsheet_plain_text + "\n" + factsheet_layout_text,
+        [
+            (
+                r"Factsheet\s*\|\s*"
+                r"(\d{1,2}\s+[A-Za-z]+\s+\d{4})"
+            ),
+            (
+                r"Data\s+as\s+at\s+"
+                r"(\d{1,2}\s+[A-Za-z]+\s+\d{4})"
+            ),
+        ],
+    )
+
+    kiid_date = first_vanguard_document_text(
+        kiid_text,
+        [
+            (
+                r"accurate\s+as\s+at\s+"
+                r"(\d{1,2}/\d{1,2}/\d{4})"
+            ),
+        ],
+    )
+
+    equity_yield = first_vanguard_document_number(
+        factsheet_plain_text,
+        [
+            (
+                r"Equity\s+yield\s*\(dividend\)"
+                r"[^\d]{0,30}(\d+(?:\.\d+)?)\s*%"
+            ),
+        ],
+    )
+
+    if equity_yield is None:
+        equity_yield = first_vanguard_document_number(
+            factsheet_layout_text,
+            [
+                (
+                    r"Equity\s+yield\s*\(dividend\)"
+                    r"[^\d]{0,60}(\d+(?:\.\d+)?)\s*%"
+                ),
+            ],
+        )
+
+    portfolio_turnover = first_vanguard_document_number(
+        factsheet_plain_text,
+        [
+            (
+                r"(?:Portfolio\s+)?Turnover\s+rate"
+                r"[^\d+-]{0,30}([-+]?\d+(?:\.\d+)?)\s*%"
+            ),
+        ],
+    )
+
+    if portfolio_turnover is None:
+        portfolio_turnover = first_vanguard_document_number(
+            factsheet_layout_text,
+            [
+                (
+                    r"(?:Portfolio\s+)?Turnover\s+rate"
+                    r"[^\d+-]{0,60}([-+]?\d+(?:\.\d+)?)\s*%"
+                ),
+            ],
+        )
+
+    sector_allocation = parse_vanguard_sector_allocation(
+        factsheet_layout_text
+    )
+
+    if len(sector_allocation) < 8:
+        sector_allocation = parse_vanguard_sector_allocation(
+            factsheet_plain_text
+        )
+
+    sector_total = (
+        round(
+            sum(
+                item["weight_percentage"]
+                for item in sector_allocation
+            ),
+            4,
+        )
+        if sector_allocation
+        else None
+    )
+
+    return {
+        "status": "ok",
+        "ongoing_charges_percentage": ongoing_charges,
+        "factsheet_date": factsheet_date,
+        "kiid_date": kiid_date,
+        "equity_yield_percentage": equity_yield,
+        "portfolio_turnover_percentage": portfolio_turnover,
+        "sector_allocation": sector_allocation,
+        "sector_total_percentage": sector_total,
+        "largest_sector": (
+            sector_allocation[0]
+            if sector_allocation
+            else None
+        ),
+        "coverage": {
+            "ocf_available": ongoing_charges is not None,
+            "sector_count": len(sector_allocation),
+            "sector_total_close_to_100": (
+                sector_total is not None
+                and 98 <= sector_total <= 102
+            ),
+            "equity_yield_available": equity_yield is not None,
+            "turnover_available": portfolio_turnover is not None,
+        },
+    }
+
+
+def get_vanguard_official_document_data(
+    factsheet_url: str | None,
+    kiid_url: str | None,
+) -> dict:
+    if not factsheet_url:
+        return {
+            "status": "unavailable",
+            "reason": "Factsheet oficial não encontrado.",
+        }
+
+    factsheet_bytes = fetch_official_bytes(factsheet_url)
+    factsheet_plain_text = extract_official_pdf_text(
+        factsheet_bytes,
+        mode="plain",
+    )
+    factsheet_layout_text = extract_official_pdf_text(
+        factsheet_bytes,
+        mode="layout",
+    )
+
+    kiid_text = ""
+
+    if kiid_url:
+        kiid_text = extract_official_pdf_text(
+            fetch_official_bytes(kiid_url),
+            mode="plain",
+        )
+
+    return parse_vanguard_official_documents(
+        factsheet_plain_text,
+        factsheet_layout_text,
+        kiid_text,
+    )
+
+
 def build_vanguard_etf_profile(
     asset: dict,
     source_url: str,
@@ -1888,6 +2298,35 @@ def build_vanguard_etf_profile(
     prices_and_structure = (
         parse_vanguard_prices_and_structure(page_text)
     )
+
+    factsheet_url = find_official_document_link(
+        parser.links,
+        source_url,
+        "Factsheet",
+    )
+    kiid_url = find_official_document_link(
+        parser.links,
+        source_url,
+        "KIID",
+    )
+
+    official_document_data = {
+        "status": "unavailable",
+        "reason": "Documentos ainda não processados.",
+    }
+
+    try:
+        official_document_data = (
+            get_vanguard_official_document_data(
+                factsheet_url,
+                kiid_url,
+            )
+        )
+    except Exception as error:
+        official_document_data = {
+            "status": "unavailable",
+            "reason": str(error),
+        }
 
     top_10_holdings = holdings[:10]
 
@@ -1973,10 +2412,51 @@ def build_vanguard_etf_profile(
             tokens,
             ["Investment manager"],
         ),
-        "ocf_ter": find_official_value(
-            tokens,
-            ["OCF/TER", "OCF", "TER"],
+        "ocf_ter": (
+            (
+                f"{official_document_data.get('ongoing_charges_percentage'):.2f}%"
+                if official_document_data.get(
+                    "ongoing_charges_percentage"
+                ) is not None
+                else None
+            )
+            or find_official_value(
+                tokens,
+                ["OCF/TER", "OCF", "TER"],
+            )
         ),
+        "ongoing_charges_percentage": (
+            official_document_data.get(
+                "ongoing_charges_percentage"
+            )
+        ),
+        "factsheet_date": official_document_data.get(
+            "factsheet_date"
+        ),
+        "kiid_date": official_document_data.get("kiid_date"),
+        "equity_yield_percentage": (
+            official_document_data.get(
+                "equity_yield_percentage"
+            )
+        ),
+        "portfolio_turnover_percentage": (
+            official_document_data.get(
+                "portfolio_turnover_percentage"
+            )
+        ),
+        "sector_allocation": official_document_data.get(
+            "sector_allocation",
+            [],
+        ),
+        "sector_total_percentage": (
+            official_document_data.get(
+                "sector_total_percentage"
+            )
+        ),
+        "largest_sector": official_document_data.get(
+            "largest_sector"
+        ),
+        "official_document_data": official_document_data,
         "number_of_stocks": (
             characteristics
             .get("number_of_stocks", {})
@@ -2015,11 +2495,8 @@ def build_vanguard_etf_profile(
             ).upper()
             else None
         ),
-        "factsheet_url": find_official_document_link(
-            parser.links,
-            source_url,
-            "Factsheet",
-        ),
+        "factsheet_url": factsheet_url,
+        "kiid_url": kiid_url,
         "source_url": source_url,
         "source": "Vanguard official product page",
     }
@@ -2066,6 +2543,21 @@ def build_vanguard_etf_profile(
         ),
         "base_currency": bool(
             prices_and_structure.get("base_currency")
+        ),
+        "ongoing_charges": (
+            profile.get("ongoing_charges_percentage")
+            is not None
+        ),
+        "sector_allocation": bool(
+            profile.get("sector_allocation")
+        ),
+        "equity_yield": (
+            profile.get("equity_yield_percentage")
+            is not None
+        ),
+        "portfolio_turnover": (
+            profile.get("portfolio_turnover_percentage")
+            is not None
         ),
     }
 
@@ -2698,7 +3190,7 @@ def analysis_source(
 
 
 
-FRAMEWORK_ENGINE_VERSION = "0.4"
+FRAMEWORK_ENGINE_VERSION = "0.5"
 
 
 def fact_value(fact):
@@ -3683,6 +4175,7 @@ def build_etf_framework_engine(
         for key, label in [
             ("source_url", "página oficial do emitente"),
             ("factsheet_url", "factsheet oficial"),
+            ("kiid_url", "KID/KIID oficial"),
             ("share_class_inception", "início da classe"),
             ("listing_date", "data de listagem"),
         ]
@@ -3694,6 +4187,7 @@ def build_etf_framework_engine(
         for key, label in [
             ("source_url", "página oficial do emitente"),
             ("factsheet_url", "factsheet oficial"),
+            ("kiid_url", "KID/KIID oficial"),
             ("share_class_inception", "início da classe"),
             ("listing_date", "data de listagem"),
         ]
@@ -3762,6 +4256,10 @@ def build_etf_framework_engine(
                 ),
                 "setores das principais posições",
             ),
+            (
+                bool(etf_profile.get("sector_allocation")),
+                "alocação setorial completa",
+            ),
         ]
         if available
     ]
@@ -3781,7 +4279,11 @@ def build_etf_framework_engine(
                 )
                 else None
             ),
-            "alocação setorial completa",
+            (
+                "alocação setorial completa"
+                if not etf_profile.get("sector_allocation")
+                else None
+            ),
             "exposição por moedas das holdings",
             "overlap com outros ETFs",
         ]
@@ -3804,6 +4306,23 @@ def build_etf_framework_engine(
         "concentration",
         {},
     )
+    sector_allocation = etf_profile.get(
+        "sector_allocation",
+        [],
+    )
+    largest_sector = etf_profile.get(
+        "largest_sector",
+        {},
+    ) or {}
+    ongoing_charges = etf_profile.get(
+        "ongoing_charges_percentage"
+    )
+    equity_yield = etf_profile.get(
+        "equity_yield_percentage"
+    )
+    portfolio_turnover = etf_profile.get(
+        "portfolio_turnover_percentage"
+    )
 
     tracking_error_available = any(
         value is not None
@@ -3814,8 +4333,17 @@ def build_etf_framework_engine(
         label
         for available, label in [
             (
-                bool(etf_profile.get("ocf_ter")),
+                ongoing_charges is not None
+                or bool(etf_profile.get("ocf_ter")),
                 "TER/OCF",
+            ),
+            (
+                equity_yield is not None,
+                "dividend yield agregado",
+            ),
+            (
+                portfolio_turnover is not None,
+                "turnover reportado",
             ),
             (
                 bool(etf_profile.get("share_class_assets")),
@@ -3878,8 +4406,17 @@ def build_etf_framework_engine(
         label
         for available, label in [
             (
-                bool(etf_profile.get("ocf_ter")),
+                ongoing_charges is not None
+                or bool(etf_profile.get("ocf_ter")),
                 "TER/OCF",
+            ),
+            (
+                equity_yield is not None,
+                "dividend yield agregado",
+            ),
+            (
+                portfolio_turnover is not None,
+                "turnover reportado",
             ),
             (
                 bool(etf_profile.get("share_class_assets")),
@@ -3990,7 +4527,6 @@ def build_etf_framework_engine(
             ],
             [
                 *official_missing,
-                "KID/KIID",
                 "relatório anual do fundo",
             ],
         ),
@@ -4098,11 +4634,11 @@ def build_etf_framework_engine(
         ),
         "scope": (
             (
-                "Identificação, preço, moeda, composição, "
-                "tracking error, concentração e valuation agregado "
-                "já estão parcialmente ligados. TER, tracking "
-                "difference, análise técnica e carteira continuam "
-                "incompletos."
+                "Identificação, preço, moeda, composição, custos, "
+                "alocação setorial, tracking error, concentração e "
+                "valuation agregado já estão parcialmente ligados. "
+                "Tracking difference, liquidez, análise técnica e "
+                "carteira continuam incompletos."
             )
             if profile_available
             else (
@@ -4132,7 +4668,7 @@ def build_etf_framework_engine(
                 "name": "Framework de decisão e monitorização",
                 "status": "blocked",
                 "reason": (
-                    "TER, tracking difference, análise técnica, "
+                    "Tracking difference, liquidez, análise técnica, "
                     "overlap e contexto da carteira ainda incompletos."
                 ),
             },
@@ -4178,6 +4714,20 @@ def build_etf_framework_engine(
                         if tracking_error.get(
                             "five_year_percentage"
                         ) is not None
+                        else None
+                    ),
+                    (
+                        {
+                            "label": "OCF/TER oficial",
+                            "value": ongoing_charges,
+                            "unit": "%",
+                            "interpretation": (
+                                "Custo anual reduzido para um ETF "
+                                "global e amplamente diversificado."
+                            ),
+                        }
+                        if ongoing_charges is not None
+                        and ongoing_charges <= 0.25
                         else None
                     ),
                     (
@@ -4242,6 +4792,30 @@ def build_etf_framework_engine(
                     ),
                     (
                         {
+                            "label": (
+                                largest_sector.get("sector")
+                                or "Maior setor"
+                            ),
+                            "value": largest_sector.get(
+                                "weight_percentage"
+                            ),
+                            "unit": "%",
+                            "interpretation": (
+                                "A exposição setorial está concentrada "
+                                "e deve ser considerada no overlap da "
+                                "carteira."
+                            ),
+                        }
+                        if largest_sector.get(
+                            "weight_percentage"
+                        ) is not None
+                        and largest_sector.get(
+                            "weight_percentage"
+                        ) >= 30
+                        else None
+                    ),
+                    (
+                        {
                             "label": "TER/OCF",
                             "value": None,
                             "unit": "",
@@ -4261,6 +4835,11 @@ def build_etf_framework_engine(
                 "characteristics": characteristics,
                 "concentration": concentration,
                 "prices_and_structure": prices_and_structure,
+                "ongoing_charges_percentage": ongoing_charges,
+                "equity_yield_percentage": equity_yield,
+                "portfolio_turnover_percentage": portfolio_turnover,
+                "sector_allocation": sector_allocation,
+                "largest_sector": largest_sector,
             },
             "methodology_note": (
                 "O ThesisOS não aplica um score empresarial a ETFs. "
@@ -4288,12 +4867,18 @@ def build_etf_framework_engine(
                 ),
                 (
                     "TER/OCF"
-                    if not etf_profile.get("ocf_ter")
+                    if ongoing_charges is None
+                    and not etf_profile.get("ocf_ter")
                     else None
                 ),
                 "tracking difference",
                 "liquidez e spread",
-                "alocação setorial e cambial completa",
+                (
+                    "alocação setorial completa"
+                    if not sector_allocation
+                    else None
+                ),
+                "exposição cambial das holdings",
                 "overlap com a carteira",
                 "valuation histórico e comparação com alternativas",
                 "análise técnica e zona de reforço",
@@ -4308,7 +4893,7 @@ def build_etf_framework_engine(
             ),
             "action": "monitor",
             "label": (
-                "Aguardar TER, técnica, overlap e carteira"
+                "Aguardar tracking difference, técnica e carteira"
                 if profile_available
                 else "Aguardar dados estruturais do ETF"
             ),
@@ -4319,16 +4904,16 @@ def build_etf_framework_engine(
             "catalysts": [],
             "thesis_break_signals": [],
             "next_review": (
-                "Após integração de TER, técnica e overlap"
+                "Após integração de tracking difference, técnica e overlap"
                 if profile_available
                 else "Após integração do factsheet oficial"
             ),
             "reason": (
                 (
-                    "A composição, concentração, tracking error e "
+                    "Custos, composição, concentração, tracking error e "
                     "valuation agregado já estão parcialmente ligados, "
-                    "mas faltam custos confirmados, tracking difference, "
-                    "momento de entrada e encaixe na carteira."
+                    "mas faltam tracking difference, liquidez, momento "
+                    "de entrada e encaixe na carteira."
                 )
                 if profile_available
                 else (
