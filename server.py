@@ -38,6 +38,13 @@ SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 SEC_COMPANY_FACTS_URL = (
     "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 )
+SEC_SUBMISSIONS_URL = (
+    "https://data.sec.gov/submissions/CIK{cik}.json"
+)
+SEC_ARCHIVES_URL = (
+    "https://www.sec.gov/Archives/edgar/data/"
+    "{cik}/{accession}/{primary_document}"
+)
 
 OPENFIGI_CACHE_TTL_SECONDS = 24 * 60 * 60
 EODHD_CACHE_TTL_SECONDS = 24 * 60 * 60
@@ -46,6 +53,8 @@ ECB_CACHE_TTL_SECONDS = 12 * 60 * 60
 ETF_PROFILE_CACHE_TTL_SECONDS = 24 * 60 * 60
 TECHNICAL_CACHE_TTL_SECONDS = 30 * 60
 RADAR_CACHE_TTL_SECONDS = 30 * 60
+EVIDENCE_CACHE_TTL_SECONDS = 30 * 60
+SEC_SUBMISSIONS_CACHE_TTL_SECONDS = 60 * 60
 OPENFIGI_CACHE = {}
 EODHD_CACHE = {}
 SEC_CACHE = {}
@@ -53,6 +62,8 @@ ECB_CACHE = {}
 ETF_PROFILE_CACHE = {}
 TECHNICAL_CACHE = {}
 RADAR_CACHE = {}
+EVIDENCE_CACHE = {}
+SEC_SUBMISSIONS_CACHE = {}
 
 RADAR_UNIVERSES = {
     "core_us": [
@@ -1086,6 +1097,729 @@ def get_sec_fundamentals(ticker: str):
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
+
+
+SEC_EVIDENCE_FORMS = {
+    "10-K": {
+        "category": "annual_results",
+        "label": "Relatório anual",
+        "materiality": "critical",
+        "score": 100,
+    },
+    "20-F": {
+        "category": "annual_results",
+        "label": "Relatório anual internacional",
+        "materiality": "critical",
+        "score": 100,
+    },
+    "40-F": {
+        "category": "annual_results",
+        "label": "Relatório anual canadiano",
+        "materiality": "critical",
+        "score": 100,
+    },
+    "10-Q": {
+        "category": "quarterly_results",
+        "label": "Relatório trimestral",
+        "materiality": "critical",
+        "score": 96,
+    },
+    "6-K": {
+        "category": "material_update",
+        "label": "Atualização material internacional",
+        "materiality": "high",
+        "score": 90,
+    },
+    "8-K": {
+        "category": "material_update",
+        "label": "Acontecimento material",
+        "materiality": "high",
+        "score": 90,
+    },
+    "DEF 14A": {
+        "category": "governance",
+        "label": "Proxy e governance",
+        "materiality": "medium",
+        "score": 70,
+    },
+    "4": {
+        "category": "insider_activity",
+        "label": "Transação de insider",
+        "materiality": "medium",
+        "score": 62,
+    },
+    "S-3": {
+        "category": "capital_markets",
+        "label": "Registo de emissão de valores mobiliários",
+        "materiality": "high",
+        "score": 82,
+    },
+    "424B": {
+        "category": "capital_markets",
+        "label": "Prospecto de oferta",
+        "materiality": "high",
+        "score": 84,
+    },
+}
+
+NEWS_CATEGORY_RULES = [
+    (
+        "results_guidance",
+        "Resultados e guidance",
+        [
+            "earnings", "results", "quarter", "revenue", "profit",
+            "guidance", "forecast", "outlook", "eps", "margin",
+        ],
+        "high",
+        82,
+    ),
+    (
+        "mergers_acquisitions",
+        "Aquisições e operações societárias",
+        [
+            "acquisition", "acquire", "merger", "takeover", "buyout",
+            "strategic review", "sale of", "divest",
+        ],
+        "high",
+        84,
+    ),
+    (
+        "legal_regulatory",
+        "Regulação, investigação ou litígio",
+        [
+            "lawsuit", "investigation", "regulator", "regulatory",
+            "antitrust", "fine", "probe", "court", "settlement",
+        ],
+        "high",
+        86,
+    ),
+    (
+        "capital_allocation",
+        "Capital, dívida e retorno ao acionista",
+        [
+            "offering", "share sale", "debt", "bond", "credit facility",
+            "buyback", "repurchase", "dividend", "capital raise",
+        ],
+        "high",
+        80,
+    ),
+    (
+        "management",
+        "Alteração de administração",
+        [
+            "ceo", "cfo", "chairman", "appoint", "resign", "departure",
+            "management change", "chief executive", "chief financial",
+        ],
+        "medium",
+        72,
+    ),
+    (
+        "commercial",
+        "Contratos, clientes e parcerias",
+        [
+            "contract", "order", "backlog", "customer", "partnership",
+            "agreement", "award", "supplier",
+        ],
+        "medium",
+        68,
+    ),
+    (
+        "product_operations",
+        "Produto e operações",
+        [
+            "launch", "product", "approval", "fda", "production",
+            "capacity", "factory", "recall", "outage",
+        ],
+        "medium",
+        65,
+    ),
+]
+
+CAUTION_NEWS_KEYWORDS = {
+    "miss", "cuts guidance", "lower guidance", "downgrade", "decline",
+    "fall", "drops", "lawsuit", "investigation", "probe", "fine",
+    "recall", "delay", "layoff", "bankruptcy", "default", "offering",
+}
+
+POSITIVE_NEWS_KEYWORDS = {
+    "beats", "raises guidance", "record", "wins contract", "approval",
+    "buyback", "dividend increase", "expands", "growth accelerates",
+}
+
+
+def fetch_sec_submissions(cik: str) -> dict:
+    clean_cik = str(cik or "").zfill(10)
+
+    if not re.fullmatch(r"\d{10}", clean_cik):
+        raise ValueError("CIK inválido para submissões SEC.")
+
+    cached = SEC_SUBMISSIONS_CACHE.get(clean_cik)
+
+    if cached:
+        age = time.time() - cached["created_at"]
+        if age < SEC_SUBMISSIONS_CACHE_TTL_SECONDS:
+            return cached["data"]
+
+    user_agent = os.getenv("SEC_USER_AGENT")
+    if not user_agent:
+        raise RuntimeError("SEC_USER_AGENT não está configurado.")
+
+    request = Request(
+        SEC_SUBMISSIONS_URL.format(cik=clean_cik),
+        headers={
+            "User-Agent": user_agent,
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate",
+        },
+    )
+
+    with urlopen(request, timeout=25) as response:
+        raw = decode_http_body(response)
+        data = json.loads(raw.decode("utf-8"))
+
+    SEC_SUBMISSIONS_CACHE[clean_cik] = {
+        "created_at": time.time(),
+        "data": data,
+    }
+    return data
+
+
+def normalize_sec_evidence_form(form: str) -> str:
+    clean = str(form or "").strip().upper()
+    clean = clean.removesuffix("/A")
+
+    if clean.startswith("424B"):
+        return "424B"
+
+    return clean
+
+
+def sec_filing_document_url(
+    cik: str,
+    accession_number: str,
+    primary_document: str,
+) -> str | None:
+    if not cik or not accession_number or not primary_document:
+        return None
+
+    clean_cik = str(int(str(cik)))
+    clean_accession = str(accession_number).replace("-", "")
+    return SEC_ARCHIVES_URL.format(
+        cik=clean_cik,
+        accession=clean_accession,
+        primary_document=primary_document,
+    )
+
+
+def parse_recent_sec_evidence(
+    submissions: dict,
+    days: int = 365,
+    limit: int = 14,
+) -> list[dict]:
+    recent = submissions.get("filings", {}).get("recent", {})
+    forms = recent.get("form") or []
+    filing_dates = recent.get("filingDate") or []
+    report_dates = recent.get("reportDate") or []
+    acceptance_dates = recent.get("acceptanceDateTime") or []
+    accessions = recent.get("accessionNumber") or []
+    primary_documents = recent.get("primaryDocument") or []
+    descriptions = recent.get("primaryDocDescription") or []
+    cik = submissions.get("cik")
+    cutoff = date.today().toordinal() - days
+    results = []
+
+    for index, raw_form in enumerate(forms):
+        form = normalize_sec_evidence_form(raw_form)
+        metadata = SEC_EVIDENCE_FORMS.get(form)
+
+        if not metadata:
+            continue
+
+        filing_date = filing_dates[index] if index < len(filing_dates) else None
+
+        try:
+            filing_day = date.fromisoformat(filing_date)
+        except (TypeError, ValueError):
+            continue
+
+        if filing_day.toordinal() < cutoff:
+            continue
+
+        accession = accessions[index] if index < len(accessions) else None
+        primary_document = (
+            primary_documents[index]
+            if index < len(primary_documents)
+            else None
+        )
+        report_date = report_dates[index] if index < len(report_dates) else None
+        accepted = (
+            acceptance_dates[index]
+            if index < len(acceptance_dates)
+            else None
+        )
+        description = (
+            descriptions[index]
+            if index < len(descriptions)
+            else None
+        )
+        label = metadata["label"]
+        headline = f"{form} — {label}"
+
+        if report_date:
+            headline += f" ({report_date})"
+
+        results.append(
+            {
+                "id": f"sec:{accession or form + ':' + filing_date}",
+                "event_type": "official_filing",
+                "source_kind": "official",
+                "source": "SEC EDGAR",
+                "source_confidence": "highest",
+                "event_date": filing_date,
+                "event_timestamp": accepted or f"{filing_date}T00:00:00Z",
+                "form": form,
+                "category": metadata["category"],
+                "category_label": label,
+                "materiality": metadata["materiality"],
+                "materiality_score": metadata["score"],
+                "direction": "neutral",
+                "headline": headline,
+                "summary": (
+                    description
+                    or (
+                        f"Documento regulatório oficial apresentado à SEC"
+                        + (f" para o período terminado em {report_date}." if report_date else ".")
+                    )
+                ),
+                "url": sec_filing_document_url(
+                    str(cik),
+                    accession,
+                    primary_document,
+                ),
+                "accession_number": accession,
+                "report_date": report_date,
+                "primary_document": primary_document,
+                "why_it_matters": (
+                    "Documento oficial com prioridade máxima na hierarquia "
+                    "de evidência do ThesisOS."
+                ),
+            }
+        )
+
+        if len(results) >= limit:
+            break
+
+    return results
+
+
+def classify_company_news(headline: str, summary: str) -> dict:
+    text = f"{headline or ''} {summary or ''}".casefold()
+    category = "general_news"
+    label = "Notícia empresarial"
+    materiality = "low"
+    score = 45
+
+    for (
+        candidate_category,
+        candidate_label,
+        keywords,
+        candidate_materiality,
+        candidate_score,
+    ) in NEWS_CATEGORY_RULES:
+        if any(keyword in text for keyword in keywords):
+            category = candidate_category
+            label = candidate_label
+            materiality = candidate_materiality
+            score = candidate_score
+            break
+
+    if any(keyword in text for keyword in CAUTION_NEWS_KEYWORDS):
+        direction = "caution"
+    elif any(keyword in text for keyword in POSITIVE_NEWS_KEYWORDS):
+        direction = "potential_positive"
+    else:
+        direction = "neutral"
+
+    return {
+        "category": category,
+        "category_label": label,
+        "materiality": materiality,
+        "materiality_score": score,
+        "direction": direction,
+    }
+
+
+def fetch_company_news_evidence(
+    symbol: str,
+    days: int = 90,
+    limit: int = 20,
+) -> list[dict]:
+    clean_symbol = str(symbol or "").strip().upper()
+
+    if not clean_symbol:
+        return []
+
+    end_date = date.today()
+    start_date = date.fromordinal(end_date.toordinal() - days)
+    data = fetch_finnhub(
+        "company-news",
+        {
+            "symbol": clean_symbol,
+            "from": start_date.isoformat(),
+            "to": end_date.isoformat(),
+        },
+    )
+
+    if not isinstance(data, list):
+        raise RuntimeError("Resposta inesperada da Finnhub Company News.")
+
+    seen = set()
+    events = []
+
+    for item in data:
+        headline = clean_official_text(item.get("headline"))
+        url = item.get("url")
+        identifier = item.get("id") or url or headline
+
+        if not headline or identifier in seen:
+            continue
+
+        seen.add(identifier)
+        summary = clean_official_text(item.get("summary"))
+        classification = classify_company_news(headline, summary)
+        timestamp = item.get("datetime")
+
+        try:
+            event_datetime = datetime.fromtimestamp(
+                int(timestamp),
+                tz=timezone.utc,
+            )
+            event_timestamp = event_datetime.isoformat()
+            event_date = event_datetime.date().isoformat()
+        except (TypeError, ValueError, OSError):
+            event_timestamp = None
+            event_date = None
+
+        events.append(
+            {
+                "id": f"news:{identifier}",
+                "event_type": "company_news",
+                "source_kind": "news",
+                "source": item.get("source") or "Finnhub Company News",
+                "source_confidence": "secondary",
+                "event_date": event_date,
+                "event_timestamp": event_timestamp,
+                "form": None,
+                **classification,
+                "headline": headline,
+                "summary": summary[:500] if summary else "",
+                "url": url,
+                "image": item.get("image"),
+                "related": item.get("related"),
+                "why_it_matters": (
+                    "Notícia classificada por tema e materialidade. "
+                    "Quando possível, deve ser confirmada no documento original."
+                ),
+            }
+        )
+
+        if len(events) >= limit:
+            break
+
+    return events
+
+
+def evidence_review_implications(events: list[dict]) -> list[str]:
+    implications = []
+    recent_official = [
+        event
+        for event in events
+        if event.get("source_kind") == "official"
+        and event.get("materiality") in {"critical", "high"}
+    ]
+    caution_events = [
+        event
+        for event in events
+        if event.get("direction") == "caution"
+        and event.get("materiality") in {"critical", "high"}
+    ]
+
+    if any(
+        event.get("category") in {"annual_results", "quarterly_results"}
+        for event in recent_official
+    ):
+        implications.append(
+            "Rever receitas, margens, cash flow, dívida e guidance face à tese anterior."
+        )
+
+    if any(
+        event.get("category") == "material_update"
+        for event in recent_official
+    ):
+        implications.append(
+            "Ler o 8-K/6-K antes de alterar a decisão ou o tamanho da posição."
+        )
+
+    if any(
+        event.get("category") == "capital_markets"
+        for event in recent_official
+    ):
+        implications.append(
+            "Validar potencial diluição, custo da dívida e impacto no valor por ação."
+        )
+
+    if caution_events:
+        implications.append(
+            "Existe notícia material com sinal de cautela; confirmar a origem oficial."
+        )
+
+    if not implications:
+        implications.append(
+            "Nenhum evento material recente identificado que, por si só, altere a tese."
+        )
+
+    return implications
+
+
+def build_evidence_snapshot(
+    asset: dict,
+    fundamentals: dict | None,
+) -> dict:
+    symbol = str(asset.get("symbol") or "").strip().upper()
+    asset_type = asset.get("asset_type")
+    cik = (fundamentals or {}).get("cik")
+    cache_key = f"{asset_type}:{symbol}:{cik or ''}"
+    cached = EVIDENCE_CACHE.get(cache_key)
+
+    if cached:
+        age = time.time() - cached["created_at"]
+        if age < EVIDENCE_CACHE_TTL_SECONDS:
+            return cached["data"]
+
+    filings = []
+    news = []
+    errors = []
+    filings_status = "not_applicable"
+    news_status = "not_applicable"
+
+    if asset_type == "stock":
+        if not cik and symbol:
+            try:
+                company = find_sec_company(symbol)
+                cik = (company or {}).get("cik")
+            except Exception as error:
+                errors.append(f"SEC company lookup: {error}")
+
+        if cik:
+            try:
+                submissions = fetch_sec_submissions(cik)
+                filings = parse_recent_sec_evidence(submissions)
+                filings_status = "ok" if filings else "empty"
+            except Exception as error:
+                filings_status = "unavailable"
+                errors.append(f"SEC submissions: {error}")
+        else:
+            filings_status = "unavailable"
+            errors.append("CIK indisponível para consultar submissões SEC.")
+
+        if symbol:
+            try:
+                news = fetch_company_news_evidence(symbol)
+                news_status = "ok" if news else "empty"
+            except Exception as error:
+                news_status = "unavailable"
+                errors.append(f"Finnhub company news: {error}")
+
+    events = filings + news
+    events.sort(
+        key=lambda item: (
+            item.get("event_timestamp") or item.get("event_date") or "",
+            item.get("materiality_score") or 0,
+        ),
+        reverse=True,
+    )
+
+    material_events = sorted(
+        [
+            event
+            for event in events
+            if event.get("materiality") in {"critical", "high"}
+        ],
+        key=lambda item: (
+            item.get("materiality_score") or 0,
+            item.get("event_timestamp") or item.get("event_date") or "",
+        ),
+        reverse=True,
+    )
+
+    official_available = filings_status in {"ok", "empty"}
+    news_available = news_status in {"ok", "empty"}
+
+    if official_available and news_available:
+        status = "ok"
+        coverage = 100
+    elif official_available:
+        status = "partial"
+        coverage = 65
+    elif news_available:
+        status = "partial"
+        coverage = 40
+    else:
+        status = "unavailable"
+        coverage = 0
+
+    review_required = False
+    review_reason = None
+    today = date.today()
+
+    for event in material_events:
+        try:
+            event_day = date.fromisoformat(event.get("event_date"))
+        except (TypeError, ValueError):
+            continue
+
+        age_days = (today - event_day).days
+        if (
+            event.get("source_kind") == "official"
+            and age_days <= 30
+        ) or (
+            event.get("direction") == "caution"
+            and age_days <= 14
+        ):
+            review_required = True
+            review_reason = event.get("headline")
+            break
+
+    snapshot = {
+        "status": status,
+        "coverage_percentage": coverage,
+        "symbol": symbol,
+        "cik": cik,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "filings_status": filings_status,
+        "news_status": news_status,
+        "official_filings_count": len(filings),
+        "news_count": len(news),
+        "material_events_count": len(material_events),
+        "review_required": review_required,
+        "review_reason": review_reason,
+        "latest_event": events[0] if events else None,
+        "latest_official_filing": filings[0] if filings else None,
+        "events": events[:30],
+        "material_events": material_events[:12],
+        "thesis_implications": evidence_review_implications(events),
+        "errors": errors,
+        "source_hierarchy": [
+            "SEC EDGAR official filings",
+            "Company or regulatory source linked by the event",
+            "Finnhub company news aggregation",
+        ],
+        "methodology_note": (
+            "O motor classifica documentos e notícias por fonte, tema, "
+            "recência e materialidade. Não inventa impacto financeiro nem "
+            "substitui a leitura do documento original."
+        ),
+    }
+
+    EVIDENCE_CACHE[cache_key] = {
+        "created_at": time.time(),
+        "data": snapshot,
+    }
+    return snapshot
+
+
+def enrich_framework_engine_with_evidence(
+    engine: dict,
+    evidence: dict | None,
+) -> dict:
+    if not isinstance(engine, dict) or not evidence:
+        return engine
+
+    checklist = engine.get("framework_checklist", {}).get("items", [])
+    documentation_item = next(
+        (
+            item
+            for item in checklist
+            if item.get("id") == "official_documentation"
+        ),
+        None,
+    )
+
+    official_count = evidence.get("official_filings_count", 0)
+    news_count = evidence.get("news_count", 0)
+    available = []
+
+    if official_count:
+        available.append("submissões SEC recentes")
+    if any(
+        event.get("form") in {"10-K", "10-Q", "20-F", "40-F"}
+        for event in evidence.get("events", [])
+    ):
+        available.append("10-K/10-Q/20-F recentes")
+    if any(
+        event.get("form") in {"8-K", "6-K"}
+        for event in evidence.get("events", [])
+    ):
+        available.append("8-K/6-K recentes")
+    if news_count:
+        available.append("notícias empresariais recentes")
+    if evidence.get("material_events_count"):
+        available.append("classificação de materialidade")
+
+    if documentation_item and available:
+        documentation_item["status"] = "partial"
+        documentation_item["available_data"] = list(dict.fromkeys(
+            documentation_item.get("available_data", []) + available
+        ))
+        documentation_item["missing_data"] = [
+            value
+            for value in documentation_item.get("missing_data", [])
+            if not any(
+                token in str(value).casefold()
+                for token in ("8-k", "notícias materiais")
+            )
+        ]
+
+    engine["evidence_snapshot"] = evidence
+    engine["next_required_data"] = [
+        item
+        for item in engine.get("next_required_data", [])
+        if not any(
+            token in str(item).casefold()
+            for token in ("8-k", "notícias materiais")
+        )
+    ]
+
+    decision = engine.get("decision", {})
+    decision["evidence_context"] = {
+        "status": evidence.get("status"),
+        "material_events_count": evidence.get("material_events_count"),
+        "review_required": evidence.get("review_required"),
+        "review_reason": evidence.get("review_reason"),
+    }
+
+    if evidence.get("review_required"):
+        existing_reason = decision.get("reason") or ""
+        event_reason = (
+            " Existe um evento material recente que deve ser lido antes "
+            "de alterar a decisão ou o tamanho da posição."
+        )
+        if event_reason.strip() not in existing_reason:
+            decision["reason"] = (existing_reason + event_reason).strip()
+        decision["event_gate"] = "review_required"
+
+    framework = engine.get("framework_checklist", {})
+    if checklist:
+        available_count = sum(
+            1
+            for item in checklist
+            if item.get("status") in {"available", "partial"}
+        )
+        framework["coverage_percentage"] = round(
+            available_count / len(checklist) * 100
+        )
+
+    return engine
 
 def decode_http_body(response) -> bytes:
     raw = response.read()
@@ -3758,7 +4492,7 @@ def enrich_framework_engine_with_technical(
 
 
 
-FRAMEWORK_ENGINE_VERSION = "0.8"
+FRAMEWORK_ENGINE_VERSION = "0.9"
 
 
 def fact_value(fact):
@@ -6039,6 +6773,46 @@ def build_analysis_payload(
             "A análise técnica está temporariamente indisponível."
         )
 
+    evidence = None
+
+    if asset.get("asset_type") == "stock":
+        try:
+            evidence = build_evidence_snapshot(asset, fundamentals)
+            evidence_status = (
+                "ok"
+                if evidence.get("status") == "ok"
+                else "partial"
+                if evidence.get("status") == "partial"
+                else "unavailable"
+            )
+            sources["evidence"] = analysis_source(
+                "SEC EDGAR + Finnhub Company News",
+                evidence_status,
+                coverage_percentage=evidence.get(
+                    "coverage_percentage"
+                ),
+                official_filings=evidence.get(
+                    "official_filings_count"
+                ),
+                news_items=evidence.get("news_count"),
+            )
+        except Exception as error:
+            sources["evidence"] = analysis_source(
+                "Evidence & Events Engine",
+                "unavailable",
+                detail=str(error),
+            )
+            warnings.append(
+                "Os eventos e notícias recentes estão "
+                "temporariamente indisponíveis."
+            )
+    else:
+        sources["evidence"] = analysis_source(
+            "Evidence & Events Engine",
+            "not_applicable",
+            reason="A versão atual está otimizada para ações.",
+        )
+
     valuation = None
     if asset.get("asset_type") == "stock":
         try:
@@ -6115,7 +6889,7 @@ def build_analysis_payload(
     ]
 
     if asset.get("asset_type") == "stock":
-        required_source_keys.append("fundamentals")
+        required_source_keys.extend(["fundamentals", "evidence"])
 
     if asset.get("asset_type") == "etf":
         required_source_keys.append("etf_structure")
@@ -6161,6 +6935,7 @@ def build_analysis_payload(
         "etf_profile": etf_profile,
         "technical": technical,
         "valuation": valuation,
+        "evidence": evidence,
         "fx": fx,
         "sources": sources,
         "data_quality": {
@@ -6193,6 +6968,10 @@ def build_analysis_payload(
     payload["framework_engine"] = enrich_framework_engine_with_valuation(
         payload["framework_engine"],
         valuation,
+    )
+    payload["framework_engine"] = enrich_framework_engine_with_evidence(
+        payload["framework_engine"],
+        evidence,
     )
 
     return payload, 200
@@ -6828,6 +7607,14 @@ def radar_status(score, payload):
     coverage = payload.get("data_quality", {}).get(
         "completeness_percentage", 0
     )
+    evidence = payload.get("evidence") or {}
+
+    if evidence.get("review_required"):
+        return {
+            "code": "event_review",
+            "label": "Rever evento material",
+            "action": "Ler documento/notícia antes de agir",
+        }
 
     if score is None or coverage < 50:
         return {
@@ -6862,6 +7649,7 @@ def radar_result_from_payload(payload: dict) -> dict:
     technical = payload.get("technical") or {}
     valuation = payload.get("valuation") or {}
     valuation_metrics = valuation.get("metrics", {})
+    evidence = payload.get("evidence") or {}
     indicators = technical.get("indicators", {})
     score = radar_composite_score(payload)
     status = radar_status(score, payload)
@@ -6903,6 +7691,10 @@ def radar_result_from_payload(payload: dict) -> dict:
         "quality_classification": snapshot.get("classification"),
         "valuation_score": valuation.get("score"),
         "valuation_classification": valuation.get("classification"),
+        "evidence_status": evidence.get("status"),
+        "material_events_count": evidence.get("material_events_count"),
+        "event_review_required": evidence.get("review_required"),
+        "latest_event": evidence.get("latest_event"),
         "free_cash_flow_yield_percentage": valuation_metrics.get(
             "free_cash_flow_yield_percentage"
         ),
@@ -7134,6 +7926,7 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
                         "SEC EDGAR",
                         "ECB Data Portal",
                         "Yahoo Finance via yfinance",
+                        "SEC submissions and Finnhub Company News",
                     ],
                 }
             )
@@ -7157,6 +7950,10 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
 
         if parsed_url.path.startswith("/api/valuation/"):
             self.handle_valuation_request(parsed_url)
+            return
+
+        if parsed_url.path.startswith("/api/evidence/"):
+            self.handle_evidence_request(parsed_url)
             return
 
         if parsed_url.path.startswith("/api/fx/"):
@@ -7277,6 +8074,36 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             self.send_json(
                 {
                     "error": "Erro ao calcular valuation.",
+                    "detail": str(error),
+                },
+                status=500,
+            )
+
+    def handle_evidence_request(self, parsed_url) -> None:
+        identifier = unquote(
+            parsed_url.path.removeprefix("/api/evidence/")
+        ).strip().upper()
+
+        if not identifier:
+            self.send_json({"error": "Identificador inválido."}, status=400)
+            return
+
+        query = parse_qs(parsed_url.query)
+
+        try:
+            payload, status = resolve_analysis_payload(
+                identifier,
+                exchange=query.get("exchange", [None])[0],
+                ticker=query.get("ticker", [None])[0],
+            )
+            if status != 200:
+                self.send_json(payload, status=status)
+                return
+            self.send_json(payload.get("evidence") or {})
+        except Exception as error:
+            self.send_json(
+                {
+                    "error": "Erro ao recolher evidência e eventos.",
                     "detail": str(error),
                 },
                 status=500,

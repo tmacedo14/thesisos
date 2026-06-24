@@ -16,15 +16,18 @@ ThesisOS is a functional academic prototype for evidence-based investment analys
 - Functional local Portfolio Manager with transactions, current prices, average monitoring cost, P&L, target weights, contribution optimisation and CSV import/export.
 - Functional Decision Journal with thesis versioning, snapshots, entry zones, review dates and CSV export.
 - Functional monitoring alerts for price, scores, RSI, pullback and thesis review dates.
+- Evidence & Events Engine with SEC submissions, recent company news, source hierarchy, materiality and thesis-review gates.
 - Stock-to-stock and ETF-to-ETF comparison.
 - Printable analysis that can be saved as PDF from the browser.
 
 ## Data sources
 
 - **Finnhub:** US quotes and company profiles.
+- **Finnhub Company News:** recent North American company news used as a secondary evidence layer.
 - **OpenFIGI:** instrument identification and security type.
 - **EODHD:** European ticker/ISIN listing discovery and previous close.
 - **SEC EDGAR Company Facts:** official US financial statements.
+- **SEC submissions history:** recent 10-K, 10-Q, 8-K, proxy, insider and capital-market filings.
 - **ECB Data Portal:** official EUR reference exchange rates.
 - **Yahoo Finance via yfinance:** historical daily price and volume data.
 - **Official ETF issuers:** product pages, factsheets and KIID documents. The current official adapter covers Vanguard FTSE All-World UCITS ETF (VWCE/VWRP/VWRA share class).
@@ -74,8 +77,9 @@ python3 server.py
 4. Add an asset to **Watchlist**.
 5. Compare `MSFT` with `AAPL`.
 6. Add AAPL or VWCE to **My Portfolio**, refresh prices and calculate the next contribution.
-7. Save the current analysis in **Investment Journal**, create monitoring alerts and update them.
-8. In an analysis, choose **Imprimir / PDF**.
+7. Open **Notícias & Alertas**, load AAPL and inspect SEC filings and recent news.
+8. Save the current analysis in **Investment Journal**, create monitoring alerts and update them.
+9. In an analysis, choose **Imprimir / PDF**.
 
 ## Architecture and safety
 

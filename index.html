@@ -575,7 +575,7 @@
     #etfAnalysisPanel{display:none}
     #analysis.stock-mode #stockFundamentalsPanel{display:block}
     #analysis.stock-mode #etfAnalysisPanel{display:none!important}
-    #analysis.stock-mode #realMarketDataCard ~ *:not(#stockFundamentalsPanel):not(#stockCashFlowPanel):not(#stockValuationPanel){display:none!important}
+    #analysis.stock-mode #realMarketDataCard ~ *:not(#stockFundamentalsPanel):not(#stockCashFlowPanel):not(#stockValuationPanel):not(#evidenceEventsCard){display:none!important}
     #analysis.etf-mode #stockFundamentalsPanel{display:none!important}
     #analysis.etf-mode #etfAnalysisPanel{display:block}
     #analysis.etf-mode #realMarketDataCard ~ *:not(#etfAnalysisPanel){display:none!important}
@@ -1342,6 +1342,41 @@
     @media(max-width:1100px){.valuation-metric-grid{grid-template-columns:repeat(3,1fr)}.valuation-layout{grid-template-columns:1fr}}
     @media(max-width:700px){.valuation-metric-grid,.dcf-input-grid,.dcf-result-grid{grid-template-columns:1fr}}
 
+  
+    /* ThesisOS Evidence & Events Engine */
+    #evidenceEventsCard{display:none;margin-bottom:16px}
+    #analysis.stock-mode #evidenceEventsCard{display:block!important}
+    #analysis.etf-mode #evidenceEventsCard,
+    #analysis.analysis-neutral #evidenceEventsCard{display:none!important}
+    .evidence-engine-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+    .evidence-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+    .evidence-kpi{padding:13px;border:1px solid #263a59;border-radius:13px;background:#111d30;min-height:94px}
+    .evidence-kpi span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+    .evidence-kpi strong{display:block;font-size:20px;margin:7px 0 3px}
+    .evidence-kpi small{color:var(--muted);line-height:1.35}
+    .evidence-layout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(300px,.7fr);gap:14px;margin-top:14px}
+    .evidence-event-list{display:grid;gap:9px;max-height:570px;overflow:auto;padding-right:3px}
+    .evidence-event{padding:13px;border:1px solid #263a59;border-radius:13px;background:#101b2d}
+    .evidence-event[data-materiality="critical"]{border-color:#80515c}
+    .evidence-event[data-materiality="high"]{border-color:#6a532d}
+    .evidence-event-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .evidence-event h3{font-size:13px;line-height:1.4;margin:0}
+    .evidence-event p{margin:7px 0;color:var(--muted);font-size:12px;line-height:1.5}
+    .evidence-event-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+    .evidence-event-link{display:inline-flex;margin-top:9px;color:#a8c3ff;font-size:11px;text-decoration:none}
+    .evidence-event-link:hover{text-decoration:underline}
+    .evidence-implication-list{display:grid;gap:8px;margin:10px 0 0;padding:0;list-style:none}
+    .evidence-implication-list li{padding:10px 11px;border:1px solid #263a59;border-radius:11px;background:#101b2d;color:#c5d0df;font-size:12px;line-height:1.45}
+    .evidence-feed-toolbar{display:grid;grid-template-columns:1fr auto auto;gap:9px;align-items:end}
+    .evidence-feed-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}
+    .evidence-feed-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:20px}
+    .evidence-feed-empty{grid-column:1/-1;padding:38px 20px;text-align:center;color:var(--muted);border:1px dashed #354b6c;border-radius:15px}
+    .evidence-filter-row{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
+    .evidence-filter{padding:8px 10px;border-radius:999px;border:1px solid #2b4162;background:#132139;color:#aebbd0}
+    .evidence-filter.active{background:#284268;color:#fff;border-color:#4c6c9e}
+    @media(max-width:1000px){.evidence-layout{grid-template-columns:1fr}.evidence-kpi-grid,.evidence-feed-summary{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:700px){.evidence-kpi-grid,.evidence-feed-summary,.evidence-feed-grid,.evidence-feed-toolbar{grid-template-columns:1fr}}
+
   </style>
 </head>
 <body>
@@ -1593,6 +1628,13 @@
               <span class="analysis-source-status">A aguardar</span>
             </div>
             <small>Yahoo Finance</small>
+          </div>
+          <div class="analysis-source-item" id="analysisSourceEvidence" data-status="waiting" style="display:none">
+            <div class="analysis-source-item-head">
+              <strong>Evidência & eventos</strong>
+              <span class="analysis-source-status">A aguardar</span>
+            </div>
+            <small>SEC submissions + Finnhub Company News</small>
           </div>
           <div class="analysis-source-item" id="analysisSourceValuation" data-status="waiting" style="display:none">
             <div class="analysis-source-item-head">
@@ -2034,6 +2076,23 @@
         </div>
 
         <div class="framework-engine-note" id="valuationMethodology">Valuation relativo inicial. Ainda faltam histórico, comparáveis, guidance, normalização do FCF e cenários específicos.</div>
+      </section>
+
+      <section class="card" id="evidenceEventsCard">
+        <div class="evidence-engine-top">
+          <div><h2 style="margin:0 0 6px">Evidence & Events Engine</h2><p class="sub" id="evidenceScope">Documentos SEC e notícias recentes, ordenados por confiança e materialidade.</p></div>
+          <div style="text-align:right"><span class="pill" id="evidenceStatus">A aguardar</span><div class="sub" id="evidenceGeneratedAt" style="margin-top:7px">Sem atualização</div></div>
+        </div>
+        <div class="evidence-kpi-grid">
+          <div class="evidence-kpi"><span>Documentos oficiais</span><strong id="evidenceOfficialCount">—</strong><small>10-K, 10-Q, 8-K e outros</small></div>
+          <div class="evidence-kpi"><span>Notícias recentes</span><strong id="evidenceNewsCount">—</strong><small>Finnhub Company News</small></div>
+          <div class="evidence-kpi"><span>Eventos materiais</span><strong id="evidenceMaterialCount">—</strong><small>Materialidade alta ou crítica</small></div>
+          <div class="evidence-kpi"><span>Revisão da tese</span><strong id="evidenceReviewState">—</strong><small id="evidenceReviewReason">Sem avaliação</small></div>
+        </div>
+        <div class="evidence-layout">
+          <div><div class="section-head" style="margin:0 0 8px"><div><h3>Eventos mais recentes</h3><p class="sub" style="margin:4px 0 0">O documento original tem prioridade sobre o resumo.</p></div></div><div class="evidence-event-list" id="analysisEvidenceEvents"></div></div>
+          <div><h3>Implicações para a tese</h3><ul class="evidence-implication-list" id="analysisEvidenceImplications"></ul><div class="framework-engine-note" id="evidenceMethodology">A classificação não substitui a leitura do documento original.</div></div>
+        </div>
       </section>
 
       <section class="card" id="etfAnalysisPanel" style="margin-bottom:16px">
@@ -2588,6 +2647,19 @@
         <div><h1>Monitorização & Alertas</h1><p class="sub">Regras de preço, score, RSI, pullback e revisão da tese, avaliadas com os dados atuais do ThesisOS.</p></div>
         <div class="monitoring-toolbar"><button class="ghost" id="alertsFromJournalBtn" type="button">Criar a partir da última decisão</button><button class="ghost" id="alertsRefreshBtn" type="button">Atualizar todos</button><button class="primary" id="alertsNewBtn" type="button">+ Novo alerta</button></div>
       </div>
+      <div class="card" id="evidenceFeedCard">
+        <div class="section-head" style="margin:0 0 10px"><div><h2>Evidence Feed</h2><p class="sub">Pesquisa um ativo ou usa a análise atual para consultar documentos oficiais e notícias recentes.</p></div><span class="freshness warn" id="evidenceFeedUpdated">Ainda não carregado</span></div>
+        <div class="evidence-feed-toolbar"><label>Ticker ou ISIN<input id="evidenceFeedSymbol" placeholder="AAPL"></label><button class="ghost" id="evidenceUseCurrentBtn" type="button">Usar análise atual</button><button class="primary" id="evidenceLoadBtn" type="button">Carregar eventos</button></div>
+        <div class="evidence-feed-summary">
+          <div class="card"><div class="metric-label">Documentos oficiais</div><div class="metric" id="feedOfficialCount">0</div><div class="delta">SEC EDGAR</div></div>
+          <div class="card"><div class="metric-label">Notícias</div><div class="metric" id="feedNewsCount">0</div><div class="delta">Últimos 90 dias</div></div>
+          <div class="card"><div class="metric-label">Materiais</div><div class="metric" id="feedMaterialCount">0</div><div class="delta warn">Alta ou crítica</div></div>
+          <div class="card"><div class="metric-label">Revisão necessária</div><div class="metric" id="feedReviewState">Não</div><div class="delta" id="feedReviewReason">Sem evento bloqueante</div></div>
+        </div>
+        <div class="evidence-filter-row"><button class="evidence-filter active" data-evidence-filter="all">Todos</button><button class="evidence-filter" data-evidence-filter="official">Oficiais</button><button class="evidence-filter" data-evidence-filter="news">Notícias</button><button class="evidence-filter" data-evidence-filter="material">Materiais</button></div>
+        <div class="evidence-feed-grid" id="evidenceFeedList"><div class="evidence-feed-empty">Pesquisa um ativo para carregar eventos.</div></div>
+      </div>
+
       <div class="sync-strip" id="alertsSyncStrip"><div class="sync-left"><div class="sync-icon">◉</div><div><strong>Monitorização local e explicável</strong><small id="alertsSyncText">Os alertas são verificados quando abres ou atualizas esta página; não executam ordens.</small></div></div><span class="freshness warn" id="alertsUpdated">Ainda não verificados</span></div>
       <div class="monitoring-summary">
         <div class="card"><div class="metric-label">Alertas configurados</div><div class="metric" id="alertsTotalCount">0</div><div class="delta">Regras locais</div></div>
@@ -2773,7 +2845,14 @@
     if(id==="watchlist") renderWatchlist();
     if(id==="myportfolio") renderPortfolioManager();
     if(id==="journal") renderDecisionJournal();
-    if(id==="alerts") renderMonitoringAlerts();
+    if(id==="alerts"){
+      renderMonitoringAlerts();
+      if(window.currentAnalysisPayload?.evidence){
+        const payload=window.currentAnalysisPayload;
+        $("#evidenceFeedSymbol").value=payload.query||payload.asset?.symbol||"";
+        renderEvidenceFeed(payload.evidence);
+      }
+    }
   }
   navButtons.forEach(button=>button.addEventListener("click",()=>handlePageOpen(button.dataset.page)));
   $$("[data-go]").forEach(button=>button.addEventListener("click",()=>handlePageOpen(button.dataset.go)));
@@ -3380,6 +3459,7 @@
       "#analysisSourceIdentification",
       "#analysisSourceMarket",
       "#analysisSourceTechnical",
+      "#analysisSourceEvidence",
       "#analysisSourceValuation",
       "#analysisSourceFundamentals",
       "#analysisSourceFx",
@@ -3439,6 +3519,18 @@
       "#analysisSourceTechnical",
       sources.technical
     );
+    const evidenceSourceCard=$("#analysisSourceEvidence");
+    if(evidenceSourceCard){
+      const isStock=payload.asset?.asset_type==="stock";
+      evidenceSourceCard.style.display=isStock ? "" : "none";
+      if(isStock){
+        updateAnalysisSourceCard(
+          "#analysisSourceEvidence",
+          sources.evidence
+        );
+      }
+    }
+
     const valuationSourceCard=$("#analysisSourceValuation");
     if(valuationSourceCard){
       const isStock=payload.asset?.asset_type==="stock";
@@ -5031,6 +5123,7 @@
     renderFrameworkEngine(payload.framework_engine);
     renderTechnicalAnalysis(payload.technical);
     renderStockValuation(payload.valuation,asset);
+    renderEvidenceSnapshot(payload.evidence);
     syncAnalysisActionButtons();
 
     showToast(
@@ -5060,6 +5153,7 @@
     resetFrameworkEngine("loading");
     resetTechnicalAnalysis("loading");
     resetStockValuation("loading");
+    resetEvidenceSnapshot("loading");
     resetEtfOfficialProfile("loading");
 
     status.textContent="A construir análise agregada…";
@@ -6263,6 +6357,129 @@
   document.addEventListener("click",e=>{const del=e.target.closest(".portfolio-delete-tx");if(del){if(confirm("Eliminar esta transação?"))savePortfolioTransactions(getPortfolioTransactions().filter(tx=>tx.id!==del.dataset.id));return;}const analyze=e.target.closest(".portfolio-analyze-position");if(analyze){void loadUnifiedAnalysis(analyze.dataset.symbol,{exchange:analyze.dataset.exchange||undefined,ticker:analyze.dataset.ticker||undefined});return;}const add=e.target.closest(".portfolio-add-position-tx");if(add){const p=portfolioSnapshot().positions.find(item=>item.key===add.dataset.key);if(p)portfolioOpenModal({type:"BUY",symbol:p.symbol,name:p.name,exchange:p.exchange,ticker:p.ticker,asset_type:p.asset_type,currency:p.currency,category:p.category,target_weight:p.target_weight,unit_price:p.quote?.price||""});}});
   renderPortfolioManager();
 
+
+
+  // ---------------------------------------------------------------
+  // Evidence & Events Engine
+  // ---------------------------------------------------------------
+  let currentEvidenceFilter="all";
+  let currentEvidenceFeed=null;
+
+  function evidenceEscape(value){
+    return String(value??"").replace(/[&<>'"]/g,char=>({
+      "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"
+    })[char]);
+  }
+
+  function evidenceMaterialityLabel(value){
+    return ({critical:"Crítico",high:"Alto",medium:"Médio",low:"Baixo"})[value] || "Não classificado";
+  }
+
+  function evidenceDirectionLabel(value){
+    return ({caution:"Cautela",potential_positive:"Potencial positivo",neutral:"Neutro"})[value] || "Neutro";
+  }
+
+  function evidenceStatusLabel(value){
+    return ({ok:"Cobertura completa",partial:"Cobertura parcial",unavailable:"Indisponível"})[value] || "A aguardar";
+  }
+
+  function resetEvidenceSnapshot(state="waiting"){
+    const loading=state==="loading";
+    ["#evidenceOfficialCount","#evidenceNewsCount","#evidenceMaterialCount"].forEach(selector=>{
+      if($(selector)) $(selector).textContent=loading?"…":"—";
+    });
+    if($("#evidenceStatus")) $("#evidenceStatus").textContent=loading?"A recolher":"A aguardar";
+    if($("#evidenceGeneratedAt")) $("#evidenceGeneratedAt").textContent=loading?"A consultar fontes":"Sem atualização";
+    if($("#evidenceReviewState")) $("#evidenceReviewState").textContent=loading?"…":"—";
+    if($("#evidenceReviewReason")) $("#evidenceReviewReason").textContent="Sem avaliação";
+    if($("#analysisEvidenceEvents")) $("#analysisEvidenceEvents").innerHTML=`<div class="evidence-feed-empty">${loading?"A carregar eventos…":"Sem eventos carregados."}</div>`;
+    if($("#analysisEvidenceImplications")) $("#analysisEvidenceImplications").innerHTML="<li>Pesquisa um ativo para gerar implicações.</li>";
+  }
+
+  function evidenceEventHtml(event){
+    const materiality=event.materiality||"low";
+    const sourceKind=event.source_kind==="official"?"Oficial":"Notícia";
+    const link=event.url?`<a class="evidence-event-link" href="${evidenceEscape(event.url)}" target="_blank" rel="noopener noreferrer">Abrir fonte original ↗</a>`:"";
+    return `<article class="evidence-event" data-materiality="${evidenceEscape(materiality)}"><div class="evidence-event-head"><div><h3>${evidenceEscape(event.headline||"Evento sem título")}</h3><small style="color:var(--muted)">${evidenceEscape(event.event_date||"Data indisponível")} · ${evidenceEscape(event.source||"Fonte indisponível")}</small></div><span class="${materiality==="critical"?"priority":materiality==="high"?"pill warn":"pill"}">${evidenceEscape(evidenceMaterialityLabel(materiality))}</span></div><p>${evidenceEscape(event.summary||event.why_it_matters||"Sem resumo disponível.")}</p><div class="evidence-event-meta"><span class="chip">${sourceKind}</span><span class="chip">${evidenceEscape(event.category_label||event.category||"Geral")}</span><span class="chip">${evidenceEscape(evidenceDirectionLabel(event.direction))}</span>${event.form?`<span class="chip">${evidenceEscape(event.form)}</span>`:""}</div>${link}</article>`;
+  }
+
+  function renderEvidenceSnapshot(evidence){
+    if(!evidence){resetEvidenceSnapshot();return;}
+    $("#evidenceStatus").textContent=evidenceStatusLabel(evidence.status);
+    $("#evidenceGeneratedAt").textContent=evidence.generated_at?`Atualizado ${formatAssetDate(evidence.generated_at)}`:"Sem data";
+    $("#evidenceOfficialCount").textContent=evidence.official_filings_count??0;
+    $("#evidenceNewsCount").textContent=evidence.news_count??0;
+    $("#evidenceMaterialCount").textContent=evidence.material_events_count??0;
+    $("#evidenceReviewState").textContent=evidence.review_required?"Rever":"Sem bloqueio";
+    $("#evidenceReviewReason").textContent=evidence.review_reason||"Nenhum evento recente bloqueante";
+    const events=(evidence.events||[]).slice(0,8);
+    $("#analysisEvidenceEvents").innerHTML=events.length?events.map(evidenceEventHtml).join(""):'<div class="evidence-feed-empty">Nenhum evento recente encontrado.</div>';
+    const implications=evidence.thesis_implications||[];
+    $("#analysisEvidenceImplications").innerHTML=implications.length?implications.map(item=>`<li>${evidenceEscape(item)}</li>`).join(""):"<li>Sem implicações automáticas.</li>";
+    $("#evidenceMethodology").textContent=evidence.methodology_note||"A classificação não substitui a leitura da fonte original.";
+  }
+
+  function filteredEvidenceEvents(evidence){
+    const events=evidence?.events||[];
+    if(currentEvidenceFilter==="official") return events.filter(item=>item.source_kind==="official");
+    if(currentEvidenceFilter==="news") return events.filter(item=>item.source_kind==="news");
+    if(currentEvidenceFilter==="material") return events.filter(item=>["critical","high"].includes(item.materiality));
+    return events;
+  }
+
+  function renderEvidenceFeed(evidence){
+    currentEvidenceFeed=evidence;
+    $("#feedOfficialCount").textContent=evidence?.official_filings_count??0;
+    $("#feedNewsCount").textContent=evidence?.news_count??0;
+    $("#feedMaterialCount").textContent=evidence?.material_events_count??0;
+    $("#feedReviewState").textContent=evidence?.review_required?"Sim":"Não";
+    $("#feedReviewReason").textContent=evidence?.review_reason||"Sem evento bloqueante";
+    $("#evidenceFeedUpdated").textContent=evidence?.generated_at?`Atualizado ${formatAssetDate(evidence.generated_at)}`:"Sem atualização";
+    $("#evidenceFeedUpdated").className=`freshness ${evidence?.review_required?"bad":""}`;
+    const events=filteredEvidenceEvents(evidence);
+    $("#evidenceFeedList").innerHTML=events.length?events.map(evidenceEventHtml).join(""):'<div class="evidence-feed-empty">Nenhum evento nesta vista.</div>';
+  }
+
+  async function loadEvidenceFeed(identifier,options={}){
+    const clean=String(identifier||"").trim().toUpperCase();
+    if(!clean){showToast("Indica um ticker ou ISIN.");return;}
+    $("#evidenceLoadBtn").disabled=true;
+    $("#evidenceLoadBtn").textContent="A carregar…";
+    $("#evidenceFeedList").innerHTML='<div class="evidence-feed-empty">A consultar SEC e notícias…</div>';
+    const params=new URLSearchParams();
+    if(options.exchange) params.set("exchange",options.exchange);
+    if(options.ticker) params.set("ticker",options.ticker);
+    try{
+      const response=await fetch(`/api/evidence/${encodeURIComponent(clean)}?${params.toString()}`);
+      const data=await response.json();
+      if(!response.ok) throw new Error(data.detail||data.error||"Evidence Feed indisponível");
+      renderEvidenceFeed(data);
+      showToast(`Eventos de ${data.symbol||clean} carregados.`);
+    }catch(error){
+      $("#evidenceFeedList").innerHTML=`<div class="evidence-feed-empty">${evidenceEscape(error.message)}</div>`;
+      showToast(error.message);
+    }finally{
+      $("#evidenceLoadBtn").disabled=false;
+      $("#evidenceLoadBtn").textContent="Carregar eventos";
+    }
+  }
+
+  $("#evidenceUseCurrentBtn")?.addEventListener("click",()=>{
+    const payload=window.currentAnalysisPayload;
+    if(!payload){showToast("Pesquisa primeiro um ativo.");return;}
+    const symbol=payload.query||payload.asset?.symbol;
+    $("#evidenceFeedSymbol").value=symbol||"";
+    if(payload.evidence) renderEvidenceFeed(payload.evidence);
+    else void loadEvidenceFeed(symbol,{exchange:payload.asset?.exchange_code,ticker:payload.asset?.symbol});
+  });
+  $("#evidenceLoadBtn")?.addEventListener("click",()=>loadEvidenceFeed($("#evidenceFeedSymbol").value));
+  $("#evidenceFeedSymbol")?.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();void loadEvidenceFeed(event.currentTarget.value);}});
+  $$("[data-evidence-filter]").forEach(button=>button.addEventListener("click",()=>{
+    $$("[data-evidence-filter]").forEach(item=>item.classList.remove("active"));
+    button.classList.add("active");
+    currentEvidenceFilter=button.dataset.evidenceFilter;
+    if(currentEvidenceFeed) renderEvidenceFeed(currentEvidenceFeed);
+  }));
 
   // ---------------------------------------------------------------
   // Decision Journal and Monitoring Alerts
