@@ -234,9 +234,9 @@ def test_static(suite: Suite) -> None:
         "/api/technical/",
         "/api/valuation/",
         "/api/evidence/",
-        "/api/sync/status",
-        "/api/sync/login",
-        "/api/sync/state",
+        "/api/auth/config",
+        "/api/auth/session",
+        "/api/user/state",
     ]
     absent_routes = [route for route in routes if route not in server]
     suite.check(
@@ -324,21 +324,24 @@ def test_runtime(suite: Suite, base_url: str) -> None:
         return
 
     try:
-        status, data = json_request(endpoint(base_url, "/api/sync/status"), timeout=10)
-        if status != 200 or data.get("status") != "ok":
-            suite.fail("Cloud Sync status", f"HTTP {status}: {data}")
-        elif data.get("configured"):
-            suite.pass_(
-                "Cloud Sync configuration",
-                f"workspace={data.get('workspace_id')}, provider={data.get('provider')}",
-            )
-        else:
-            suite.warn(
-                "Cloud Sync configuration",
-                "missing: " + ", ".join(data.get("missing") or []),
-            )
+        status, data = json_request(
+            endpoint(base_url, "/api/auth/config"),
+            timeout=10,
+        )
+        configured = (
+            status == 200
+            and data.get("status") == "ok"
+            and data.get("configured") is True
+            and bool(data.get("url"))
+            and bool(data.get("publishable_key"))
+        )
+        suite.check(
+            "Supabase Auth configuration",
+            configured,
+            "configured" if configured else f"HTTP {status}: {data}",
+        )
     except Exception as error:
-        suite.fail("Cloud Sync status", str(error))
+        suite.fail("Supabase Auth configuration", str(error))
 
 
 def test_full(suite: Suite, base_url: str) -> None:
