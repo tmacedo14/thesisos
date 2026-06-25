@@ -319,6 +319,8 @@ def test_static(suite: Suite) -> None:
         "Logo proxy token isolation": 'os.getenv("LOGOKIT_PUBLISHABLE_TOKEN"' in server,
         "Logo provider registry": '"LogoKit stock and ETF logos"' in server,
         "frontend logo helper": "function radarTickerLogo(item){" in index,
+        "frontend Radar logo helper invocation": 'radar-live-card"><div class="ticker">${radarTickerLogo(item)}' in index,
+        "frontend Radar hardcoded ticker removed": 'radar-live-card"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div>' not in index,
         "frontend logo proxy": '`/api/logo?${logoParams.toString()}`' in index,
         "frontend provider fallback": "data-fallback-src=" in index,
         "frontend textual fallback": "radar-logo-fallback" in index,
