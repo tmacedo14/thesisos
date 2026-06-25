@@ -1623,12 +1623,12 @@
         <div class="page-action-row"><span class="freshness" id="radarUpdated">Ainda não executado</span><button class="primary" id="runRadarBtn" type="button">Executar Radar</button></div>
       </div>
       <div class="status-banner" id="radarStatusBanner" style="margin-bottom:14px">
-        <div><strong id="radarStatusTitle">Radar pronto</strong><div class="sub" id="radarStatusDetail" style="font-size:12px">O universo base usa oito ações líquidas. Podes também analisar a tua watchlist ou uma lista personalizada.</div></div>
+        <div><strong id="radarStatusTitle">Radar pronto</strong><div class="sub" id="radarStatusDetail" style="font-size:12px">Os universos automáticos descobrem candidatos, aplicam filtros de liquidez e dimensão e enviam apenas a shortlist para o framework completo.</div></div>
         <span class="freshness" id="radarCoverage">0 analisados</span>
       </div>
       <div class="card radar-config">
         <div class="radar-config-grid">
-          <label>Universo<select id="radarUniverse"><option value="core_us">Core US</option><option value="quality_us">Quality US</option><option value="growth_us">Growth US</option><option value="watchlist">Watchlist</option><option value="custom">Lista personalizada</option></select></label>
+          <label>Universo<select id="radarUniverse"><optgroup label="Descoberta automática"><option value="discover_market_us">US Multi-Factor Discovery</option><option value="discover_quality_us">US Quality Discovery</option><option value="discover_growth_us">US Profitable Growth Discovery</option><option value="discover_etf_us">US ETF Discovery</option></optgroup><optgroup label="Listas base"><option value="core_us">Core US</option><option value="quality_us">Quality US</option><option value="growth_us">Growth US</option></optgroup><optgroup label="Universos pessoais"><option value="watchlist">Watchlist</option><option value="custom">Lista personalizada</option></optgroup></select></label>
           <label>Tickers personalizados<input id="radarCustomSymbols" placeholder="MSFT, AAPL, MCD, KO" disabled /></label>
           <label>Máximo de ativos<select id="radarLimit"><option value="6">6</option><option value="8" selected>8</option><option value="10">10</option><option value="12">12</option></select></label>
           <label>Ordenação<select id="radarSort"><option value="score">Radar score</option><option value="quality">Qualidade</option><option value="technical">Técnica</option><option value="pullback">Maior pullback</option></select></label>
@@ -1640,7 +1640,7 @@
       <div class="radar-empty" id="dynamicRadarEmpty">Ainda não existem resultados. Executa o Radar.</div>
       <div class="card" style="margin-top:16px">
         <div class="section-head" style="margin:0 0 8px"><div><h2>Funil automático</h2><p class="sub">O Radar reduz o universo e encaminha os melhores candidatos para análise completa.</p></div></div>
-        <div class="automation-flow" style="grid-template-columns:repeat(5,1fr)"><div class="automation-step"><strong>Universo</strong><span>Core, quality, growth ou watchlist</span></div><div class="automation-step"><strong>Fontes</strong><span>Preço, SEC, BCE e histórico</span></div><div class="automation-step"><strong>Frameworks</strong><span>Qualidade, risco e estrutura</span></div><div class="automation-step"><strong>Técnica</strong><span>Tendência, pullback e volatilidade</span></div><div class="automation-step"><strong>Ranking</strong><span>Candidata, monitorizar ou aguardar</span></div></div>
+        <div class="automation-flow" style="grid-template-columns:repeat(5,1fr)"><div class="automation-step"><strong>Descoberta</strong><span>Queries multifator ou universo escolhido</span></div><div class="automation-step"><strong>Pré-filtro</strong><span>Tipo, dimensão, preço e liquidez</span></div><div class="automation-step"><strong>Shortlist</strong><span>Consenso, diversidade e exclusões</span></div><div class="automation-step"><strong>Framework</strong><span>Qualidade, valuation, técnica e risco</span></div><div class="automation-step"><strong>Decisão</strong><span>Ranking sujeito a eventos e carteira</span></div></div>
       </div>
     </section>
 
@@ -6408,6 +6408,34 @@ function escapeHtml(value){
     if($("#radarStatusDetail"))$("#radarStatusDetail").textContent="Configura o universo e carrega em Executar Radar para gerar um ranking atual.";
   }
 
+  function radarDiscoverySummary(data){
+    const discovery=data?.discovery||{};
+
+    if(data?.universe_mode!=="automatic_discovery"){
+      return data?.methodology?.decision_limit
+        ||"Candidatas identificadas para análise aprofundada.";
+    }
+
+    const pool=Number(discovery.candidate_pool_count)||0;
+    const eligible=Number(discovery.eligible_count)||0;
+    const selected=Number(discovery.shortlist_count)||0;
+    const strategy=discovery.selection_policy?.strategy;
+    const fallback=discovery.fallback_used
+      ?" · fallback utilizado"
+      :"";
+
+    const strategyLabels={
+      quality_source_interleave:"diversidade entre qualidade e financeiras",
+      strong_growth_sources_required:"crescimento rentável obrigatório",
+      multi_factor_round_robin:"alternância multifator",
+      liquid_unleveraged_etfs:"ETFs líquidos e não alavancados",
+    };
+
+    return `${pool} descobertos · ${eligible} elegíveis · ${selected} enviados para análise`
+      +(strategy?` · ${strategyLabels[strategy]||strategy}`:"")
+      +fallback;
+  }
+
   async function loadOpportunityRadar(force=false){
     const universe=$("#radarUniverse")?.value || "core_us";
     const limit=$("#radarLimit")?.value || "8";
@@ -6418,9 +6446,9 @@ function escapeHtml(value){
     const params=new URLSearchParams({universe:universe==="watchlist"||universe==="custom"?"custom":universe,limit});
     if(symbols) params.set("symbols",symbols);
     if(force) params.set("refresh","1");
-    $("#radarLoading").hidden=false;$("#dynamicRadarCards").innerHTML="";$("#dynamicRadarEmpty").style.display="none";$("#radarStatusTitle").textContent="Radar em execução";$("#radarStatusDetail").textContent="A recolher dados, calcular scores e ordenar candidatas.";
+    $("#radarLoading").hidden=false;$("#dynamicRadarCards").innerHTML="";$("#dynamicRadarEmpty").style.display="none";$("#radarStatusTitle").textContent="Radar em execução";$("#radarStatusDetail").textContent=universe.startsWith("discover_")?"A descobrir candidatos, aplicar o pré-filtro e executar o framework sobre a shortlist.":"A recolher dados, calcular scores e ordenar candidatas.";
     try{
-      const response=await fetch(`/api/radar?${params}`);const data=await response.json();if(!response.ok) throw new Error(data.detail||data.error||"Erro no Radar");window.lastRadarData=data;try{localStorage.setItem(DASHBOARD_RADAR_KEY,JSON.stringify(data));cloudSchedulePush();}catch{}renderRadarResults(data);renderLiveDashboard();$("#radarUpdated").textContent=`Atualizado ${formatAssetDate(data.generated_at)}${data.cached?" · cache":force?" · atualização forçada":""}`;$("#radarCoverage").textContent=`${data.analysed_count} analisados · ${data.error_count} erros`;$("#radarStatusTitle").textContent="Ranking concluído";$("#radarStatusDetail").textContent=data.methodology?.decision_limit || "Candidatas identificadas para análise aprofundada.";
+      const response=await fetch(`/api/radar?${params}`);const data=await response.json();if(!response.ok) throw new Error(data.detail||data.error||"Erro no Radar");window.lastRadarData=data;try{localStorage.setItem(DASHBOARD_RADAR_KEY,JSON.stringify(data));cloudSchedulePush();}catch{}renderRadarResults(data);renderLiveDashboard();$("#radarUpdated").textContent=`Atualizado ${formatAssetDate(data.generated_at)}${data.cached?" · cache":force?" · atualização forçada":""}`;$("#radarCoverage").textContent=`${data.analysed_count} analisados · ${data.error_count} erros`;$("#radarStatusTitle").textContent="Ranking concluído";$("#radarStatusDetail").textContent=radarDiscoverySummary(data);
     }catch(error){$("#radarStatusTitle").textContent="Radar indisponível";$("#radarStatusDetail").textContent=error.message;$("#dynamicRadarEmpty").textContent="Não foi possível executar o Radar.";$("#dynamicRadarEmpty").style.display="block";showToast(error.message);}finally{$("#radarLoading").hidden=true;}
   }
   function radarPortfolioFit(item){
@@ -8081,7 +8109,7 @@ function escapeHtml(value){
       await dashboardCheckHealth();
       if(portfolioSnapshot().positions.length)await portfolioRefreshQuotes();
       if(getMonitoringAlerts().length)await refreshMonitoringAlerts();
-      const stored=dashboardReadRadar();if(stored){if(stored.universe&&$("#radarUniverse"))$("#radarUniverse").value=["core_us","quality_us","growth_us"].includes(stored.universe)?stored.universe:"core_us";await loadOpportunityRadar(true);}
+      const stored=dashboardReadRadar();if(stored){if(stored.universe&&$("#radarUniverse"))$("#radarUniverse").value=["discover_market_us","discover_quality_us","discover_growth_us","discover_etf_us","core_us","quality_us","growth_us"].includes(stored.universe)?stored.universe:"discover_market_us";await loadOpportunityRadar(true);}
       renderLiveDashboard();showToast("Dashboard atualizado.");
     }catch(error){showToast(error.message||"Atualização incompleta.");}
     finally{dashboardRefreshRunning=false;button.disabled=false;button.textContent=original;}

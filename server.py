@@ -53,6 +53,7 @@ ECB_CACHE_TTL_SECONDS = 12 * 60 * 60
 ETF_PROFILE_CACHE_TTL_SECONDS = 24 * 60 * 60
 TECHNICAL_CACHE_TTL_SECONDS = 30 * 60
 RADAR_CACHE_TTL_SECONDS = 30 * 60
+RADAR_DISCOVERY_CACHE_TTL_SECONDS = 30 * 60
 EVIDENCE_CACHE_TTL_SECONDS = 30 * 60
 SEC_SUBMISSIONS_CACHE_TTL_SECONDS = 60 * 60
 OPENFIGI_CACHE = {}
@@ -62,6 +63,7 @@ ECB_CACHE = {}
 ETF_PROFILE_CACHE = {}
 TECHNICAL_CACHE = {}
 RADAR_CACHE = {}
+RADAR_DISCOVERY_CACHE = {}
 EVIDENCE_CACHE = {}
 SEC_SUBMISSIONS_CACHE = {}
 
@@ -312,6 +314,57 @@ RADAR_UNIVERSES = {
         "NVDA", "AMD", "AMZN", "META",
         "PWR", "SMCI", "IREN", "KRMN",
     ],
+}
+
+
+RADAR_DISCOVERY_UNIVERSES = {
+    "discover_quality_us": {
+        "label": "US-listed Quality Discovery",
+        "asset_type": "EQUITY",
+        "sources": [
+            "quality_nonfinancial",
+            "quality_financial",
+            "value_quality",
+        ],
+        "fallback": RADAR_UNIVERSES["quality_us"],
+    },
+    "discover_growth_us": {
+        "label": "US-listed Profitable Growth Discovery",
+        "asset_type": "EQUITY",
+        "sources": [
+            "profitable_growth",
+            "quality_growth",
+            "technology_growth",
+        ],
+        "fallback": RADAR_UNIVERSES["growth_us"],
+    },
+    "discover_market_us": {
+        "label": "US-listed Multi-Factor Discovery",
+        "asset_type": "EQUITY",
+        "sources": [
+            "quality_nonfinancial",
+            "quality_financial",
+            "profitable_growth",
+            "quality_growth",
+            "value_quality",
+        ],
+        "fallback": list(dict.fromkeys(
+            RADAR_UNIVERSES["core_us"]
+            + RADAR_UNIVERSES["growth_us"]
+        )),
+    },
+    "discover_etf_us": {
+        "label": "US ETF Discovery",
+        "asset_type": "ETF",
+        "sources": [
+            "top_etfs_us",
+            "top_performing_etfs",
+        ],
+        "fallback": [
+            "VOO", "VTI", "SPY", "QQQ",
+            "SCHD", "VXUS", "IWM", "BND",
+        ],
+    },
 }
 
 YAHOO_EXCHANGE_SUFFIX = {
@@ -8086,11 +8139,955 @@ def radar_result_from_payload(payload: dict) -> dict:
     }
 
 
+def radar_discovery_number(value) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    return number if math.isfinite(number) else None
+
+
+def build_radar_discovery_sources(yf) -> dict:
+    query = yf.EquityQuery
+
+    def common_equity_filters(
+        minimum_market_cap: int = 5_000_000_000,
+    ) -> list:
+        return [
+            query("eq", ["region", "us"]),
+            query(
+                "gt",
+                ["intradaymarketcap", minimum_market_cap],
+            ),
+            query("gt", ["avgdailyvol3m", 500_000]),
+            query("gt", ["eodprice", 1]),
+        ]
+
+    non_financial_sectors = [
+        "Basic Materials",
+        "Communication Services",
+        "Consumer Cyclical",
+        "Consumer Defensive",
+        "Energy",
+        "Healthcare",
+        "Industrials",
+        "Technology",
+        "Utilities",
+    ]
+
+    quality_nonfinancial = query(
+        "and",
+        common_equity_filters() + [
+            query(
+                "is-in",
+                ["sector", *non_financial_sectors],
+            ),
+            query(
+                "btwn",
+                [
+                    "returnonequity.lasttwelvemonths",
+                    12,
+                    60,
+                ],
+            ),
+            query(
+                "btwn",
+                [
+                    "ebitdamargin.lasttwelvemonths",
+                    12,
+                    60,
+                ],
+            ),
+            query(
+                "gt",
+                [
+                    "leveredfreecashflow.lasttwelvemonths",
+                    0,
+                ],
+            ),
+            query(
+                "lt",
+                ["netdebtebitda.lasttwelvemonths", 3],
+            ),
+        ],
+    )
+
+    quality_financial = query(
+        "and",
+        common_equity_filters() + [
+            query(
+                "eq",
+                ["sector", "Financial Services"],
+            ),
+            query(
+                "btwn",
+                [
+                    "returnonequity.lasttwelvemonths",
+                    10,
+                    35,
+                ],
+            ),
+            query(
+                "gt",
+                ["netincomemargin.lasttwelvemonths", 8],
+            ),
+            query(
+                "btwn",
+                ["peratio.lasttwelvemonths", 5, 30],
+            ),
+        ],
+    )
+
+    profitable_growth = query(
+        "and",
+        common_equity_filters(2_000_000_000) + [
+            query(
+                "btwn",
+                [
+                    "totalrevenues1yrgrowth.lasttwelvemonths",
+                    8,
+                    60,
+                ],
+            ),
+            query(
+                "btwn",
+                [
+                    "epsgrowth.lasttwelvemonths",
+                    8,
+                    100,
+                ],
+            ),
+            query(
+                "gt",
+                ["ebitdamargin.lasttwelvemonths", 8],
+            ),
+            query(
+                "gt",
+                [
+                    "leveredfreecashflow.lasttwelvemonths",
+                    0,
+                ],
+            ),
+        ],
+    )
+
+    quality_growth = query(
+        "and",
+        common_equity_filters(2_000_000_000) + [
+            query(
+                "is-in",
+                ["sector", *non_financial_sectors],
+            ),
+            query(
+                "btwn",
+                [
+                    "totalrevenues1yrgrowth.lasttwelvemonths",
+                    5,
+                    40,
+                ],
+            ),
+            query(
+                "btwn",
+                [
+                    "epsgrowth.lasttwelvemonths",
+                    5,
+                    80,
+                ],
+            ),
+            query(
+                "btwn",
+                [
+                    "returnonequity.lasttwelvemonths",
+                    12,
+                    60,
+                ],
+            ),
+            query(
+                "gt",
+                [
+                    "leveredfreecashflow.lasttwelvemonths",
+                    0,
+                ],
+            ),
+            query(
+                "lt",
+                ["netdebtebitda.lasttwelvemonths", 3.5],
+            ),
+        ],
+    )
+
+    technology_growth = query(
+        "and",
+        common_equity_filters(2_000_000_000) + [
+            query("eq", ["sector", "Technology"]),
+            query(
+                "btwn",
+                [
+                    "totalrevenues1yrgrowth.lasttwelvemonths",
+                    8,
+                    60,
+                ],
+            ),
+            query(
+                "btwn",
+                [
+                    "epsgrowth.lasttwelvemonths",
+                    8,
+                    120,
+                ],
+            ),
+            query(
+                "gt",
+                ["ebitdamargin.lasttwelvemonths", 10],
+            ),
+            query(
+                "gt",
+                [
+                    "leveredfreecashflow.lasttwelvemonths",
+                    0,
+                ],
+            ),
+        ],
+    )
+
+    value_quality = query(
+        "and",
+        common_equity_filters() + [
+            query(
+                "is-in",
+                ["sector", *non_financial_sectors],
+            ),
+            query(
+                "btwn",
+                [
+                    "returnonequity.lasttwelvemonths",
+                    10,
+                    60,
+                ],
+            ),
+            query(
+                "gt",
+                [
+                    "leveredfreecashflow.lasttwelvemonths",
+                    0,
+                ],
+            ),
+            query(
+                "btwn",
+                ["peratio.lasttwelvemonths", 5, 30],
+            ),
+            query(
+                "lt",
+                ["netdebtebitda.lasttwelvemonths", 3.5],
+            ),
+        ],
+    )
+
+    return {
+        "quality_nonfinancial": {
+            "query": quality_nonfinancial,
+            "count": 30,
+            "sort_field": "intradaymarketcap",
+            "sort_asc": False,
+        },
+        "quality_financial": {
+            "query": quality_financial,
+            "count": 30,
+            "sort_field": "intradaymarketcap",
+            "sort_asc": False,
+        },
+        "profitable_growth": {
+            "query": profitable_growth,
+            "count": 30,
+            "sort_field": (
+                "totalrevenues1yrgrowth.lasttwelvemonths"
+            ),
+            "sort_asc": False,
+        },
+        "quality_growth": {
+            "query": quality_growth,
+            "count": 30,
+            "sort_field": "intradaymarketcap",
+            "sort_asc": False,
+        },
+        "technology_growth": {
+            "query": technology_growth,
+            "count": 30,
+            "sort_field": (
+                "totalrevenues1yrgrowth.lasttwelvemonths"
+            ),
+            "sort_asc": False,
+        },
+        "value_quality": {
+            "query": value_quality,
+            "count": 30,
+            "sort_field": "peratio.lasttwelvemonths",
+            "sort_asc": True,
+        },
+        "top_etfs_us": {
+            "predefined": "top_etfs_us",
+            "count": 30,
+        },
+        "top_performing_etfs": {
+            "predefined": "top_performing_etfs",
+            "count": 30,
+        },
+    }
+
+
+def radar_discovery_score(
+    quote_data: dict,
+    source_count: int,
+    asset_type: str,
+) -> float:
+    price = radar_discovery_number(
+        quote_data.get("regularMarketPrice")
+    )
+    volume = radar_discovery_number(
+        quote_data.get("averageDailyVolume3Month")
+    ) or 0
+    if asset_type == "ETF":
+        source_score = min(10.0, source_count * 5.0)
+    else:
+        source_score = min(
+            25.0,
+            8.0 + max(0, source_count - 1) * 8.0,
+        )
+
+    if asset_type == "ETF":
+        net_assets = radar_discovery_number(
+            quote_data.get("netAssets")
+        ) or 0
+        expense_ratio = radar_discovery_number(
+            quote_data.get("netExpenseRatio")
+        )
+        annual_return = radar_discovery_number(
+            quote_data.get("annualReturnNavY3")
+        )
+        change_52w = radar_discovery_number(
+            quote_data.get("fiftyTwoWeekChangePercent")
+        )
+
+        if net_assets >= 50_000_000_000:
+            size_score = 30
+        elif net_assets >= 10_000_000_000:
+            size_score = 26
+        elif net_assets >= 1_000_000_000:
+            size_score = 21
+        elif net_assets >= 100_000_000:
+            size_score = 14
+        else:
+            size_score = 0
+
+        if volume >= 5_000_000:
+            liquidity_score = 25
+        elif volume >= 1_000_000:
+            liquidity_score = 21
+        elif volume >= 250_000:
+            liquidity_score = 17
+        elif volume >= 25_000:
+            liquidity_score = 10
+        else:
+            liquidity_score = 0
+
+        if expense_ratio is None:
+            cost_score = 0
+        elif expense_ratio <= 0.10:
+            cost_score = 20
+        elif expense_ratio <= 0.25:
+            cost_score = 16
+        elif expense_ratio <= 0.50:
+            cost_score = 10
+        elif expense_ratio <= 0.80:
+            cost_score = 5
+        else:
+            cost_score = 0
+
+        performance_score = 0
+        if annual_return is not None:
+            performance_score += 8 if annual_return > 0 else 2
+        if change_52w is not None:
+            if change_52w > 0:
+                performance_score += 7
+            elif change_52w >= -15:
+                performance_score += 3
+
+        return round(min(
+            100.0,
+            size_score
+            + liquidity_score
+            + cost_score
+            + performance_score
+            + source_score,
+        ), 2)
+
+    market_cap = radar_discovery_number(
+        quote_data.get("marketCap")
+    ) or 0
+    forward_pe = radar_discovery_number(
+        quote_data.get("forwardPE")
+    )
+    trailing_pe = radar_discovery_number(
+        quote_data.get("trailingPE")
+    )
+    price_to_book = radar_discovery_number(
+        quote_data.get("priceToBook")
+    )
+    average_200d = radar_discovery_number(
+        quote_data.get("twoHundredDayAverage")
+    )
+    change_52w = radar_discovery_number(
+        quote_data.get("fiftyTwoWeekChangePercent")
+    )
+
+    if market_cap >= 200_000_000_000:
+        size_score = 20
+    elif market_cap >= 50_000_000_000:
+        size_score = 18
+    elif market_cap >= 10_000_000_000:
+        size_score = 15
+    elif market_cap >= 2_000_000_000:
+        size_score = 10
+    else:
+        size_score = 0
+
+    if volume >= 20_000_000:
+        liquidity_score = 20
+    elif volume >= 5_000_000:
+        liquidity_score = 17
+    elif volume >= 1_000_000:
+        liquidity_score = 13
+    elif volume >= 500_000:
+        liquidity_score = 8
+    else:
+        liquidity_score = 0
+
+    valuation_score = 0
+    if forward_pe is not None and forward_pe > 0:
+        if forward_pe <= 15:
+            valuation_score += 10
+        elif forward_pe <= 25:
+            valuation_score += 7
+        elif forward_pe <= 40:
+            valuation_score += 3
+
+    if trailing_pe is not None and trailing_pe > 0:
+        if trailing_pe <= 15:
+            valuation_score += 8
+        elif trailing_pe <= 30:
+            valuation_score += 6
+        elif trailing_pe <= 45:
+            valuation_score += 2
+
+    if price_to_book is not None and price_to_book > 0:
+        if price_to_book <= 3:
+            valuation_score += 5
+        elif price_to_book <= 8:
+            valuation_score += 3
+
+    valuation_score = min(20, valuation_score)
+
+    technical_score = 0
+    if price is not None and average_200d:
+        technical_score += 8 if price >= average_200d else 3
+
+    if change_52w is not None:
+        if -30 <= change_52w <= 20:
+            technical_score += 7
+        elif 20 < change_52w <= 60:
+            technical_score += 4
+        elif change_52w < -30:
+            technical_score += 2
+
+    return round(min(
+        100.0,
+        size_score
+        + liquidity_score
+        + valuation_score
+        + technical_score
+        + source_score,
+    ), 2)
+
+
+def radar_select_discovery_candidates(
+    universe: str,
+    candidates: list[dict],
+) -> tuple[list[dict], dict]:
+    def sources(item):
+        return set(item.get("sources") or [])
+
+    def append_from(
+        bucket: list[dict],
+        selected: list[dict],
+        selected_symbols: set[str],
+        count: int = 1,
+    ) -> int:
+        appended = 0
+
+        while bucket and appended < count:
+            item = bucket.pop(0)
+            symbol = item["symbol"]
+
+            if symbol in selected_symbols:
+                continue
+
+            selected.append(item)
+            selected_symbols.add(symbol)
+            appended += 1
+
+        return appended
+
+    if universe == "discover_growth_us":
+        strong_growth_sources = {
+            "profitable_growth",
+            "technology_growth",
+        }
+        selected = [
+            item
+            for item in candidates
+            if sources(item) & strong_growth_sources
+        ]
+
+        return selected, {
+            "strategy": "strong_growth_sources_required",
+            "required_sources": sorted(strong_growth_sources),
+            "excluded_quality_growth_only": True,
+        }
+
+    if universe == "discover_quality_us":
+        financial_only = [
+            item
+            for item in candidates
+            if sources(item) == {"quality_financial"}
+        ]
+        diversified_quality = [
+            item
+            for item in candidates
+            if sources(item) != {"quality_financial"}
+        ]
+
+        selected = []
+        selected_symbols = set()
+
+        while diversified_quality or financial_only:
+            before = len(selected)
+
+            append_from(
+                diversified_quality,
+                selected,
+                selected_symbols,
+                count=3,
+            )
+            append_from(
+                financial_only,
+                selected,
+                selected_symbols,
+                count=1,
+            )
+
+            if len(selected) == before:
+                break
+
+        return selected, {
+            "strategy": "quality_source_interleave",
+            "sequence": [
+                "3 diversified quality",
+                "1 financial quality",
+            ],
+            "maximum_financial_only_share_in_normal_prefix": 0.25,
+        }
+
+    if universe == "discover_market_us":
+        quality_bucket = [
+            item
+            for item in candidates
+            if sources(item) & {
+                "quality_nonfinancial",
+                "quality_growth",
+            }
+        ]
+        growth_bucket = [
+            item
+            for item in candidates
+            if sources(item) & {
+                "profitable_growth",
+                "technology_growth",
+            }
+        ]
+        value_bucket = [
+            item
+            for item in candidates
+            if "value_quality" in sources(item)
+        ]
+        financial_bucket = [
+            item
+            for item in candidates
+            if sources(item) == {"quality_financial"}
+        ]
+
+        selected = []
+        selected_symbols = set()
+        buckets = [
+            quality_bucket,
+            growth_bucket,
+            value_bucket,
+            financial_bucket,
+        ]
+
+        while any(buckets):
+            before = len(selected)
+
+            for bucket in buckets:
+                append_from(
+                    bucket,
+                    selected,
+                    selected_symbols,
+                    count=1,
+                )
+
+            if len(selected) == before:
+                break
+
+        remaining = list(candidates)
+        append_from(
+            remaining,
+            selected,
+            selected_symbols,
+            count=len(remaining),
+        )
+
+        return selected, {
+            "strategy": "multi_factor_round_robin",
+            "sequence": [
+                "quality",
+                "profitable growth",
+                "value quality",
+                "financial quality",
+            ],
+        }
+
+    if universe == "discover_etf_us":
+        excluded_terms = re.compile(
+            r"\b("
+            r"2X|3X|"
+            r"ULTRAPRO|ULTRASHORT|ULTRA|"
+            r"LEVERAGED|INVERSE|BEAR"
+            r")\b",
+            re.IGNORECASE,
+        )
+
+        selected = []
+        exclusions = {
+            "leveraged_or_inverse": 0,
+            "insufficient_assets": 0,
+            "insufficient_liquidity": 0,
+        }
+
+        for item in candidates:
+            name = str(item.get("name") or "")
+            net_assets = item.get("net_assets")
+            average_volume = item.get("average_volume_3m") or 0
+
+            if excluded_terms.search(name):
+                exclusions["leveraged_or_inverse"] += 1
+                continue
+
+            if net_assets is not None and net_assets < 500_000_000:
+                exclusions["insufficient_assets"] += 1
+                continue
+
+            if average_volume < 100_000:
+                exclusions["insufficient_liquidity"] += 1
+                continue
+
+            selected.append(item)
+
+        return selected, {
+            "strategy": "liquid_unleveraged_etfs",
+            "minimum_net_assets_usd_when_available": 500_000_000,
+            "minimum_average_volume_3m": 100_000,
+            "excluded_name_terms": [
+                "2x",
+                "3x",
+                "ultra",
+                "leveraged",
+                "inverse",
+                "bear",
+            ],
+            "exclusions": exclusions,
+        }
+
+    return list(candidates), {
+        "strategy": "discovery_score",
+    }
+
+
+def discover_radar_symbols(
+    universe: str,
+    limit: int,
+    force_refresh: bool = False,
+) -> tuple[list[str], dict]:
+    config = RADAR_DISCOVERY_UNIVERSES[universe]
+    cached = RADAR_DISCOVERY_CACHE.get(universe)
+
+    if cached and not force_refresh:
+        age = time.time() - cached["created_at"]
+        if age < RADAR_DISCOVERY_CACHE_TTL_SECONDS:
+            cached_data = cached["data"]
+            return (
+                list(cached_data["symbols"][:limit]),
+                {
+                    **cached_data["metadata"],
+                    "cached": True,
+                    "shortlist_count": min(
+                        limit,
+                        len(cached_data["symbols"]),
+                    ),
+                },
+            )
+
+    try:
+        import yfinance as yf
+    except ImportError as error:
+        raise RuntimeError(
+            "A dependência yfinance não está instalada."
+        ) from error
+
+    expected_type = config["asset_type"]
+    source_registry = build_radar_discovery_sources(yf)
+    merged = {}
+    source_errors = []
+
+    for source_name in config["sources"]:
+        source = source_registry[source_name]
+
+        try:
+            if source.get("query") is not None:
+                response = yf.screen(
+                    source["query"],
+                    count=source.get("count", 30),
+                    sortField=source.get("sort_field"),
+                    sortAsc=source.get("sort_asc"),
+                )
+            else:
+                response = yf.screen(
+                    source["predefined"],
+                    count=source.get("count", 30),
+                )
+
+            quotes = (
+                response.get("quotes", [])
+                if isinstance(response, dict)
+                else []
+            )
+        except Exception as error:
+            source_errors.append({
+                "source": source_name,
+                "screener": source.get(
+                    "predefined",
+                    "custom_equity_query",
+                ),
+                "error": str(error),
+            })
+            continue
+
+        for quote_data in quotes:
+            symbol = str(
+                quote_data.get("symbol") or ""
+            ).strip().upper()
+            quote_type = str(
+                quote_data.get("quoteType") or ""
+            ).strip().upper()
+
+            if not symbol or quote_type != expected_type:
+                continue
+
+            record = merged.setdefault(symbol, {
+                "symbol": symbol,
+                "quote": dict(quote_data),
+                "sources": [],
+            })
+
+            if source_name not in record["sources"]:
+                record["sources"].append(source_name)
+
+            for key, value in quote_data.items():
+                current_value = record["quote"].get(key)
+                if current_value is None or current_value == "":
+                    record["quote"][key] = value
+
+    eligible = []
+
+    for record in merged.values():
+        quote_data = record["quote"]
+        price = radar_discovery_number(
+            quote_data.get("regularMarketPrice")
+        )
+        volume = radar_discovery_number(
+            quote_data.get("averageDailyVolume3Month")
+        ) or 0
+
+        if price is None or price <= 1:
+            continue
+
+        if expected_type == "EQUITY":
+            market_cap = radar_discovery_number(
+                quote_data.get("marketCap")
+            ) or 0
+
+            if market_cap < 2_000_000_000:
+                continue
+            if volume < 500_000:
+                continue
+        else:
+            net_assets = radar_discovery_number(
+                quote_data.get("netAssets")
+            )
+
+            if net_assets is not None and net_assets < 100_000_000:
+                continue
+            if volume < 25_000:
+                continue
+
+        score = radar_discovery_score(
+            quote_data,
+            len(record["sources"]),
+            expected_type,
+        )
+
+        eligible.append({
+            "symbol": record["symbol"],
+            "name": (
+                quote_data.get("longName")
+                or quote_data.get("shortName")
+                or record["symbol"]
+            ),
+            "quote_type": expected_type,
+            "exchange": quote_data.get("exchange"),
+            "currency": quote_data.get("currency"),
+            "market_cap": radar_discovery_number(
+                quote_data.get("marketCap")
+            ),
+            "net_assets": radar_discovery_number(
+                quote_data.get("netAssets")
+            ),
+            "average_volume_3m": volume,
+            "price": price,
+            "forward_pe": radar_discovery_number(
+                quote_data.get("forwardPE")
+            ),
+            "trailing_pe": radar_discovery_number(
+                quote_data.get("trailingPE")
+            ),
+            "expense_ratio": radar_discovery_number(
+                quote_data.get("netExpenseRatio")
+            ),
+            "change_52w_percentage": radar_discovery_number(
+                quote_data.get("fiftyTwoWeekChangePercent")
+            ),
+            "discovery_score": score,
+            "sources": record["sources"],
+            "screeners": record["sources"],
+        })
+
+    eligible.sort(
+        key=lambda item: (
+            item["discovery_score"],
+            item.get("market_cap") or item.get("net_assets") or 0,
+            item["average_volume_3m"],
+        ),
+        reverse=True,
+    )
+
+    if expected_type == "EQUITY":
+        unique_companies = []
+        company_keys = set()
+
+        for item in eligible:
+            company_key = re.sub(
+                r"[^A-Z0-9]+",
+                "",
+                str(item.get("name") or item["symbol"]).upper(),
+            )
+
+            if company_key in company_keys:
+                continue
+
+            company_keys.add(company_key)
+            unique_companies.append(item)
+
+        eligible = unique_companies
+
+    selected_candidates, selection_policy = (
+        radar_select_discovery_candidates(
+            universe,
+            eligible,
+        )
+    )
+
+    fallback_used = not selected_candidates
+    if fallback_used:
+        symbols = list(config["fallback"])
+    else:
+        symbols = [
+            item["symbol"]
+            for item in selected_candidates
+        ]
+
+    metadata = {
+        "mode": "automatic_discovery",
+        "label": config["label"],
+        "asset_type": expected_type,
+        "provider": "Yahoo Finance screener via yfinance",
+        "sources": config["sources"],
+        "screeners": config["sources"],
+        "candidate_pool_count": len(merged),
+        "eligible_count": len(eligible),
+        "selection_pool_count": len(selected_candidates),
+        "shortlist_count": min(limit, len(symbols)),
+        "selection_policy": selection_policy,
+        "fallback_used": fallback_used,
+        "fallback_symbols": (
+            list(config["fallback"])
+            if fallback_used
+            else []
+        ),
+        "source_errors": source_errors,
+        "screener_errors": source_errors,
+        "prefilter": {
+            "equities": {
+                "minimum_market_cap_usd": 2_000_000_000,
+                "minimum_average_volume_3m": 500_000,
+                "minimum_price_usd": 1,
+            },
+            "etfs": {
+                "minimum_net_assets_usd_when_available": 100_000_000,
+                "minimum_average_volume_3m": 25_000,
+                "minimum_price_usd": 1,
+            },
+        },
+        "candidates": selected_candidates[:25],
+        "cached": False,
+    }
+
+    RADAR_DISCOVERY_CACHE[universe] = {
+        "created_at": time.time(),
+        "data": {
+            "symbols": symbols,
+            "metadata": metadata,
+        },
+    }
+
+    return symbols[:limit], metadata
+
+
 def parse_radar_symbols(
     universe: str,
     symbols_value: str | None,
     limit: int,
-) -> list[str]:
+    force_refresh: bool = False,
+) -> tuple[list[str], dict]:
     if symbols_value:
         candidates = re.split(r"[,;\s]+", symbols_value.upper())
         symbols = [
@@ -8098,17 +9095,42 @@ def parse_radar_symbols(
             for symbol in candidates
             if re.fullmatch(r"[A-Z0-9.\-]{1,20}", symbol)
         ]
+        metadata = {
+            "mode": "custom",
+            "candidate_pool_count": len(symbols),
+            "eligible_count": len(symbols),
+            "shortlist_count": min(limit, len(symbols)),
+            "fallback_used": False,
+            "cached": False,
+        }
+    elif universe in RADAR_DISCOVERY_UNIVERSES:
+        return discover_radar_symbols(
+            universe,
+            limit,
+            force_refresh=force_refresh,
+        )
     else:
         symbols = list(
-            RADAR_UNIVERSES.get(universe, RADAR_UNIVERSES["core_us"])
+            RADAR_UNIVERSES.get(
+                universe,
+                RADAR_UNIVERSES["core_us"],
+            )
         )
+        metadata = {
+            "mode": "static",
+            "candidate_pool_count": len(symbols),
+            "eligible_count": len(symbols),
+            "shortlist_count": min(limit, len(symbols)),
+            "fallback_used": False,
+            "cached": False,
+        }
 
     unique = []
     for symbol in symbols:
         if symbol not in unique:
             unique.append(symbol)
 
-    return unique[:limit]
+    return unique[:limit], metadata
 
 
 def build_opportunity_radar(
@@ -8117,7 +9139,12 @@ def build_opportunity_radar(
     limit: int = 8,
     force_refresh: bool = False,
 ) -> dict:
-    symbols = parse_radar_symbols(universe, symbols_value, limit)
+    symbols, discovery = parse_radar_symbols(
+        universe,
+        symbols_value,
+        limit,
+        force_refresh=force_refresh,
+    )
     cache_key = json.dumps(
         {"universe": universe, "symbols": symbols},
         sort_keys=True,
@@ -8173,6 +9200,8 @@ def build_opportunity_radar(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "universe": universe,
         "symbols_requested": symbols,
+        "universe_mode": discovery.get("mode"),
+        "discovery": discovery,
         "analysed_count": len(results),
         "error_count": len(errors),
         "results": results,
@@ -8193,6 +9222,11 @@ def build_opportunity_radar(
                 "technical_entry": 0.20,
                 "data_quality": 0.10,
             },
+            "discovery_policy": (
+                "Os universos automáticos usam screeners do Yahoo Finance, "
+                "aplicam filtros mínimos de dimensão, liquidez e preço e só "
+                "depois enviam a shortlist para o framework completo."
+            ),
             "coverage_policy": (
                 "Nas ações, regras quantitativas indisponíveis "
                 "reduzem os sub-scores operacional e financeiro."

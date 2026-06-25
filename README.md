@@ -38,13 +38,32 @@ ThesisOS is a functional academic prototype for evidence-based investment analys
 
 ## Opportunity Radar methodology
 
-The Radar is a screening funnel, not an order generator. Its current composite score uses:
+The Radar is a screening funnel, not an order generator. It now supports both static universes and automatic candidate discovery.
+
+### Automatic discovery universes
+
+- **US Multi-Factor Discovery:** alternates quality, profitable growth, value-quality and financial-quality candidates.
+- **US Quality Discovery:** combines non-financial quality, financial quality and value-quality sources while limiting financial-only concentration in the shortlist.
+- **US Profitable Growth Discovery:** requires candidates to appear in a profitable-growth or technology-growth source, preventing broad quality alone from qualifying.
+- **US ETF Discovery:** prioritises liquid, sufficiently large, non-leveraged and non-inverse US-listed ETFs.
+
+### Discovery funnel
+
+1. Yahoo Finance screeners and bounded `EquityQuery` filters generate candidate pools.
+2. The backend validates asset type, price, market capitalisation or net assets, and average liquidity.
+3. Duplicate share classes or repeated companies are removed where the available name data permits.
+4. Universe-specific selection policies create a diversified shortlist from the eligible pool.
+5. Only the shortlist enters the complete fundamental, structural, valuation, technical, event and data-quality framework.
+
+Discovery responses expose the candidate-pool size, eligible count, selection policy, shortlist size, provider errors and whether a static fallback was required. Results are cached in memory for 30 minutes to reduce repeated provider calls.
+
+The final Radar composite score uses:
 
 - 70% fundamental or ETF structural score;
 - 20% Technical Engine score;
 - 10% data completeness.
 
-A high result means **candidate for deeper analysis**. It does not mean “buy”. Final decisions remain blocked until valuation, current news, portfolio fit, position size and entry plan are sufficiently assessed.
+A high result means **candidate for deeper analysis**. It does not mean “buy”. Event gates, valuation, current information, portfolio fit, concentration limits, position size and entry planning can still block or alter the final decision.
 
 ## Run locally / Replit
 
@@ -79,7 +98,7 @@ python3 server.py
 2. Open the live Dashboard to show portfolio, Radar, alerts, reviews, evidence and API status.
 3. Search `AAPL` to demonstrate stock fundamentals, valuation, technical analysis and policy-aware position sizing.
 3. Search `VWCE`, select XETRA, and demonstrate official ETF structure, costs, tracking and holdings.
-4. Open **Opportunity Radar** and execute the Core US universe.
+4. Open **Opportunity Radar** and execute **US Multi-Factor Discovery** to demonstrate automatic discovery, pre-filtering, shortlist construction and full framework analysis.
 5. Add an asset to **Watchlist**.
 6. Compare `MSFT` with `AAPL`.
 7. Add AAPL or VWCE to **My Portfolio**, refresh prices and calculate the next contribution.
@@ -99,7 +118,7 @@ python3 server.py
 ## Current limitations
 
 - Yahoo Finance access through `yfinance` is unofficial and can occasionally be unavailable.
-- The Radar scans configured universes, not every listed security worldwide.
+- Automatic discovery uses bounded Yahoo Finance screener result pools. It is broader than the static universes but is not an exhaustive scan of every listed security worldwide.
 - Deep official ETF adapters are issuer/product specific; the current full example is Vanguard FTSE All-World UCITS ETF.
 - Full tax accounting, historical FX, live news, portfolio overlap look-through and broker synchronisation remain future work.
 - XTB no longer provides a public trading API; IBKR integration would require a separately authenticated local gateway and is intentionally outside this Replit prototype.

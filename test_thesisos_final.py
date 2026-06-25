@@ -287,6 +287,54 @@ def test_static(suite: Suite) -> None:
         ),
     )
 
+    radar_discovery_checks = {
+        "discovery universe registry": "RADAR_DISCOVERY_UNIVERSES = {" in server,
+        "automatic market universe": '"discover_market_us": {' in server,
+        "automatic quality universe": '"discover_quality_us": {' in server,
+        "automatic growth universe": '"discover_growth_us": {' in server,
+        "automatic ETF universe": '"discover_etf_us": {' in server,
+        "discovery cache TTL": "RADAR_DISCOVERY_CACHE_TTL_SECONDS = 30 * 60" in server,
+        "custom screener builder": "def build_radar_discovery_sources(yf) -> dict:" in server,
+        "discovery scoring": "def radar_discovery_score(" in server,
+        "candidate discovery": "def discover_radar_symbols(" in server,
+        "selection policy engine": "def radar_select_discovery_candidates(" in server,
+        "quality diversification": '"strategy": "quality_source_interleave"' in server,
+        "strong growth requirement": '"strategy": "strong_growth_sources_required"' in server,
+        "multi-factor rotation": '"strategy": "multi_factor_round_robin"' in server,
+        "ETF safety filter": '"strategy": "liquid_unleveraged_etfs"' in server,
+        "ETF asset threshold": '"minimum_net_assets_usd_when_available": 500_000_000' in server,
+        "ETF liquidity threshold": '"minimum_average_volume_3m": 100_000' in server,
+        "selection pool metadata": '"selection_pool_count": len(selected_candidates)' in server,
+        "selection policy metadata": '"selection_policy": selection_policy' in server,
+        "automatic mode metadata": '"mode": "automatic_discovery"' in server,
+        "Yahoo provider disclosure": '"provider": "Yahoo Finance screener via yfinance"' in server,
+        "frontend market option": 'value="discover_market_us"' in index,
+        "frontend quality option": 'value="discover_quality_us"' in index,
+        "frontend growth option": 'value="discover_growth_us"' in index,
+        "frontend ETF option": 'value="discover_etf_us"' in index,
+        "frontend discovery summary": "function radarDiscoverySummary(data){" in index,
+        "frontend automatic status": "A descobrir candidatos" in index,
+        "frontend pool disclosure": "${pool} descobertos" in index,
+        "frontend selection strategy labels": "multi_factor_round_robin:" in index,
+        "frontend automatic default": ':"discover_market_us"' in index,
+        "discovery funnel": "<strong>Descoberta</strong>" in index,
+        "shortlist funnel": "<strong>Shortlist</strong>" in index,
+    }
+    missing_radar_discovery = [
+        name
+        for name, present in radar_discovery_checks.items()
+        if not present
+    ]
+    suite.check(
+        "Opportunity Radar Universe v1",
+        not missing_radar_discovery,
+        (
+            "automatic discovery, source diversification, ETF filters and frontend integration"
+            if not missing_radar_discovery
+            else "missing: " + ", ".join(missing_radar_discovery)
+        ),
+    )
+
     decision_gate_checks = {
         "local decision engine": "function radarPortfolioFit(item)" in index,
         "saved policy gate": "hasSavedInvestorPolicy()" in index,
