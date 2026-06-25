@@ -319,6 +319,33 @@ def test_static(suite: Suite) -> None:
         ),
     )
 
+    portfolio_target_checks = {
+        "policy target limit": "function portfolioTargetLimit(assetType)" in index,
+        "target clamp": "function portfolioClampTargetWeight(value,assetType)" in index,
+        "modal limit refresh": "function portfolioUpdateTargetLimit()" in index,
+        "dynamic table maximum": 'max="${targetLimit}"' in index,
+        "zero target preserved": "prefill.target_weight??0" in index,
+        "trade-only target persistence": 'isTrade=["BUY","SELL"].includes(transaction.type)' in index,
+        "controlled form validation": 'id="portfolioTransactionForm" novalidate' in index,
+        "toast above portfolio modal": "z-index:12050" in index,
+        "saved-before-render protection": (
+            "Portfolio transaction saved, but interface refresh failed" in index
+        ),
+        "visible save failure": "Não foi possível guardar a transação." in index,
+    }
+    missing_portfolio_targets = [
+        name for name, present in portfolio_target_checks.items() if not present
+    ]
+    suite.check(
+        "Portfolio target policy enforcement",
+        not missing_portfolio_targets,
+        (
+            "policy limits, zero targets and robust transaction persistence"
+            if not missing_portfolio_targets
+            else "missing: " + ", ".join(missing_portfolio_targets)
+        ),
+    )
+
     concentration_gate_checks = {
         "radar metadata country": '"country": asset.get("country")' in server,
         "radar metadata industry": '"industry": asset.get("industry")' in server,
