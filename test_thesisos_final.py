@@ -173,6 +173,28 @@ def test_static(suite: Suite) -> None:
     index = read_text(ROOT / "index.html")
     server = read_text(ROOT / "server.py")
     readme = read_text(ROOT / "README.md")
+
+    alpha_identity = all(
+        marker in index
+        for marker in (
+            "ThesisOS Alpha",
+            "v0.1.0-alpha",
+            "AI Investment Brief",
+            "ainda não ativa nesta versão Alpha",
+        )
+    ) and all(
+        marker in server
+        for marker in (
+            'PRODUCT_NAME = "ThesisOS Alpha"',
+            'PRODUCT_VERSION = "0.1.0-alpha"',
+            'RELEASE_STAGE = "alpha"',
+        )
+    )
+    suite.check(
+        "Alpha product identity",
+        alpha_identity,
+        "ThesisOS Alpha v0.1.0-alpha",
+    )
     requirements = read_text(ROOT / "requirements.txt")
     schema = read_text(ROOT / "supabase_auth_migration.sql").lower()
     replit = read_text(ROOT / ".replit")
@@ -511,10 +533,22 @@ def test_static(suite: Suite) -> None:
 def test_runtime(suite: Suite, base_url: str) -> None:
     try:
         status, data = json_request(endpoint(base_url, "/api/health"), timeout=10)
+        expected_identity = (
+            status == 200
+            and data.get("status") == "ok"
+            and data.get("service") == "ThesisOS Alpha API"
+            and data.get("version") == "0.1.0-alpha"
+            and data.get("release_stage") == "alpha"
+            and data.get("framework_engine_version") == "0.9"
+        )
+        detail = (
+            f"{data.get('service', 'unknown service')} · "
+            f"{data.get('version', 'version missing')}"
+        )
         suite.check(
-            "API health",
-            status == 200 and data.get("status") == "ok",
-            data.get("service", f"HTTP {status}"),
+            "API health and Alpha identity",
+            expected_identity,
+            detail,
         )
         providers = data.get("providers") or []
         suite.check("API provider registry", len(providers) >= 7, f"{len(providers)} providers")

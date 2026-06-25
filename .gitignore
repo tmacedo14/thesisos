@@ -16,3 +16,13 @@ fix_supabase_auth_*.py
 fix_opportunity_radar_*.py
 fix_radar_*.py
 thesisos_auth_empty_state*.zip
+
+# Python and Replit generated files
+__pycache__/
+*.py[cod]
+.pythonlibs/
+.cache/
+.local/
+.upm/
+.venv/
+venv/

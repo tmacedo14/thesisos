@@ -4774,6 +4774,10 @@ def enrich_framework_engine_with_technical(
     return engine
 
 
+PRODUCT_NAME = "ThesisOS Alpha"
+PRODUCT_VERSION = "0.1.0-alpha"
+RELEASE_STAGE = "alpha"
+
 FRAMEWORK_ENGINE_VERSION = "0.9"
 
 
@@ -9607,7 +9611,10 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             self.send_json(
                 {
                     "status": "ok",
-                    "service": "ThesisOS API",
+                    "service": f"{PRODUCT_NAME} API",
+                    "version": PRODUCT_VERSION,
+                    "release_stage": RELEASE_STAGE,
+                    "framework_engine_version": FRAMEWORK_ENGINE_VERSION,
                     "providers": [
                         "Finnhub",
                         "OpenFIGI",
