@@ -34,6 +34,7 @@ ThesisOS is a functional academic prototype for evidence-based investment analys
 - **SEC submissions history:** recent 10-K, 10-Q, 8-K, proxy, insider and capital-market filings.
 - **ECB Data Portal:** official EUR reference exchange rates.
 - **Yahoo Finance via yfinance:** historical daily price and volume data.
+- **LogoKit:** stock and ETF logos through a server-side proxy. The system first attempts the financial ticker and, for ETFs or funds, can fall back to a recognised issuer brand such as Vanguard, iShares, State Street, Amundi or Invesco.
 - **Official ETF issuers:** product pages, factsheets and KIID documents. The current official adapter covers Vanguard FTSE All-World UCITS ETF (VWCE/VWRP/VWRA share class).
 
 ## Opportunity Radar methodology
@@ -57,6 +58,8 @@ The Radar is a screening funnel, not an order generator. It now supports both st
 
 Discovery responses expose the candidate-pool size, eligible count, selection policy, shortlist size, provider errors and whether a static fallback was required. Results are cached in memory for 30 minutes to reduce repeated provider calls.
 
+Radar cards use the company logo supplied by Finnhub when available. Otherwise, a server-side LogoKit proxy attempts the financial ticker and then, for ETFs or funds, a controlled issuer-domain mapping. Logo images are cached for 24 hours, the LogoKit token is never sent to the browser, and the ticker remains visible whenever no image can be resolved.
+
 The final Radar composite score uses:
 
 - 70% fundamental or ETF structural score;
@@ -79,6 +82,7 @@ pip install -r requirements.txt
 FINNHUB_API_KEY
 OPENFIGI_API_KEY
 EODHD_API_TOKEN
+LOGOKIT_PUBLISHABLE_TOKEN
 SEC_USER_AGENT
 ```
 

@@ -1212,7 +1212,9 @@
     .radar-config{margin-bottom:0}.radar-config-grid{display:grid;grid-template-columns:1fr 2fr .7fr 1fr;gap:12px;align-items:end}
     .radar-loading{margin-top:16px;padding:26px;border:1px dashed #385174;border-radius:16px;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);text-align:center}
     .radar-loading[hidden]{display:none}.radar-spinner{width:30px;height:30px;border-radius:50%;border:3px solid #2b4162;border-top-color:var(--accent);animation:radarSpin .8s linear infinite}@keyframes radarSpin{to{transform:rotate(360deg)}}
-    .radar-live-card .ticker-logo{font-size:12px}.radar-score-layout{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:13px 0}.radar-score-box{padding:9px;border-radius:10px;background:#0f1a2c;border:1px solid #243650}.radar-score-box span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.radar-score-box strong{display:block;margin-top:4px}
+    .radar-live-card .ticker-logo{font-size:12px;position:relative;overflow:hidden}
+    .radar-live-card .ticker-logo img{width:100%;height:100%;object-fit:contain;padding:5px;box-sizing:border-box;background:#fff}
+    .radar-logo-fallback{position:absolute;inset:0;display:grid;place-items:center}.radar-score-layout{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:13px 0}.radar-score-box{padding:9px;border-radius:10px;background:#0f1a2c;border:1px solid #243650}.radar-score-box span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase}.radar-score-box strong{display:block;margin-top:4px}
     .radar-reasons{display:grid;gap:6px;margin-top:10px}.radar-reason{font-size:11px;color:#bdc9da}.radar-reason.good:before{content:'✓ ';color:var(--success)}.radar-reason.warn:before{content:'! ';color:var(--warn)}
     .watchlist-add-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}.watchlist-add-row input{margin:0}
     .watchlist-card-meta{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}.watchlist-card-meta>div{padding:9px;border-radius:10px;background:#0f1a2c;border:1px solid #243650}.watchlist-card-meta span{display:block;color:var(--muted);font-size:9px}.watchlist-card-meta strong{display:block;margin-top:4px;font-size:12px}
@@ -1636,6 +1638,10 @@
         <div class="logic-note">Ações: 55% qualidade + 20% valuation + 15% técnica + 10% qualidade dos dados. ETFs: 70% estrutura + 20% técnica + 10% dados. Notícias, carteira e plano de entrada continuam obrigatórios.</div>
       </div>
       <div class="radar-loading" id="radarLoading" hidden><div class="radar-spinner"></div><strong>A analisar ativos e a aplicar os frameworks…</strong><span>Na primeira execução pode demorar alguns segundos; os resultados ficam em cache.</span></div>
+      <div class="radar-logo-attribution" style="margin:8px 0 14px;color:var(--muted);font-size:12px">
+        Logos adicionais fornecidos por
+        <a href="https://logokit.com" target="_blank" rel="noopener noreferrer">LogoKit</a>.
+      </div>
       <div class="grid g3 opportunity-list" id="dynamicRadarCards" style="margin-top:16px"></div>
       <div class="radar-empty" id="dynamicRadarEmpty">Ainda não existem resultados. Executa o Radar.</div>
       <div class="card" style="margin-top:16px">
@@ -6390,7 +6396,7 @@ function escapeHtml(value){
     const items=getWatchlist();const container=$("#watchlistCards");const empty=$("#watchlistEmpty");updateWatchlistCount();
     if(!container) return;
     empty.style.display=items.length ? "none" : "block";
-    container.innerHTML=items.map(item=>`<article class="card opportunity"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="watchlist-card-meta"><div><span>Último preço guardado</span><strong>${item.currency?escapeHtml(item.currency)+" ":""}${Number.isFinite(Number(item.price))?formatNumber(item.price):"Atualizar análise"}</strong></div><div><span>Adicionado</span><strong>${formatAssetDate(item.added_at)}</strong></div></div><div class="card-actions"><button class="ghost watchlist-analyze" data-symbol="${escapeHtml(item.symbol)}" data-exchange="${escapeHtml(item.exchange || "")}">Analisar</button><button class="ghost watchlist-compare" data-symbol="${escapeHtml(item.symbol)}">Comparar</button><button class="danger-btn watchlist-remove" data-symbol="${escapeHtml(item.symbol)}" data-exchange="${escapeHtml(item.exchange || "")}">Remover</button></div></article>`).join("");
+    container.innerHTML=items.map(item=>`<article class="card opportunity"><div class="ticker">${radarTickerLogo(item)}<div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="watchlist-card-meta"><div><span>Último preço guardado</span><strong>${item.currency?escapeHtml(item.currency)+" ":""}${Number.isFinite(Number(item.price))?formatNumber(item.price):"Atualizar análise"}</strong></div><div><span>Adicionado</span><strong>${formatAssetDate(item.added_at)}</strong></div></div><div class="card-actions"><button class="ghost watchlist-analyze" data-symbol="${escapeHtml(item.symbol)}" data-exchange="${escapeHtml(item.exchange || "")}">Analisar</button><button class="ghost watchlist-compare" data-symbol="${escapeHtml(item.symbol)}">Comparar</button><button class="danger-btn watchlist-remove" data-symbol="${escapeHtml(item.symbol)}" data-exchange="${escapeHtml(item.exchange || "")}">Remover</button></div></article>`).join("");
   }
 
   function resetOpportunityRadarView(){
@@ -7060,6 +7066,61 @@ function escapeHtml(value){
       return sortable(b)-sortable(a);
     });
   }
+  function radarTickerLogo(item){
+    const rawSymbol=String(item?.symbol || "").trim().toUpperCase();
+    const symbol=escapeHtml(rawSymbol || "—");
+    const providerLogo=String(item?.logo || "").trim();
+    const assetName=String(item?.name || "").trim();
+    const assetType=String(item?.asset_type || "").trim();
+
+    const logoParams=new URLSearchParams();
+
+    if(rawSymbol) logoParams.set("symbol",rawSymbol);
+    if(assetName) logoParams.set("name",assetName);
+    if(assetType) logoParams.set("asset_type",assetType);
+
+    const proxyLogo=rawSymbol
+      ? `/api/logo?${logoParams.toString()}`
+      : "";
+
+    const primaryLogo=/^https?:\/\//i.test(providerLogo)
+      ? providerLogo
+      : proxyLogo;
+
+    const secondaryLogo=
+      /^https?:\/\//i.test(providerLogo) && proxyLogo
+        ? proxyLogo
+        : "";
+
+    if(!primaryLogo){
+      return `<div class="ticker-logo">${symbol}</div>`;
+    }
+
+    return `<div class="ticker-logo radar-logo">
+      <span class="radar-logo-fallback">${symbol}</span>
+      <img
+        src="${escapeHtml(primaryLogo)}"
+        data-fallback-src="${escapeHtml(secondaryLogo)}"
+        alt="${symbol}"
+        loading="lazy"
+        referrerpolicy="no-referrer"
+        onload="this.previousElementSibling.style.display='none'"
+        onerror="
+          const fallback=this.dataset.fallbackSrc;
+          const resolved=fallback
+            ? new URL(fallback,location.href).href
+            : '';
+          if(fallback && this.src!==resolved){
+            this.dataset.fallbackSrc='';
+            this.src=fallback;
+          }else{
+            this.remove();
+          }
+        "
+      >
+    </div>`;
+  }
+
   function renderRadarResults(data){
     const container=$("#dynamicRadarCards");const empty=$("#dynamicRadarEmpty");const results=sortedRadarResults(data.results || []);empty.style.display=results.length?"none":"block";
     container.innerHTML=results.map(item=>{

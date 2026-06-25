@@ -64,6 +64,9 @@ ETF_PROFILE_CACHE = {}
 TECHNICAL_CACHE = {}
 RADAR_CACHE = {}
 RADAR_DISCOVERY_CACHE = {}
+
+LOGO_CACHE_TTL_SECONDS = 24 * 60 * 60
+LOGO_CACHE = {}
 EVIDENCE_CACHE = {}
 SEC_SUBMISSIONS_CACHE = {}
 
@@ -8040,6 +8043,142 @@ def radar_status(score, payload):
     }
 
 
+LOGOKIT_ISSUER_DOMAINS = (
+    (("SPDR", "STATE STREET", "SSGA"), "statestreet.com"),
+    (("ISHARES",), "ishares.com"),
+    (("BLACKROCK",), "blackrock.com"),
+    (("VANGUARD",), "vanguard.com"),
+    (("AMUNDI",), "amundi.com"),
+    (("INVESCO",), "invesco.com"),
+    (("XTRACKERS", "DWS"), "dws.com"),
+    (("VANECK",), "vaneck.com"),
+    (("WISDOMTREE",), "wisdomtree.com"),
+    (("GLOBAL X",), "globalxetfs.com"),
+)
+
+
+def logokit_issuer_domain(name: str | None) -> str | None:
+    normalized = re.sub(
+        r"[^A-Z0-9]+",
+        " ",
+        str(name or "").upper(),
+    ).strip()
+
+    for aliases, domain in LOGOKIT_ISSUER_DOMAINS:
+        if any(alias in normalized for alias in aliases):
+            return domain
+
+    return None
+
+
+def fetch_logokit_logo(
+    symbol: str,
+    name: str | None = None,
+    asset_type: str | None = None,
+) -> tuple[bytes, str]:
+    safe_symbol = str(symbol or "").strip().upper()
+
+    if not re.fullmatch(r"[A-Z0-9.\-]{1,20}", safe_symbol):
+        raise ValueError("Símbolo inválido.")
+
+    normalized_asset_type = str(
+        asset_type or ""
+    ).strip().upper()
+
+    cache_key = "|".join([
+        safe_symbol,
+        str(name or "").strip().upper(),
+        normalized_asset_type,
+    ])
+
+    cached = LOGO_CACHE.get(cache_key)
+    if cached:
+        age = time.time() - cached["created_at"]
+        if age < LOGO_CACHE_TTL_SECONDS:
+            return cached["content"], cached["content_type"]
+
+    token = os.getenv("LOGOKIT_PUBLISHABLE_TOKEN", "").strip()
+    if not token or not token.startswith("pk_"):
+        raise RuntimeError("LogoKit não está configurado.")
+
+    lookups = [("ticker", safe_symbol)]
+
+    issuer_domain = (
+        logokit_issuer_domain(name)
+        if normalized_asset_type in {"ETF", "FUND", "MUTUALFUND"}
+        else None
+    )
+    if issuer_domain:
+        lookups.append(("domain", issuer_domain))
+
+    query = urlencode({
+        "token": token,
+        "size": 64,
+        "fallback": "404",
+    })
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 Chrome/149 Safari/537.36"
+        ),
+        "Accept": "image/avif,image/webp,image/png,image/*,*/*;q=0.8",
+        "Referer": (
+            "https://thesisosreplitstarter-1-zip--tmgms14.replit.app/"
+        ),
+    }
+
+    attempted = set()
+
+    for lookup_type, value in lookups:
+        lookup_key = (lookup_type, value)
+
+        if lookup_key in attempted:
+            continue
+
+        attempted.add(lookup_key)
+
+        if lookup_type == "ticker":
+            endpoint = f"ticker/{quote(value)}"
+        else:
+            endpoint = quote(value, safe=".")
+
+        request = Request(
+            f"https://img.logokit.com/{endpoint}?{query}",
+            headers=headers,
+        )
+
+        try:
+            with urlopen(request, timeout=20) as response:
+                content = response.read()
+                content_type = (
+                    response.headers.get("Content-Type")
+                    or "image/png"
+                ).split(";")[0].strip()
+
+                if not content or not content_type.startswith("image/"):
+                    continue
+
+                LOGO_CACHE[cache_key] = {
+                    "created_at": time.time(),
+                    "content": content,
+                    "content_type": content_type,
+                    "lookup_type": lookup_type,
+                    "lookup_value": value,
+                }
+
+                return content, content_type
+
+        except HTTPError as error:
+            if error.code in {403, 404, 429}:
+                continue
+            continue
+        except URLError:
+            continue
+
+    raise FileNotFoundError("Logótipo indisponível.")
+
+
 def radar_result_from_payload(payload: dict) -> dict:
     asset = payload.get("asset", {})
     engine = payload.get("framework_engine", {})
@@ -8086,6 +8225,8 @@ def radar_result_from_payload(payload: dict) -> dict:
         "country": asset.get("country"),
         "sector": asset.get("sector"),
         "industry": asset.get("industry"),
+        "logo": asset.get("logo"),
+        "website": asset.get("website"),
         "etf_largest_sector": etf_profile.get("largest_sector"),
         "etf_sector_allocation": etf_profile.get("sector_allocation", []),
         "etf_market_allocation": etf_profile.get("market_allocation", []),
@@ -9426,6 +9567,42 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             return
 
 
+        if parsed_url.path == "/api/logo":
+            query = parse_qs(parsed_url.query)
+            symbol = str(
+                (query.get("symbol") or [""])[0]
+            ).strip().upper()
+
+            name = str(
+                (query.get("name") or [""])[0]
+            ).strip()
+            asset_type = str(
+                (query.get("asset_type") or [""])[0]
+            ).strip().upper()
+            try:
+                content, content_type = fetch_logokit_logo(
+                    symbol,
+                    name=name,
+                    asset_type=asset_type,
+                )
+            except (ValueError, FileNotFoundError, RuntimeError):
+                self.send_response(404)
+                self.send_header("Cache-Control", "public, max-age=300")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header(
+                "Cache-Control",
+                "public, max-age=86400, immutable",
+            )
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+            return
+
         if parsed_url.path == "/api/health":
             self.send_json(
                 {
@@ -9438,6 +9615,7 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
                         "SEC EDGAR",
                         "ECB Data Portal",
                         "Yahoo Finance via yfinance",
+                        "LogoKit stock and ETF logos",
                         "SEC submissions and Finnhub Company News",
                     ],
                 }
