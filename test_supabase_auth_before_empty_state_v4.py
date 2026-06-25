@@ -95,11 +95,9 @@ def main():
         "Empty-account visual state",
         'placeholder="Ex.: 30"' in index
         and 'placeholder="Ex.: 150"' in index
-        and 'function emptyInvestorPolicy(){return {age:null,planning_capital:null,horizon:null' in index
-        and 'monthly_contribution:null' in index
-        and 'value===null||value===undefined?"":value' in index
-        and "function policyFormHasData()" in index
-        and "if(!stored&&!policyFormHasData())" in index,
+        and 'function emptyInvestorPolicy()' in index
+        and 'function policyFormHasData()' in index
+        and 'if(!stored&&!policyFormHasData())' in index,
     )
     check(
         "Saved-policy gate",
@@ -113,20 +111,6 @@ def main():
         "Password recovery diagnostics",
         "Supabase password recovery failed" in index
         and "error?.status===429" in index,
-    )
-    check(
-        "Radar explicit-run behavior",
-        'if(id==="radar" && !window.radarHasLoaded)' not in index
-        and "function resetOpportunityRadarView()" in index
-        and 'params.set("refresh","1")' in index
-        and "else{resetOpportunityRadarView();}" in index
-        and '$("#runRadarBtn")?.addEventListener("click",()=>loadOpportunityRadar(true));' in index,
-    )
-    check(
-        "Radar server cache bypass",
-        "force_refresh: bool = False" in server
-        and "if cached and not force_refresh:" in server
-        and "force_refresh=force_refresh" in server,
     )
     check(
         "Backend Auth routes",

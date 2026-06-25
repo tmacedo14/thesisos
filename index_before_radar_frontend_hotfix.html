@@ -6319,7 +6319,9 @@
   // ---------------------------------------------------------------
   const WATCHLIST_KEY="thesisos_watchlist_v1";
   window.currentAnalysisPayload=null;
-function escapeHtml(value){
+  window.radarHasLoaded=false;
+
+  function escapeHtml(value){
     return String(value ?? "").replace(/[&<>'"]/g,char=>({
       "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"
     })[char]);

@@ -116,11 +116,12 @@ def main():
     )
     check(
         "Radar explicit-run behavior",
-        'if(id==="radar" && !window.radarHasLoaded)' not in index
+        'window.radarHasLoaded' not in index
         and "function resetOpportunityRadarView()" in index
         and 'params.set("refresh","1")' in index
-        and "else{resetOpportunityRadarView();}" in index
-        and '$("#runRadarBtn")?.addEventListener("click",()=>loadOpportunityRadar(true));' in index,
+        and 'if(cloudSyncSession.authenticated){try{localStorage.setItem(DASHBOARD_RADAR_KEY' in index
+        and 'const radar=cloudSyncSession.authenticated?dashboardRead(DASHBOARD_RADAR_KEY,null):null' in index
+        and "else{resetOpportunityRadarView();}" in index,
     )
     check(
         "Radar server cache bypass",

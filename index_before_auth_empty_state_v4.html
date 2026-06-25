@@ -3067,6 +3067,10 @@
   }
   function handlePageOpen(id){
     openPage(id);
+    if(id==="radar" && !window.radarHasLoaded){
+      window.radarHasLoaded=true;
+      setTimeout(()=>loadOpportunityRadar(),120);
+    }
     if(id==="dashboard"){
       renderLiveDashboard();
       if(!window.dashboardHealthCheckedAt || Date.now()-window.dashboardHealthCheckedAt>60000){
@@ -6319,7 +6323,9 @@
   // ---------------------------------------------------------------
   const WATCHLIST_KEY="thesisos_watchlist_v1";
   window.currentAnalysisPayload=null;
-function escapeHtml(value){
+  window.radarHasLoaded=false;
+
+  function escapeHtml(value){
     return String(value ?? "").replace(/[&<>'"]/g,char=>({
       "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"
     })[char]);
@@ -6406,21 +6412,6 @@ function escapeHtml(value){
     container.innerHTML=items.map(item=>`<article class="card opportunity"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="watchlist-card-meta"><div><span>Último preço guardado</span><strong>${item.currency?escapeHtml(item.currency)+" ":""}${Number.isFinite(Number(item.price))?formatNumber(item.price):"Atualizar análise"}</strong></div><div><span>Adicionado</span><strong>${formatAssetDate(item.added_at)}</strong></div></div><div class="card-actions"><button class="ghost watchlist-analyze" data-symbol="${escapeHtml(item.symbol)}" data-exchange="${escapeHtml(item.exchange || "")}">Analisar</button><button class="ghost watchlist-compare" data-symbol="${escapeHtml(item.symbol)}">Comparar</button><button class="danger-btn watchlist-remove" data-symbol="${escapeHtml(item.symbol)}" data-exchange="${escapeHtml(item.exchange || "")}">Remover</button></div></article>`).join("");
   }
 
-  function resetOpportunityRadarView(){
-    window.lastRadarData=null;
-    const container=$("#dynamicRadarCards");
-    const empty=$("#dynamicRadarEmpty");
-    if(container)container.innerHTML="";
-    if(empty){
-      empty.textContent="Ainda não existem resultados. Carrega em Executar Radar.";
-      empty.style.display="block";
-    }
-    if($("#radarUpdated"))$("#radarUpdated").textContent="Ainda não executado";
-    if($("#radarCoverage"))$("#radarCoverage").textContent="0 analisados";
-    if($("#radarStatusTitle"))$("#radarStatusTitle").textContent="Radar pronto";
-    if($("#radarStatusDetail"))$("#radarStatusDetail").textContent="Configura o universo e carrega em Executar Radar para gerar um ranking atual.";
-  }
-
   async function loadOpportunityRadar(force=false){
     const universe=$("#radarUniverse")?.value || "core_us";
     const limit=$("#radarLimit")?.value || "8";
@@ -6430,10 +6421,10 @@ function escapeHtml(value){
     if((universe==="watchlist" || universe==="custom") && !symbols){showToast("A lista selecionada está vazia.");return;}
     const params=new URLSearchParams({universe:universe==="watchlist"||universe==="custom"?"custom":universe,limit});
     if(symbols) params.set("symbols",symbols);
-    if(force) params.set("refresh","1");
+    if(force) params.set("refresh",Date.now());
     $("#radarLoading").hidden=false;$("#dynamicRadarCards").innerHTML="";$("#dynamicRadarEmpty").style.display="none";$("#radarStatusTitle").textContent="Radar em execução";$("#radarStatusDetail").textContent="A recolher dados, calcular scores e ordenar candidatas.";
     try{
-      const response=await fetch(`/api/radar?${params}`);const data=await response.json();if(!response.ok) throw new Error(data.detail||data.error||"Erro no Radar");window.lastRadarData=data;try{localStorage.setItem(DASHBOARD_RADAR_KEY,JSON.stringify(data));cloudSchedulePush();}catch{}renderRadarResults(data);renderLiveDashboard();$("#radarUpdated").textContent=`Atualizado ${formatAssetDate(data.generated_at)}${data.cached?" · cache":force?" · atualização forçada":""}`;$("#radarCoverage").textContent=`${data.analysed_count} analisados · ${data.error_count} erros`;$("#radarStatusTitle").textContent="Ranking concluído";$("#radarStatusDetail").textContent=data.methodology?.decision_limit || "Candidatas identificadas para análise aprofundada.";
+      const response=await fetch(`/api/radar?${params}`);const data=await response.json();if(!response.ok) throw new Error(data.detail||data.error||"Erro no Radar");window.lastRadarData=data;try{localStorage.setItem(DASHBOARD_RADAR_KEY,JSON.stringify(data));cloudSchedulePush();}catch{}renderRadarResults(data);renderLiveDashboard();$("#radarUpdated").textContent=`Atualizado ${formatAssetDate(data.generated_at)}${data.cached?" · cache":""}`;$("#radarCoverage").textContent=`${data.analysed_count} analisados · ${data.error_count} erros`;$("#radarStatusTitle").textContent="Ranking concluído";$("#radarStatusDetail").textContent=data.methodology?.decision_limit || "Candidatas identificadas para análise aprofundada.";
     }catch(error){$("#radarStatusTitle").textContent="Radar indisponível";$("#radarStatusDetail").textContent=error.message;$("#dynamicRadarEmpty").textContent="Não foi possível executar o Radar.";$("#dynamicRadarEmpty").style.display="block";showToast(error.message);}finally{$("#radarLoading").hidden=true;}
   }
   function sortedRadarResults(results){
@@ -6484,7 +6475,6 @@ function escapeHtml(value){
   $("#analysisCompareBtn")?.addEventListener("click",()=>{const symbol=window.currentAnalysisPayload?.query || window.currentAnalysisPayload?.asset?.symbol;if(symbol) $("#compareLeft").value=symbol;handlePageOpen("compare");});
   $("#analysisPrintBtn")?.addEventListener("click",()=>window.print());
   $("#runRadarBtn")?.addEventListener("click",()=>loadOpportunityRadar(true));
-  resetOpportunityRadarView();
   $("#radarSort")?.addEventListener("change",()=>{if(window.lastRadarData)renderRadarResults(window.lastRadarData);});
   $("#radarUniverse")?.addEventListener("change",event=>{$("#radarCustomSymbols").disabled=event.target.value!=="custom";});
   $("#watchlistRadarBtn")?.addEventListener("click",()=>{$("#radarUniverse").value="watchlist";handlePageOpen("radar");loadOpportunityRadar(true);});
@@ -6826,7 +6816,7 @@ function escapeHtml(value){
     if(input.emergency_fund==="none"){allocation.cash+=10;allocation.core-=7;allocation.quality-=3;limits.min_cash=Math.max(limits.min_cash,20);}
     return {...limits,target_allocation:allocation};
   }
-  function emptyInvestorPolicy(){return {age:null,planning_capital:null,horizon:null,goal:"",liquidity:"",income_stability:"",drop_reaction:"",emergency_fund:"",monthly_contribution:null,drawdown:null,max_stock_weight:null,max_etf_weight:null,initial_position_weight:null,max_speculative:null,max_sector:null,max_currency:null,min_cash:null,rebalance_threshold:null,target_allocation:{core:null,quality:null,dividend:null,speculative:null,cash:null},score:null,label:"Por configurar",updated_at:null};}
+  function emptyInvestorPolicy(){return {age:0,planning_capital:0,horizon:0,goal:"",liquidity:"",income_stability:"",drop_reaction:"",emergency_fund:"",monthly_contribution:0,drawdown:0,max_stock_weight:0,max_etf_weight:0,initial_position_weight:0,max_speculative:0,max_sector:0,max_currency:0,min_cash:0,rebalance_threshold:0,target_allocation:{core:0,quality:0,dividend:0,speculative:0,cash:0},score:null,label:"Por configurar",updated_at:null};}
   function defaultInvestorPolicy(){const input={age:30,planning_capital:1000,horizon:20,goal:"growth",liquidity:"low",income_stability:"medium",drop_reaction:"hold",emergency_fund:"partial",monthly_contribution:150,drawdown:30};const score=policyRiskScore(input);return {...input,...policyRecommendedValues(score,input),score,label:policyLabel(score),updated_at:null};}
   function hasSavedInvestorPolicy(){return Boolean(policyRead());}
   function getInvestorPolicy(){const stored=policyRead();if(!stored)return emptyInvestorPolicy();const fallback=defaultInvestorPolicy();return {...fallback,...stored,target_allocation:{...fallback.target_allocation,...(stored.target_allocation||{})}};}
@@ -6836,7 +6826,7 @@ function escapeHtml(value){
   function policyFromForm(){const input=policyFormInput(),score=policyRiskScore(input);return {...input,score,label:policyLabel(score),max_stock_weight:Number($("#policyMaxStock")?.value)||0,max_etf_weight:Number($("#policyMaxEtf")?.value)||0,initial_position_weight:Number($("#policyInitialWeight")?.value)||0,max_speculative:Number($("#policyMaxSpeculative")?.value)||0,max_sector:Number($("#policyMaxSector")?.value)||0,max_currency:Number($("#policyMaxCurrency")?.value)||0,min_cash:Number($("#policyMinCash")?.value)||0,rebalance_threshold:Number($("#policyRebalanceThreshold")?.value)||0,target_allocation:{core:Number($("#policyCoreAllocation")?.value)||0,quality:Number($("#policyQualityAllocation")?.value)||0,dividend:Number($("#policyDividendAllocation")?.value)||0,speculative:Number($("#policySpecAllocation")?.value)||0,cash:Number($("#policyCashAllocation")?.value)||0},updated_at:null};}
   function fillPolicyForm(policy=getInvestorPolicy()){
     const fields={policyAge:policy.age,policyPlanningCapital:policy.planning_capital,policyHorizon:policy.horizon,policyGoal:policy.goal,policyLiquidity:policy.liquidity,policyIncomeStability:policy.income_stability,policyDropReaction:policy.drop_reaction,policyEmergencyFund:policy.emergency_fund,policyMonthlyContribution:policy.monthly_contribution,policyDrawdown:policy.drawdown,policyMaxStock:policy.max_stock_weight,policyMaxEtf:policy.max_etf_weight,policyInitialWeight:policy.initial_position_weight,policyMaxSpeculative:policy.max_speculative,policyMaxSector:policy.max_sector,policyMaxCurrency:policy.max_currency,policyMinCash:policy.min_cash,policyRebalanceThreshold:policy.rebalance_threshold,policyCoreAllocation:policy.target_allocation.core,policyQualityAllocation:policy.target_allocation.quality,policyDividendAllocation:policy.target_allocation.dividend,policySpecAllocation:policy.target_allocation.speculative,policyCashAllocation:policy.target_allocation.cash};
-    Object.entries(fields).forEach(([id,value])=>{if($("#"+id))$("#"+id).value=value===null||value===undefined?"":value;});investorPolicyFormLoaded=true;
+    Object.entries(fields).forEach(([id,value])=>{if($("#"+id))$("#"+id).value=value;});investorPolicyFormLoaded=true;
   }
   function policyAllocationTotal(policy){return Object.values(policy.target_allocation||{}).reduce((sum,value)=>sum+(Number(value)||0),0);}
   function policyCompliance(policy=getInvestorPolicy()){
@@ -7173,7 +7163,7 @@ function escapeHtml(value){
   function cloudSwitchAuthMode(mode){cloudAuthMode=mode;["login","signup","reset"].forEach(value=>{$(`#cloudAuth${value[0].toUpperCase()+value.slice(1)}Tab`)?.classList.toggle("active",value===mode);});if($("#cloudSyncLoginBtn"))$("#cloudSyncLoginBtn").style.display=mode==="login"?"inline-block":"none";if($("#cloudSyncSignupBtn"))$("#cloudSyncSignupBtn").style.display=mode==="signup"?"inline-block":"none";if($("#cloudSyncResetBtn"))$("#cloudSyncResetBtn").style.display=mode==="reset"?"inline-block":"none";const password=$("#cloudSyncPassword");if(password){password.style.display=mode==="reset"?"none":"block";password.autocomplete=mode==="signup"?"new-password":"current-password";password.placeholder=mode==="signup"?"Palavra-passe nova (mínimo 8 caracteres)":"Palavra-passe";}}
   function cloudUpdateUi(){const configured=cloudSyncSession.configured,authenticated=cloudSyncSession.authenticated,user=cloudSyncSession.user||{},badge=$("#cloudSyncBadge");if(badge){badge.textContent=!configured?"Não configurado":authenticated?"Conta ligada":"Sessão desligada";badge.className=`freshness ${!configured?"bad":authenticated?"":"warn"}`.trim();}if($("#cloudSyncConfigured"))$("#cloudSyncConfigured").textContent=configured?"Supabase Auth pronta":"Falta configuração";if($("#cloudSyncSession"))$("#cloudSyncSession").textContent=authenticated?"Autenticada":"Desligada";if($("#cloudSyncWorkspace"))$("#cloudSyncWorkspace").textContent=user.email||"—";if($("#cloudSyncRows"))$("#cloudSyncRows").textContent=cloudSyncSession.row_count===null?"—":`${cloudSyncSession.row_count} namespaces`;const last=localStorage.getItem(CLOUD_LAST_SYNC_KEY);if($("#cloudSyncLastSync"))$("#cloudSyncLastSync").textContent=last?new Date(last).toLocaleString("pt-PT"):"Nunca";if($("#cloudSyncAuto"))$("#cloudSyncAuto").checked=localStorage.getItem(CLOUD_AUTOSYNC_KEY)==="1";$("#cloudAuthSignedOut")?.classList.toggle("hidden",authenticated);$("#cloudAuthSignedIn")?.classList.toggle("visible",authenticated);$("#cloudLegacyMigration")?.classList.toggle("visible",authenticated);$("#cloudRecoveryPanel")?.classList.toggle("visible",cloudRecoveryMode&&authenticated);if($("#cloudAuthUserEmail"))$("#cloudAuthUserEmail").textContent=user.email||"Sessão iniciada";if($("#cloudAuthUserId"))$("#cloudAuthUserId").textContent=user.id?`ID: ${user.id}`:"—";["cloudSyncPushBtn","cloudSyncPullBtn","cloudSyncAuto","cloudLegacyMigrateBtn"].forEach(id=>{const el=$("#"+id);if(el)el.disabled=!authenticated||cloudSyncBusy;});const topName=$("#topbarUserName"),topAvatar=$("#topbarUserAvatar");if(topName)topName.textContent=authenticated?cloudDisplayName(user.email):"Visitante";if(topAvatar)topAvatar.textContent=authenticated?cloudInitials(user.email):"—";}
   async function cloudRequest(path,options={},requireAuth=false){const headers={"Content-Type":"application/json",...(options.headers||{})};if(requireAuth){if(!cloudAuthClient)throw new Error("Supabase Auth ainda não inicializada.");const {data,error}=await cloudAuthClient.auth.getSession();if(error)throw error;const token=data?.session?.access_token;if(!token)throw new Error("Inicia sessão para aceder à cloud.");headers.Authorization=`Bearer ${token}`;}const response=await fetch(path,{...options,headers,credentials:"same-origin"}),data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||data.error||`Erro HTTP ${response.status}`);return data;}
-  function cloudRenderAll(){updateWatchlistCount();renderWatchlist();renderPortfolioManager();renderDecisionJournal();renderMonitoringAlerts();investorPolicyFormLoaded=false;fillPolicyForm(getInvestorPolicy());renderInvestorPolicy();renderPortfolioConstruction();renderLiveDashboard();const radar=dashboardRead(DASHBOARD_RADAR_KEY,null);if(radar){window.lastRadarData=radar;renderRadarResults(radar);if($("#radarUpdated"))$("#radarUpdated").textContent=`Guardado ${formatAssetDate(radar.generated_at)}`;}else{resetOpportunityRadarView();}const evidence=dashboardRead(DASHBOARD_EVIDENCE_KEY,null);if(evidence)renderEvidenceFeed(evidence);if(window.currentAnalysisPayload)renderPolicySizing(window.currentAnalysisPayload);}
+  function cloudRenderAll(){updateWatchlistCount();renderWatchlist();renderPortfolioManager();renderDecisionJournal();renderMonitoringAlerts();investorPolicyFormLoaded=false;fillPolicyForm(getInvestorPolicy());renderInvestorPolicy();renderPortfolioConstruction();renderLiveDashboard();const radar=dashboardRead(DASHBOARD_RADAR_KEY,null);if(radar){window.lastRadarData=radar;renderRadarResults(radar);}const evidence=dashboardRead(DASHBOARD_EVIDENCE_KEY,null);if(evidence)renderEvidenceFeed(evidence);if(window.currentAnalysisPayload)renderPolicySizing(window.currentAnalysisPayload);}
   function cloudApplyState(state){cloudWriteStateToLocal(state,{touchSync:true});const userId=cloudSyncSession.user?.id||localStorage.getItem(CLOUD_LOCAL_OWNER_KEY);if(userId)cloudSaveUserCache(userId);}
   async function cloudRefreshAuthenticatedState({resolveConflict=false,autoPull=false}={}){if(!cloudAuthClient)return null;const {data,error}=await cloudAuthClient.auth.getSession();if(error)throw error;const session=data?.session;if(!session){cloudSyncSession={...cloudSyncSession,authenticated:false,user:null,row_count:0};cloudUpdateUi();return null;}const backend=await cloudRequest("/api/auth/session",{method:"GET"},true);if(!backend.authenticated){cloudSyncSession={...cloudSyncSession,authenticated:false,user:null,row_count:0};cloudUpdateUi();return null;}cloudPrepareLocalStateForUser(backend.user?.id);cloudSyncSession={...cloudSyncSession,configured:true,authenticated:true,user:backend.user,row_count:backend.row_count??0};cloudUpdateUi();if(resolveConflict)await cloudResolveInitialConflict();else if(autoPull&&localStorage.getItem(CLOUD_AUTOSYNC_KEY)==="1")await cloudPullState({silent:true,confirmOverwrite:false});return backend;}
   async function cloudResolveInitialConflict(){const localHas=cloudLocalHasData(),cloudHas=(cloudSyncSession.row_count||0)>0;if(cloudHas&&!localHas){await cloudPullState({silent:true,confirmOverwrite:false});localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Os dados desta conta foram restaurados porque este navegador estava vazio.");}else if(!cloudHas&&localHas){await cloudPushState({silent:true});localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Os dados locais foram associados automaticamente à nova conta.");}else if(cloudHas&&localHas){localStorage.setItem(CLOUD_AUTOSYNC_KEY,"0");cloudSetMessage("Existem dados locais e dados na conta. Escolhe ‘Enviar dados locais’ ou ‘Restaurar da cloud’ antes de ativar a sincronização automática.","warn");}else{localStorage.setItem(CLOUD_AUTOSYNC_KEY,"1");cloudSetMessage("Conta vazia e pronta para sincronizar.");}cloudUpdateUi();}

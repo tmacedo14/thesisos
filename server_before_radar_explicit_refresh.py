@@ -8325,7 +8325,6 @@ def build_opportunity_radar(
     universe: str = "core_us",
     symbols_value: str | None = None,
     limit: int = 8,
-    force_refresh: bool = False,
 ) -> dict:
     symbols = parse_radar_symbols(universe, symbols_value, limit)
     cache_key = json.dumps(
@@ -8334,7 +8333,7 @@ def build_opportunity_radar(
     )
     cached = RADAR_CACHE.get(cache_key)
 
-    if cached and not force_refresh:
+    if cached:
         age = time.time() - cached["created_at"]
         if age < RADAR_CACHE_TTL_SECONDS:
             return {**cached["data"], "cached": True}
@@ -8826,8 +8825,6 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
         query = parse_qs(parsed_url.query)
         universe = query.get("universe", ["core_us"])[0]
         symbols_value = query.get("symbols", [None])[0]
-        refresh_value = str(query.get("refresh", ["0"])[0]).strip().lower()
-        force_refresh = refresh_value not in {"", "0", "false", "no", "off"}
 
         try:
             limit = int(query.get("limit", ["8"])[0])
@@ -8841,7 +8838,6 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
                 universe=universe,
                 symbols_value=symbols_value,
                 limit=limit,
-                force_refresh=force_refresh,
             )
             self.send_json(payload)
         except Exception as error:
