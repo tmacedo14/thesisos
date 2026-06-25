@@ -7792,40 +7792,160 @@ def resolve_analysis_payload(
     )
 
 
-def radar_composite_score(payload: dict):
+
+def radar_rule_block(rules: list[dict], areas: set[str]) -> dict:
+    selected = [
+        rule for rule in rules
+        if rule.get("area") in areas
+    ]
+
+    total_max = sum(
+        finite_number(rule.get("max_points")) or 0
+        for rule in selected
+    )
+    available = [
+        rule for rule in selected
+        if rule.get("status") != "unavailable"
+    ]
+    available_max = sum(
+        finite_number(rule.get("max_points")) or 0
+        for rule in available
+    )
+    achieved = sum(
+        finite_number(rule.get("points")) or 0
+        for rule in available
+    )
+
+    score = (
+        round((achieved / total_max) * 100)
+        if total_max
+        else None
+    )
+    coverage = (
+        round((available_max / total_max) * 100)
+        if total_max
+        else 0
+    )
+
+    return {
+        "score": score,
+        "coverage_percentage": coverage,
+        "available_rules": len(available),
+        "total_rules": len(selected),
+    }
+
+
+
+def radar_score_breakdown(payload: dict) -> dict:
     engine = payload.get("framework_engine", {})
     snapshot = engine.get("quantitative_snapshot", {})
     technical = payload.get("technical") or {}
     valuation = payload.get("valuation") or {}
     asset_type = payload.get("asset", {}).get("asset_type")
-    quality_score = finite_number(snapshot.get("score"))
+
     technical_score = finite_number(technical.get("score"))
     valuation_score = finite_number(valuation.get("score"))
-    source_coverage = finite_number(
+    data_score = finite_number(
         payload.get("data_quality", {}).get("completeness_percentage")
     )
 
+    if asset_type == "stock":
+        rules = snapshot.get("rules") or []
+
+        operational = radar_rule_block(
+            rules,
+            {"growth", "profitability", "cash_flow_quality"},
+        )
+        financial = radar_rule_block(
+            rules,
+            {"balance_sheet", "dilution", "capital_allocation"},
+        )
+
+        components = {
+            "operational_quality": {
+                **operational,
+                "weight": 0.35,
+            },
+            "financial_strength": {
+                **financial,
+                "weight": 0.25,
+            },
+            "valuation": {
+                "score": valuation_score or 0,
+                "weight": 0.20,
+            },
+            "technical_entry": {
+                "score": technical_score or 0,
+                "weight": 0.10,
+            },
+            "data_quality": {
+                "score": data_score or 0,
+                "weight": 0.10,
+            },
+        }
+
+        score = round(sum(
+            component["score"] * component["weight"]
+            for component in components.values()
+        ))
+
+        return {
+            "score": score,
+            "model": "stock_framework_v2",
+            "components": components,
+        }
+
+    quality_score = finite_number(snapshot.get("score"))
     weighted = []
-    weights = (
-        {"quality": 0.55, "valuation": 0.20, "technical": 0.15, "data": 0.10}
-        if asset_type == "stock"
-        else {"quality": 0.70, "technical": 0.20, "data": 0.10}
-    )
+
+    weights = {
+        "structure": 0.70,
+        "technical": 0.20,
+        "data_quality": 0.10,
+    }
 
     if quality_score is not None:
-        weighted.append((quality_score, weights["quality"]))
-    if valuation_score is not None and "valuation" in weights:
-        weighted.append((valuation_score, weights["valuation"]))
+        weighted.append((quality_score, weights["structure"]))
     if technical_score is not None:
         weighted.append((technical_score, weights["technical"]))
-    if source_coverage is not None:
-        weighted.append((source_coverage, weights["data"]))
+    if data_score is not None:
+        weighted.append((data_score, weights["data_quality"]))
 
     if not weighted:
-        return None
+        return {
+            "score": None,
+            "model": "asset_structure_v1",
+            "components": {},
+        }
 
     total_weight = sum(weight for _, weight in weighted)
-    return round(sum(value * weight for value, weight in weighted) / total_weight)
+    score = round(
+        sum(value * weight for value, weight in weighted)
+        / total_weight
+    )
+
+    return {
+        "score": score,
+        "model": "asset_structure_v1",
+        "components": {
+            "structure": {
+                "score": quality_score,
+                "weight": weights["structure"],
+            },
+            "technical_entry": {
+                "score": technical_score,
+                "weight": weights["technical"],
+            },
+            "data_quality": {
+                "score": data_score,
+                "weight": weights["data_quality"],
+            },
+        },
+    }
+
+
+def radar_composite_score(payload: dict):
+    return radar_score_breakdown(payload).get("score")
 
 
 def radar_status(score, payload):
@@ -7876,7 +7996,8 @@ def radar_result_from_payload(payload: dict) -> dict:
     valuation_metrics = valuation.get("metrics", {})
     evidence = payload.get("evidence") or {}
     indicators = technical.get("indicators", {})
-    score = radar_composite_score(payload)
+    score_breakdown = radar_score_breakdown(payload)
+    score = score_breakdown.get("score")
     status = radar_status(score, payload)
 
     positives = []
@@ -7911,6 +8032,8 @@ def radar_result_from_payload(payload: dict) -> dict:
         "price": asset.get("price"),
         "market_change_percentage": asset.get("change_percentage"),
         "radar_score": score,
+        "score_model": score_breakdown.get("model"),
+        "score_components": score_breakdown.get("components", {}),
         "status": status,
         "quality_score": snapshot.get("score"),
         "quality_classification": snapshot.get("classification"),
@@ -8047,20 +8170,32 @@ def build_opportunity_radar(
         "errors": errors,
         "cached": False,
         "methodology": {
+            "stock_model": "stock_framework_v2",
             "stock_weights": {
-                "quality": 0.55,
+                "operational_quality": 0.35,
+                "financial_strength": 0.25,
                 "valuation": 0.20,
-                "technical": 0.15,
+                "technical_entry": 0.10,
                 "data_quality": 0.10,
             },
+            "etf_model": "asset_structure_v1",
             "etf_weights": {
                 "structure": 0.70,
-                "technical": 0.20,
+                "technical_entry": 0.20,
                 "data_quality": 0.10,
             },
+            "coverage_policy": (
+                "Nas ações, regras quantitativas indisponíveis "
+                "reduzem os sub-scores operacional e financeiro."
+            ),
+            "event_policy": (
+                "Eventos materiais que exigem revisão bloqueiam "
+                "a decisão operacional, independentemente do score."
+            ),
             "decision_limit": (
-                "O ranking identifica candidatas para análise. "
-                "Não substitui notícias, contexto qualitativo, carteira ou plano de entrada."
+                "O ranking identifica candidatas para análise aprofundada. "
+                "Não substitui revisão qualitativa, notícias, encaixe na "
+                "carteira, zona de entrada ou dimensionamento da posição."
             ),
         },
     }

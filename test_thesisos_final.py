@@ -250,6 +250,43 @@ def test_static(suite: Suite) -> None:
         "expected 0.9",
     )
 
+    radar_v2_checks = {
+        "backend score breakdown": "def radar_score_breakdown(payload: dict) -> dict:" in server,
+        "stock model": '"model": "stock_framework_v2"' in server,
+        "operational quality": '"operational_quality"' in server,
+        "financial strength": '"financial_strength"' in server,
+        "valuation component": '"valuation": {' in server,
+        "technical entry": '"technical_entry"' in server,
+        "data quality": '"data_quality"' in server,
+        "operational areas": '{"growth", "profitability", "cash_flow_quality"}' in server,
+        "financial areas": '{"balance_sheet", "dilution", "capital_allocation"}' in server,
+        "coverage penalty": "round((achieved / total_max) * 100)" in server,
+        "unavailable-rule handling": 'rule.get("status") != "unavailable"' in server,
+        "stock methodology": '"stock_model": "stock_framework_v2"' in server,
+        "operational weight": '"operational_quality": 0.35' in server,
+        "financial weight": '"financial_strength": 0.25' in server,
+        "valuation weight": '"valuation": 0.20' in server,
+        "technical weight": '"technical_entry": 0.10' in server,
+        "data weight": '"data_quality": 0.10' in server,
+        "frontend operational label": "Qualidade operacional" in index,
+        "frontend financial label": "Solidez financeira" in index,
+        "frontend entry label": "Momento de entrada" in index,
+        "frontend component sorting": "components.operational_quality?.score" in index,
+        "zero-score sorting": "Number.isFinite(number) ? number : -999" in index,
+    }
+    missing_radar_v2 = [
+        name for name, present in radar_v2_checks.items() if not present
+    ]
+    suite.check(
+        "Opportunity Radar v2",
+        not missing_radar_v2,
+        (
+            "framework scoring, coverage and frontend integration"
+            if not missing_radar_v2
+            else "missing: " + ", ".join(missing_radar_v2)
+        ),
+    )
+
     dependency_ok = "pypdf" in requirements.lower() and "yfinance" in requirements.lower()
     suite.check("Runtime dependencies", dependency_ok, "pypdf and yfinance")
 

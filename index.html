@@ -6424,8 +6424,24 @@ function escapeHtml(value){
   }
   function sortedRadarResults(results){
     const mode=$("#radarSort")?.value || "score";return [...results].sort((a,b)=>{
-      const value=item=>mode==="quality"?item.quality_score:mode==="technical"?item.technical_score:mode==="pullback"?item.pullback_percentage:item.radar_score;
-      return (Number(value(b))||-999)-(Number(value(a))||-999);
+      const value=item=>{
+        const components=item.score_components || {};
+        if(mode==="quality"){
+          return item.score_model==="stock_framework_v2"
+            ? components.operational_quality?.score
+            : components.structure?.score ?? item.quality_score;
+        }
+        if(mode==="technical"){
+          return components.technical_entry?.score ?? item.technical_score;
+        }
+        if(mode==="pullback") return item.pullback_percentage;
+        return item.radar_score;
+      };
+      const sortable=item=>{
+        const number=Number(value(item));
+        return Number.isFinite(number) ? number : -999;
+      };
+      return sortable(b)-sortable(a);
     });
   }
   function renderRadarResults(data){
@@ -6434,7 +6450,12 @@ function escapeHtml(value){
       const statusClass=item.status?.code==="candidate"?"":item.status?.code==="monitor"?"warn":"bad";
       const positives=(item.positive_reasons||[]).slice(0,2).map(text=>`<div class="radar-reason good">${escapeHtml(text)}</div>`).join("");
       const warnings=(item.warning_reasons||[]).slice(0,2).map(text=>`<div class="radar-reason warn">${escapeHtml(text)}</div>`).join("");
-      return `<article class="card opportunity radar-live-card"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="score-line"><div><span class="metric-label">Radar score</span><div class="score">${Number.isFinite(Number(item.radar_score))?formatNumber(item.radar_score,0)+"/100":"—"}</div></div><span class="pill ${statusClass}">${escapeHtml(item.status?.label || "Sem estado")}</span></div><div class="radar-score-layout"><div class="radar-score-box"><span>Qualidade</span><strong>${Number.isFinite(Number(item.quality_score))?formatNumber(item.quality_score,0):"—"}</strong></div><div class="radar-score-box"><span>Valuation</span><strong>${Number.isFinite(Number(item.valuation_score))?formatNumber(item.valuation_score,0):"—"}</strong></div><div class="radar-score-box"><span>Técnica</span><strong>${Number.isFinite(Number(item.technical_score))?formatNumber(item.technical_score,0):"—"}</strong></div><div class="radar-score-box"><span>Pullback</span><strong>${Number.isFinite(Number(item.pullback_percentage))?formatNumber(item.pullback_percentage)+"%":"—"}</strong></div></div><div class="why-now"><strong>Próxima ação:</strong><br>${escapeHtml(item.status?.action || item.decision_label || "Analisar")}</div><div class="radar-reasons">${positives}${warnings}</div><div class="validity"><span>Dados ${formatNumber(item.data_completeness_percentage || 0,0)}%</span><strong>Framework ${formatNumber(item.framework_coverage_percentage || 0,0)}%</strong></div><div class="card-actions"><button class="ghost radar-analyze" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}" data-exchange="${escapeHtml(item.analysis_exchange || "")}" data-ticker="${escapeHtml(item.analysis_ticker || item.symbol)}">Analisar</button><button class="ghost radar-compare" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}">Comparar</button><button class="primary radar-watch" data-record="${encodeURIComponent(JSON.stringify(item))}">Watchlist</button></div></article>`;
+      const components=item.score_components || {};
+      const componentScore=value=>Number.isFinite(Number(value))?formatNumber(value,0):"—";
+      const scoreBoxes=item.score_model==="stock_framework_v2"
+        ? `<div class="radar-score-layout"><div class="radar-score-box"><span>Qualidade operacional</span><strong>${componentScore(components.operational_quality?.score)}</strong></div><div class="radar-score-box"><span>Solidez financeira</span><strong>${componentScore(components.financial_strength?.score)}</strong></div><div class="radar-score-box"><span>Valuation</span><strong>${componentScore(components.valuation?.score)}</strong></div><div class="radar-score-box"><span>Momento de entrada</span><strong>${componentScore(components.technical_entry?.score)}</strong></div></div>`
+        : `<div class="radar-score-layout"><div class="radar-score-box"><span>Estrutura</span><strong>${componentScore(components.structure?.score ?? item.quality_score)}</strong></div><div class="radar-score-box"><span>Valuation</span><strong>${componentScore(item.valuation_score)}</strong></div><div class="radar-score-box"><span>Técnica</span><strong>${componentScore(components.technical_entry?.score ?? item.technical_score)}</strong></div><div class="radar-score-box"><span>Pullback</span><strong>${Number.isFinite(Number(item.pullback_percentage))?formatNumber(item.pullback_percentage)+"%":"—"}</strong></div></div>`;
+      return `<article class="card opportunity radar-live-card"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="score-line"><div><span class="metric-label">Radar score</span><div class="score">${Number.isFinite(Number(item.radar_score))?formatNumber(item.radar_score,0)+"/100":"—"}</div></div><span class="pill ${statusClass}">${escapeHtml(item.status?.label || "Sem estado")}</span></div>${scoreBoxes}<div class="why-now"><strong>Próxima ação:</strong><br>${escapeHtml(item.status?.action || item.decision_label || "Analisar")}</div><div class="radar-reasons">${positives}${warnings}</div><div class="validity"><span>Dados ${formatNumber(item.data_completeness_percentage || 0,0)}%</span><strong>Framework ${formatNumber(item.framework_coverage_percentage || 0,0)}%</strong></div><div class="card-actions"><button class="ghost radar-analyze" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}" data-exchange="${escapeHtml(item.analysis_exchange || "")}" data-ticker="${escapeHtml(item.analysis_ticker || item.symbol)}">Analisar</button><button class="ghost radar-compare" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}">Comparar</button><button class="primary radar-watch" data-record="${encodeURIComponent(JSON.stringify(item))}">Watchlist</button></div></article>`;
     }).join("");
   }
 
