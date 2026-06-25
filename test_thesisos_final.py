@@ -287,6 +287,38 @@ def test_static(suite: Suite) -> None:
         ),
     )
 
+    decision_gate_checks = {
+        "local decision engine": "function radarPortfolioFit(item)" in index,
+        "saved policy gate": "hasSavedInvestorPolicy()" in index,
+        "portfolio context": "const snapshot=portfolioSnapshot();" in index,
+        "policy context": "const policy=getInvestorPolicy();" in index,
+        "policy required": 'code:"policy_required"' in index,
+        "event review": 'code="event_review"' in index,
+        "limit reached": 'code="limit_reached"' in index,
+        "avoid decision": 'code="avoid"' in index,
+        "reinforce decision": 'code="reinforce"' in index,
+        "hold decision": 'code="hold"' in index,
+        "initiate decision": 'code="initiate"' in index,
+        "current weight": "Peso atual" in index,
+        "individual limit": "Limite individual" in index,
+        "remaining capacity": "Margem disponível" in index,
+        "initial tranche": "Tranche inicial" in index,
+        "decision gate card": "Portfolio Fit & Decision Gate" in index,
+        "private frontend calculation": "radarPortfolioFit" not in server,
+    }
+    missing_decision_gate = [
+        name for name, present in decision_gate_checks.items() if not present
+    ]
+    suite.check(
+        "Portfolio Fit & Decision Gate v1",
+        not missing_decision_gate,
+        (
+            "account policy, portfolio limits and local decisions"
+            if not missing_decision_gate
+            else "missing: " + ", ".join(missing_decision_gate)
+        ),
+    )
+
     dependency_ok = "pypdf" in requirements.lower() and "yfinance" in requirements.lower()
     suite.check("Runtime dependencies", dependency_ok, "pypdf and yfinance")
 

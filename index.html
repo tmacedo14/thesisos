@@ -6422,6 +6422,118 @@ function escapeHtml(value){
       const response=await fetch(`/api/radar?${params}`);const data=await response.json();if(!response.ok) throw new Error(data.detail||data.error||"Erro no Radar");window.lastRadarData=data;try{localStorage.setItem(DASHBOARD_RADAR_KEY,JSON.stringify(data));cloudSchedulePush();}catch{}renderRadarResults(data);renderLiveDashboard();$("#radarUpdated").textContent=`Atualizado ${formatAssetDate(data.generated_at)}${data.cached?" · cache":force?" · atualização forçada":""}`;$("#radarCoverage").textContent=`${data.analysed_count} analisados · ${data.error_count} erros`;$("#radarStatusTitle").textContent="Ranking concluído";$("#radarStatusDetail").textContent=data.methodology?.decision_limit || "Candidatas identificadas para análise aprofundada.";
     }catch(error){$("#radarStatusTitle").textContent="Radar indisponível";$("#radarStatusDetail").textContent=error.message;$("#dynamicRadarEmpty").textContent="Não foi possível executar o Radar.";$("#dynamicRadarEmpty").style.display="block";showToast(error.message);}finally{$("#radarLoading").hidden=true;}
   }
+  function radarPortfolioFit(item){
+    if(!hasSavedInvestorPolicy()){
+      return {
+        code:"policy_required",
+        label:"Política necessária",
+        action:"Guardar a Investment Policy",
+        currentWeight:0,
+        maxWeight:null,
+        remaining:null,
+        initialWeight:0,
+        initialAmount:0,
+        positionExists:false,
+      };
+    }
+
+    const policy=getInvestorPolicy();
+    const snapshot=portfolioSnapshot();
+    const symbol=String(item.symbol||"").toUpperCase();
+    const exchange=String(item.analysis_exchange||item.exchange||"").toUpperCase();
+
+    const current=snapshot.positions.find(position=>{
+      const sameSymbol=String(position.symbol||"").toUpperCase()===symbol;
+      const positionExchange=String(position.exchange||"").toUpperCase();
+      return sameSymbol&&(!exchange||!positionExchange||positionExchange===exchange);
+    });
+
+    const base=snapshot.totalValue>0
+      ? snapshot.totalValue
+      : Number(policy.planning_capital)||0;
+
+    const maxWeight=item.asset_type==="etf"
+      ? Number(policy.max_etf_weight)||0
+      : Number(policy.max_stock_weight)||0;
+
+    const currentWeight=Number(current?.weight)||0;
+    const remaining=Math.max(0,maxWeight-currentWeight);
+    let initialWeight=Math.min(
+      Number(policy.initial_position_weight)||0,
+      remaining,
+    );
+
+    const valuation=Number(item.score_components?.valuation?.score ?? item.valuation_score);
+    const technical=Number(item.score_components?.technical_entry?.score ?? item.technical_score);
+    const financial=Number(item.score_components?.financial_strength?.score);
+    const radarScore=Number(item.radar_score);
+    const material=Boolean(item.event_review_required);
+
+    let code="observe";
+    let label="Aguardar";
+    let action="Rever tese, valuation e entrada";
+
+    if(material){
+      code="event_review";
+      label="Rever evento";
+      action="Decisão bloqueada até revisão do evento material";
+      initialWeight=0;
+    }else if(remaining<=0.01){
+      code="limit_reached";
+      label="Limite atingido";
+      action="Não aumentar a posição";
+      initialWeight=0;
+    }else if(Number.isFinite(financial)&&financial<45){
+      code="avoid";
+      label=current?"Rever posição":"Evitar";
+      action="Solidez financeira abaixo do limiar";
+      initialWeight=0;
+    }else if(Number.isFinite(radarScore)&&radarScore<55){
+      code="avoid";
+      label=current?"Manter sob revisão":"Evitar";
+      action="Score do Radar insuficiente";
+      initialWeight=0;
+    }else if(current){
+      if(Number.isFinite(valuation)&&valuation>=55&&Number.isFinite(technical)&&technical>=50){
+        code="reinforce";
+        label="Reforçar";
+        action="Existe margem na política para reforço faseado";
+      }else{
+        code="hold";
+        label="Manter";
+        action="Aguardar melhor valuation ou momento de entrada";
+        initialWeight=0;
+      }
+    }else if(Number.isFinite(radarScore)&&radarScore>=68){
+      code="initiate";
+      label="Iniciar pequeno";
+      action="Considerar uma primeira tranche dentro da política";
+    }
+
+    if(initialWeight>0&&Number.isFinite(valuation)&&valuation<45){
+      initialWeight*=0.5;
+      action+="; tranche reduzida por valuation exigente";
+    }else if(initialWeight>0&&Number.isFinite(technical)&&technical<45){
+      initialWeight*=0.7;
+      action+="; tranche reduzida por momento técnico fraco";
+    }
+
+    return {
+      code,
+      label,
+      action,
+      currentWeight,
+      maxWeight,
+      remaining,
+      initialWeight,
+      initialAmount:base*initialWeight/100,
+      maxAdditionalAmount:base*remaining/100,
+      positionExists:Boolean(current),
+      currentValue:Number(current?.market_value_eur)||0,
+      policyLabel:policy.label,
+    };
+  }
+
   function sortedRadarResults(results){
     const mode=$("#radarSort")?.value || "score";return [...results].sort((a,b)=>{
       const value=item=>{
@@ -6455,7 +6567,20 @@ function escapeHtml(value){
       const scoreBoxes=item.score_model==="stock_framework_v2"
         ? `<div class="radar-score-layout"><div class="radar-score-box"><span>Qualidade operacional</span><strong>${componentScore(components.operational_quality?.score)}</strong></div><div class="radar-score-box"><span>Solidez financeira</span><strong>${componentScore(components.financial_strength?.score)}</strong></div><div class="radar-score-box"><span>Valuation</span><strong>${componentScore(components.valuation?.score)}</strong></div><div class="radar-score-box"><span>Momento de entrada</span><strong>${componentScore(components.technical_entry?.score)}</strong></div></div>`
         : `<div class="radar-score-layout"><div class="radar-score-box"><span>Estrutura</span><strong>${componentScore(components.structure?.score ?? item.quality_score)}</strong></div><div class="radar-score-box"><span>Valuation</span><strong>${componentScore(item.valuation_score)}</strong></div><div class="radar-score-box"><span>Técnica</span><strong>${componentScore(components.technical_entry?.score ?? item.technical_score)}</strong></div><div class="radar-score-box"><span>Pullback</span><strong>${Number.isFinite(Number(item.pullback_percentage))?formatNumber(item.pullback_percentage)+"%":"—"}</strong></div></div>`;
-      return `<article class="card opportunity radar-live-card"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="score-line"><div><span class="metric-label">Radar score</span><div class="score">${Number.isFinite(Number(item.radar_score))?formatNumber(item.radar_score,0)+"/100":"—"}</div></div><span class="pill ${statusClass}">${escapeHtml(item.status?.label || "Sem estado")}</span></div>${scoreBoxes}<div class="why-now"><strong>Próxima ação:</strong><br>${escapeHtml(item.status?.action || item.decision_label || "Analisar")}</div><div class="radar-reasons">${positives}${warnings}</div><div class="validity"><span>Dados ${formatNumber(item.data_completeness_percentage || 0,0)}%</span><strong>Framework ${formatNumber(item.framework_coverage_percentage || 0,0)}%</strong></div><div class="card-actions"><button class="ghost radar-analyze" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}" data-exchange="${escapeHtml(item.analysis_exchange || "")}" data-ticker="${escapeHtml(item.analysis_ticker || item.symbol)}">Analisar</button><button class="ghost radar-compare" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}">Comparar</button><button class="primary radar-watch" data-record="${encodeURIComponent(JSON.stringify(item))}">Watchlist</button></div></article>`;
+      const portfolioFit=radarPortfolioFit(item);
+      const portfolioFitClass=["initiate","reinforce"].includes(portfolioFit.code)
+        ? ""
+        : ["observe","hold","policy_required"].includes(portfolioFit.code)
+          ? "warn"
+          : "bad";
+      const portfolioFitMetrics=portfolioFit.maxWeight===null
+        ? ""
+        : `<div class="radar-score-layout"><div class="radar-score-box"><span>Peso atual</span><strong>${dashboardPercent(portfolioFit.currentWeight,2)}</strong></div><div class="radar-score-box"><span>Limite individual</span><strong>${dashboardPercent(portfolioFit.maxWeight,2)}</strong></div><div class="radar-score-box"><span>Margem disponível</span><strong>${dashboardPercent(portfolioFit.remaining,2)}</strong></div><div class="radar-score-box"><span>Tranche inicial</span><strong>${dashboardPercent(portfolioFit.initialWeight,2)}</strong></div></div>`;
+      const portfolioFitAmount=portfolioFit.initialAmount>0
+        ? ` · ${portfolioEuro(portfolioFit.initialAmount)}`
+        : "";
+      const portfolioFitBlock=`<div class="why-now"><div class="score-line"><strong>Portfolio Fit & Decision Gate</strong><span class="pill ${portfolioFitClass}">${escapeHtml(portfolioFit.label)}</span></div>${portfolioFitMetrics}<div style="margin-top:10px"><strong>Decisão:</strong> ${escapeHtml(portfolioFit.action)}${escapeHtml(portfolioFitAmount)}</div></div>`;
+      return `<article class="card opportunity radar-live-card"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="score-line"><div><span class="metric-label">Radar score</span><div class="score">${Number.isFinite(Number(item.radar_score))?formatNumber(item.radar_score,0)+"/100":"—"}</div></div><span class="pill ${statusClass}">${escapeHtml(item.status?.label || "Sem estado")}</span></div>${scoreBoxes}${portfolioFitBlock}<div class="why-now"><strong>Leitura do Radar:</strong><br>${escapeHtml(item.status?.action || item.decision_label || "Analisar")}</div><div class="radar-reasons">${positives}${warnings}</div><div class="validity"><span>Dados ${formatNumber(item.data_completeness_percentage || 0,0)}%</span><strong>Framework ${formatNumber(item.framework_coverage_percentage || 0,0)}%</strong></div><div class="card-actions"><button class="ghost radar-analyze" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}" data-exchange="${escapeHtml(item.analysis_exchange || "")}" data-ticker="${escapeHtml(item.analysis_ticker || item.symbol)}">Analisar</button><button class="ghost radar-compare" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}">Comparar</button><button class="primary radar-watch" data-record="${encodeURIComponent(JSON.stringify(item))}">Watchlist</button></div></article>`;
     }).join("");
   }
 
