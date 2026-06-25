@@ -6463,10 +6463,16 @@ function escapeHtml(value){
       remaining,
     );
 
-    const valuation=Number(item.score_components?.valuation?.score ?? item.valuation_score);
-    const technical=Number(item.score_components?.technical_entry?.score ?? item.technical_score);
-    const financial=Number(item.score_components?.financial_strength?.score);
-    const radarScore=Number(item.radar_score);
+    const valuation=radarGateNumber(
+      item.score_components?.valuation?.score ?? item.valuation_score
+    );
+    const technical=radarGateNumber(
+      item.score_components?.technical_entry?.score ?? item.technical_score
+    );
+    const financial=radarGateNumber(
+      item.score_components?.financial_strength?.score
+    );
+    const radarScore=radarGateNumber(item.radar_score);
     const material=Boolean(item.event_review_required);
 
     let code="observe";
@@ -6478,23 +6484,48 @@ function escapeHtml(value){
       label="Rever evento";
       action="Decisão bloqueada até revisão do evento material";
       initialWeight=0;
+    }else if(financial!==null&&financial<45){
+      code="avoid";
+      label=current?"Rever posição":"Evitar";
+      action="Solidez financeira abaixo do limiar";
+      initialWeight=0;
+    }else if(radarScore!==null&&radarScore<55){
+      code="avoid";
+      label=current?"Manter sob revisão":"Evitar";
+      action="Score do Radar insuficiente";
+      initialWeight=0;
     }else if(remaining<=0.01){
       code="limit_reached";
       label="Limite atingido";
       action="Não aumentar a posição";
       initialWeight=0;
-    }else if(Number.isFinite(financial)&&financial<45){
-      code="avoid";
-      label=current?"Rever posição":"Evitar";
-      action="Solidez financeira abaixo do limiar";
-      initialWeight=0;
-    }else if(Number.isFinite(radarScore)&&radarScore<55){
-      code="avoid";
-      label=current?"Manter sob revisão":"Evitar";
-      action="Score do Radar insuficiente";
-      initialWeight=0;
     }else if(current){
-      if(Number.isFinite(valuation)&&valuation>=55&&Number.isFinite(technical)&&technical>=50){
+      const strongRadar=radarScore!==null&&radarScore>=68;
+      const technicalReady=technical!==null&&technical>=50;
+
+      if(item.asset_type==="etf"){
+        const valuationAcceptable=valuation===null||valuation>=45;
+
+        if(strongRadar&&technicalReady&&valuationAcceptable){
+          code="reinforce";
+          label="Reforçar";
+          action=valuation===null
+            ? "Estrutura e técnica permitem considerar reforço; valuation agregado indisponível"
+            : "Existe margem na política para reforço faseado";
+        }else{
+          code="hold";
+          label="Manter";
+          action=valuation!==null&&valuation<45
+            ? "Aguardar valuation agregado mais favorável"
+            : "Aguardar melhoria do score ou do momento de entrada";
+          initialWeight=0;
+        }
+      }else if(
+        strongRadar
+        &&valuation!==null
+        &&valuation>=55
+        &&technicalReady
+      ){
         code="reinforce";
         label="Reforçar";
         action="Existe margem na política para reforço faseado";
@@ -6504,7 +6535,7 @@ function escapeHtml(value){
         action="Aguardar melhor valuation ou momento de entrada";
         initialWeight=0;
       }
-    }else if(Number.isFinite(radarScore)&&radarScore>=68){
+    }else if(radarScore!==null&&radarScore>=68){
       code="initiate";
       label="Iniciar pequeno";
       action="Considerar uma primeira tranche dentro da política";
@@ -6532,6 +6563,450 @@ function escapeHtml(value){
       currentValue:Number(current?.market_value_eur)||0,
       policyLabel:policy.label,
     };
+  }
+
+  function radarGateNumber(value){
+    if(value===null||value===undefined||value==="")return null;
+    const number=Number(value);
+    return Number.isFinite(number)?number:null;
+  }
+
+  function radarExposureName(value){
+    return String(value||"")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g,"")
+      .toUpperCase()
+      .replace(/&/g," AND ")
+      .replace(/\b(INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LIMITED|LTD|PLC|HOLDINGS?|GROUP|SA|NV|AG|SE|CLASS [A-Z])\b/g," ")
+      .replace(/[^A-Z0-9]+/g," ")
+      .replace(/\s+/g," ")
+      .trim();
+  }
+
+  function radarHoldingMatches(left,right){
+    const a=radarExposureName(left);
+    const b=radarExposureName(right);
+    if(!a||!b)return false;
+    if(a===b)return true;
+    return Math.min(a.length,b.length)>=10&&(a.includes(b)||b.includes(a));
+  }
+
+  function radarSectorRows(source,isEtf){
+    if(isEtf){
+      const rows=Array.isArray(source?.etf_sector_allocation)
+        ? source.etf_sector_allocation
+        : [];
+      return rows
+        .map(row=>({
+          label:String(row.sector||"").trim(),
+          weight:radarGateNumber(row.weight_percentage),
+        }))
+        .filter(row=>row.label&&row.weight!==null&&row.weight>0);
+    }
+
+    const label=String(source?.sector||source?.industry||"").trim();
+    return label?[{label,weight:100}]:[];
+  }
+
+  function radarConcentrationGate(item){
+    if(!hasSavedInvestorPolicy()){
+      return {
+        code:"policy_required",
+        label:"Política necessária",
+        action:"Guardar a Investment Policy para aplicar limites de concentração.",
+        trancheWeight:0,
+        currency:null,
+        sector:null,
+        overlap:{
+          code:"unavailable",
+          label:"Não calculado",
+          detail:"A política ainda não está configurada.",
+        },
+      };
+    }
+
+    const policy=getInvestorPolicy();
+    const snapshot=portfolioSnapshot();
+    const fit=radarPortfolioFit(item);
+    const trancheWeight=Math.max(
+      0,
+      radarGateNumber(fit.initialWeight)||0,
+    );
+    const symbol=String(item.symbol||"").toUpperCase();
+    const exchange=String(item.analysis_exchange||item.exchange||"").toUpperCase();
+
+    const sameCandidate=position=>{
+      const sameSymbol=String(position.symbol||"").toUpperCase()===symbol;
+      const positionExchange=String(position.exchange||"").toUpperCase();
+      return sameSymbol&&(!exchange||!positionExchange||positionExchange===exchange);
+    };
+
+    const addExposure=(map,label,value)=>{
+      const clean=String(label||"").trim();
+      const amount=radarGateNumber(value);
+      if(!clean||amount===null||amount<=0)return;
+      map[clean]=(map[clean]||0)+amount;
+    };
+
+    const largestExposure=map=>{
+      const rows=Object.entries(map)
+        .map(([label,value])=>({label,value}))
+        .sort((a,b)=>b.value-a.value);
+      return rows[0]||null;
+    };
+
+    const currencyMap={};
+    let currencyCoveredValue=0;
+
+    for(const position of snapshot.positions){
+      const currency=String(
+        position.quote?.currency||position.currency||""
+      ).toUpperCase();
+
+      if(currency){
+        addExposure(currencyMap,currency,position.weight);
+        currencyCoveredValue+=Number(position.market_value_eur)||0;
+      }
+    }
+
+    const candidateCurrency=String(item.currency||"").toUpperCase();
+    const candidateCurrencyBefore=candidateCurrency
+      ? Number(currencyMap[candidateCurrency])||0
+      : null;
+
+    if(candidateCurrency&&trancheWeight>0){
+      addExposure(currencyMap,candidateCurrency,trancheWeight);
+    }
+
+    const largestCurrency=largestExposure(currencyMap);
+    const currencyLimit=radarGateNumber(policy.max_currency);
+    const currencyCoverage=snapshot.marketValue>0
+      ? currencyCoveredValue/snapshot.marketValue*100
+      : snapshot.positions.length?0:100;
+
+    const sectorMap={};
+    let sectorCoveredValue=0;
+
+    for(const position of snapshot.positions){
+      const rows=radarSectorRows(
+        position.quote||{},
+        position.asset_type==="etf",
+      );
+
+      if(!rows.length)continue;
+
+      sectorCoveredValue+=Number(position.market_value_eur)||0;
+      for(const row of rows){
+        addExposure(
+          sectorMap,
+          row.label,
+          Number(position.weight||0)*row.weight/100,
+        );
+      }
+    }
+
+    const candidateSectorRows=radarSectorRows(
+      {
+        sector:item.sector,
+        industry:item.industry,
+        etf_sector_allocation:item.etf_sector_allocation,
+      },
+      item.asset_type==="etf",
+    );
+
+    if(trancheWeight>0){
+      for(const row of candidateSectorRows){
+        addExposure(
+          sectorMap,
+          row.label,
+          trancheWeight*row.weight/100,
+        );
+      }
+    }
+
+    const largestSector=largestExposure(sectorMap);
+    const sectorLimit=radarGateNumber(policy.max_sector);
+    const sectorCoverage=snapshot.marketValue>0
+      ? sectorCoveredValue/snapshot.marketValue*100
+      : snapshot.positions.length?0:100;
+
+    const comparablePositions=snapshot.positions.filter(
+      position=>!sameCandidate(position)
+    );
+    const directStocks=comparablePositions.filter(
+      position=>position.asset_type!=="etf"
+    );
+    const existingEtfs=comparablePositions.filter(
+      position=>position.asset_type==="etf"
+    );
+    const etfsWithHoldings=existingEtfs.filter(
+      position=>Array.isArray(position.quote?.etf_top_holdings)
+        &&position.quote.etf_top_holdings.length
+    );
+
+    let overlap={
+      code:"unavailable",
+      label:"Dados insuficientes",
+      detail:"Não existem posições subjacentes suficientes para calcular overlap.",
+      commonNames:[],
+      repeatedWeight:null,
+      maximumPairwise:null,
+      indirectWeight:null,
+      disclosedWeight:null,
+      comparedEtfs:etfsWithHoldings.length,
+    };
+
+    if(item.asset_type==="etf"){
+      const candidateHoldings=Array.isArray(item.etf_top_holdings)
+        ? item.etf_top_holdings
+        : [];
+
+      if(!candidateHoldings.length){
+        overlap.detail="O ETF não disponibilizou principais posições para comparação.";
+      }else if(!comparablePositions.length){
+        overlap={
+          ...overlap,
+          code:"clear",
+          label:"Sem posições comparáveis",
+          detail:"A carteira ainda não contém outras posições para comparar.",
+          repeatedWeight:0,
+          maximumPairwise:0,
+          disclosedWeight:candidateHoldings.reduce(
+            (sum,row)=>sum+(radarGateNumber(row.weight_percentage)||0),
+            0,
+          ),
+        };
+      }else{
+        const commonNames=[];
+        let repeatedWeight=0;
+        let maximumPairwise=0;
+
+        for(const holding of candidateHoldings){
+          const weight=radarGateNumber(holding.weight_percentage)||0;
+
+          const directMatch=directStocks.some(position=>
+            radarHoldingMatches(holding.name,position.name)
+          );
+
+          const etfMatch=etfsWithHoldings.some(position=>
+            position.quote.etf_top_holdings.some(existing=>
+              radarHoldingMatches(holding.name,existing.name)
+            )
+          );
+
+          if(directMatch||etfMatch){
+            repeatedWeight+=weight;
+            if(commonNames.length<4)commonNames.push(holding.name);
+          }
+        }
+
+        for(const position of etfsWithHoldings){
+          let pairwise=0;
+          for(const holding of candidateHoldings){
+            const match=position.quote.etf_top_holdings.find(existing=>
+              radarHoldingMatches(holding.name,existing.name)
+            );
+            if(match){
+              pairwise+=Math.min(
+                radarGateNumber(holding.weight_percentage)||0,
+                radarGateNumber(match.weight_percentage)||0,
+              );
+            }
+          }
+          maximumPairwise=Math.max(maximumPairwise,pairwise);
+        }
+
+        const comparableSources=directStocks.length+etfsWithHoldings.length;
+        const overlapCode=comparableSources===0
+          ? "unavailable"
+          : repeatedWeight>=30||maximumPairwise>=20
+            ? "high"
+            : repeatedWeight>=10||maximumPairwise>=8
+              ? "medium"
+              : "low";
+
+        overlap={
+          ...overlap,
+          code:overlapCode,
+          label:{
+            unavailable:"Cobertura parcial",
+            high:"Overlap elevado",
+            medium:"Overlap moderado",
+            low:"Overlap reduzido",
+          }[overlapCode],
+          detail:comparableSources===0
+            ? "As posições existentes ainda não têm composição suficiente."
+            : `${commonNames.length} posição(ões) principal(is) repetida(s) na amostra disponível.`,
+          commonNames,
+          repeatedWeight,
+          maximumPairwise,
+          disclosedWeight:candidateHoldings.reduce(
+            (sum,row)=>sum+(radarGateNumber(row.weight_percentage)||0),
+            0,
+          ),
+        };
+      }
+    }else{
+      if(!existingEtfs.length){
+        overlap={
+          ...overlap,
+          code:"clear",
+          label:"Sem overlap indireto",
+          detail:"Não existem ETFs na carteira para procurar exposição indireta.",
+          indirectWeight:0,
+        };
+      }else if(!etfsWithHoldings.length){
+        overlap.detail="Os ETFs existentes ainda não têm principais posições atualizadas.";
+      }else{
+        let indirectWeight=0;
+        const commonNames=[];
+
+        for(const position of etfsWithHoldings){
+          const match=position.quote.etf_top_holdings.find(holding=>
+            radarHoldingMatches(item.name||item.symbol,holding.name)
+          );
+
+          if(match){
+            indirectWeight+=Number(position.weight||0)
+              *(radarGateNumber(match.weight_percentage)||0)/100;
+            if(commonNames.length<4)commonNames.push(position.symbol);
+          }
+        }
+
+        const overlapCode=indirectWeight>=2
+          ? "high"
+          : indirectWeight>=0.5
+            ? "medium"
+            : "low";
+
+        overlap={
+          ...overlap,
+          code:overlapCode,
+          label:{
+            high:"Exposição indireta relevante",
+            medium:"Exposição indireta moderada",
+            low:"Exposição indireta reduzida",
+          }[overlapCode],
+          detail:commonNames.length
+            ? `Exposição encontrada através de ${commonNames.join(", ")}.`
+            : "A ação não foi encontrada nas principais posições dos ETFs analisados.",
+          commonNames,
+          indirectWeight,
+        };
+      }
+    }
+
+    const sectorBreached=Boolean(
+      sectorLimit!==null
+      &&sectorLimit>0
+      &&largestSector
+      &&largestSector.value>sectorLimit+0.05
+    );
+    const currencyBreached=Boolean(
+      currencyLimit!==null
+      &&currencyLimit>0
+      &&largestCurrency
+      &&largestCurrency.value>currencyLimit+0.05
+    );
+    const incompleteSector=Boolean(
+      snapshot.positions.length
+      &&sectorCoverage<80
+    )||!candidateSectorRows.length;
+    const incompleteCurrency=Boolean(
+      snapshot.positions.length
+      &&currencyCoverage<95
+    )||!candidateCurrency;
+
+    let code="clear";
+    let label="Dentro dos limites";
+    let action="A tranche simulada não ultrapassa os limites conhecidos.";
+
+    if(sectorBreached||currencyBreached){
+      code="blocked";
+      label="Concentração excessiva";
+      const reasons=[];
+      if(sectorBreached)reasons.push(
+        `${largestSector.label} em ${dashboardPercent(largestSector.value,2)}`
+      );
+      if(currencyBreached)reasons.push(
+        `${largestCurrency.label} direto em ${dashboardPercent(largestCurrency.value,2)}`
+      );
+      action=`Rever dimensão ou composição: ${reasons.join(" · ")}.`;
+    }else if(overlap.code==="high"){
+      code="review";
+      label="Rever overlap";
+      action="A duplicação parcial justifica revisão antes de aumentar exposição.";
+    }else if(
+      incompleteSector
+      ||incompleteCurrency
+      ||overlap.code==="unavailable"
+    ){
+      code="partial";
+      label="Cobertura parcial";
+      action="Existem limites respeitados, mas faltam metadados para uma conclusão integral.";
+    }
+
+    return {
+      code,
+      label,
+      action,
+      trancheWeight,
+      currency:{
+        candidate:candidateCurrency||null,
+        before:candidateCurrencyBefore,
+        projected:candidateCurrency
+          ? Number(currencyMap[candidateCurrency])||0
+          : null,
+        largest:largestCurrency,
+        limit:currencyLimit,
+        coverage:currencyCoverage,
+        directOnly:true,
+      },
+      sector:{
+        largest:largestSector,
+        limit:sectorLimit,
+        coverage:sectorCoverage,
+        candidateRows:candidateSectorRows,
+      },
+      overlap,
+    };
+  }
+
+  function radarEffectiveDecision(item,portfolioFit,concentrationGate){
+    if(
+      ["policy_required","event_review","avoid","limit_reached"].includes(
+        portfolioFit.code
+      )
+    ){
+      return portfolioFit;
+    }
+
+    if(concentrationGate.code==="blocked"){
+      return {
+        ...portfolioFit,
+        code:"concentration_block",
+        label:portfolioFit.positionExists?"Não reforçar":"Não iniciar",
+        action:concentrationGate.action,
+        initialWeight:0,
+        initialAmount:0,
+      };
+    }
+
+    if(
+      concentrationGate.code==="review"
+      &&["initiate","reinforce"].includes(portfolioFit.code)
+    ){
+      return {
+        ...portfolioFit,
+        code:"overlap_review",
+        label:"Rever antes de agir",
+        action:concentrationGate.action,
+        initialWeight:0,
+        initialAmount:0,
+      };
+    }
+
+    return portfolioFit;
   }
 
   function sortedRadarResults(results){
@@ -6567,7 +7042,13 @@ function escapeHtml(value){
       const scoreBoxes=item.score_model==="stock_framework_v2"
         ? `<div class="radar-score-layout"><div class="radar-score-box"><span>Qualidade operacional</span><strong>${componentScore(components.operational_quality?.score)}</strong></div><div class="radar-score-box"><span>Solidez financeira</span><strong>${componentScore(components.financial_strength?.score)}</strong></div><div class="radar-score-box"><span>Valuation</span><strong>${componentScore(components.valuation?.score)}</strong></div><div class="radar-score-box"><span>Momento de entrada</span><strong>${componentScore(components.technical_entry?.score)}</strong></div></div>`
         : `<div class="radar-score-layout"><div class="radar-score-box"><span>Estrutura</span><strong>${componentScore(components.structure?.score ?? item.quality_score)}</strong></div><div class="radar-score-box"><span>Valuation</span><strong>${componentScore(item.valuation_score)}</strong></div><div class="radar-score-box"><span>Técnica</span><strong>${componentScore(components.technical_entry?.score ?? item.technical_score)}</strong></div><div class="radar-score-box"><span>Pullback</span><strong>${Number.isFinite(Number(item.pullback_percentage))?formatNumber(item.pullback_percentage)+"%":"—"}</strong></div></div>`;
-      const portfolioFit=radarPortfolioFit(item);
+      const portfolioFitBase=radarPortfolioFit(item);
+      const concentrationGate=radarConcentrationGate(item);
+      const portfolioFit=radarEffectiveDecision(
+        item,
+        portfolioFitBase,
+        concentrationGate,
+      );
       const portfolioFitClass=["initiate","reinforce"].includes(portfolioFit.code)
         ? ""
         : ["observe","hold","policy_required"].includes(portfolioFit.code)
@@ -6580,7 +7061,67 @@ function escapeHtml(value){
         ? ` · ${portfolioEuro(portfolioFit.initialAmount)}`
         : "";
       const portfolioFitBlock=`<div class="why-now"><div class="score-line"><strong>Portfolio Fit & Decision Gate</strong><span class="pill ${portfolioFitClass}">${escapeHtml(portfolioFit.label)}</span></div>${portfolioFitMetrics}<div style="margin-top:10px"><strong>Decisão:</strong> ${escapeHtml(portfolioFit.action)}${escapeHtml(portfolioFitAmount)}</div></div>`;
-      return `<article class="card opportunity radar-live-card"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="score-line"><div><span class="metric-label">Radar score</span><div class="score">${Number.isFinite(Number(item.radar_score))?formatNumber(item.radar_score,0)+"/100":"—"}</div></div><span class="pill ${statusClass}">${escapeHtml(item.status?.label || "Sem estado")}</span></div>${scoreBoxes}${portfolioFitBlock}<div class="why-now"><strong>Leitura do Radar:</strong><br>${escapeHtml(item.status?.action || item.decision_label || "Analisar")}</div><div class="radar-reasons">${positives}${warnings}</div><div class="validity"><span>Dados ${formatNumber(item.data_completeness_percentage || 0,0)}%</span><strong>Framework ${formatNumber(item.framework_coverage_percentage || 0,0)}%</strong></div><div class="card-actions"><button class="ghost radar-analyze" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}" data-exchange="${escapeHtml(item.analysis_exchange || "")}" data-ticker="${escapeHtml(item.analysis_ticker || item.symbol)}">Analisar</button><button class="ghost radar-compare" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}">Comparar</button><button class="primary radar-watch" data-record="${encodeURIComponent(JSON.stringify(item))}">Watchlist</button></div></article>`;
+
+      const concentrationGateClass=concentrationGate.code==="clear"
+        ? ""
+        : ["partial","review","policy_required"].includes(concentrationGate.code)
+          ? "warn"
+          : "bad";
+
+      const gatePercent=value=>{
+        const number=radarGateNumber(value);
+        return number===null
+          ? "—"
+          : dashboardPercent(number,2);
+      };
+
+      const currencyName=
+        concentrationGate.currency?.candidate
+        ||concentrationGate.currency?.largest?.label
+        ||"Moeda";
+
+      const simulationLabel=concentrationGate.trancheWeight>0
+        ? " projetado"
+        : "";
+
+      const currencyProjected=
+        concentrationGate.currency?.candidate
+          ? concentrationGate.currency.projected
+          : concentrationGate.currency?.largest?.value;
+
+      const sectorName=
+        concentrationGate.sector?.largest?.label
+        ||item.etf_largest_sector?.sector
+        ||item.sector
+        ||item.industry
+        ||"Setor";
+
+      const sectorProjected=
+        concentrationGate.sector?.largest?.value;
+
+      const overlapMetric=item.asset_type==="etf"
+        ? concentrationGate.overlap?.repeatedWeight
+        : concentrationGate.overlap?.indirectWeight;
+
+      const overlapMetricLabel=item.asset_type==="etf"
+        ? "Overlap parcial"
+        : "Exposição indireta";
+
+      const concentrationGateMetrics=concentrationGate.code==="policy_required"
+        ? ""
+        : `<div class="radar-score-layout"><div class="radar-score-box"><span>${escapeHtml(currencyName)} direto${simulationLabel}</span><strong>${gatePercent(currencyProjected)}</strong></div><div class="radar-score-box"><span>Limite cambial</span><strong>${gatePercent(concentrationGate.currency?.limit)}</strong></div><div class="radar-score-box"><span>${escapeHtml(sectorName)}${simulationLabel}</span><strong>${gatePercent(sectorProjected)}</strong></div><div class="radar-score-box"><span>${escapeHtml(overlapMetricLabel)}</span><strong>${gatePercent(overlapMetric)}</strong></div></div>`;
+
+      const concentrationCoverage=concentrationGate.code==="policy_required"
+        ? ""
+        : `<div style="margin-top:8px"><small>Cobertura setorial ${gatePercent(concentrationGate.sector?.coverage)} · cobertura cambial direta ${gatePercent(concentrationGate.currency?.coverage)}</small></div>`;
+
+      const overlapDetail=concentrationGate.overlap?.detail
+        ? `<div style="margin-top:8px"><small><strong>${escapeHtml(concentrationGate.overlap.label)}:</strong> ${escapeHtml(concentrationGate.overlap.detail)}</small></div>`
+        : "";
+
+      const concentrationGateBlock=`<div class="why-now"><div class="score-line"><strong>Concentration & Overlap Gate</strong><span class="pill ${concentrationGateClass}">${escapeHtml(concentrationGate.label)}</span></div>${concentrationGateMetrics}<div style="margin-top:10px"><strong>Diagnóstico:</strong> ${escapeHtml(concentrationGate.action)}</div>${overlapDetail}${concentrationCoverage}</div>`;
+
+      return `<article class="card opportunity radar-live-card"><div class="ticker"><div class="ticker-logo">${escapeHtml(item.symbol)}</div><div class="ticker-meta"><strong>${escapeHtml(item.name || item.symbol)}</strong><small>${escapeHtml(item.exchange || "Mercado")} · ${escapeHtml(item.currency || "—")} · ${escapeHtml(item.asset_type || "ativo")}</small></div></div><div class="score-line"><div><span class="metric-label">Radar score</span><div class="score">${Number.isFinite(Number(item.radar_score))?formatNumber(item.radar_score,0)+"/100":"—"}</div></div><span class="pill ${statusClass}">${escapeHtml(item.status?.label || "Sem estado")}</span></div>${scoreBoxes}${portfolioFitBlock}${concentrationGateBlock}<div class="why-now"><strong>Leitura do Radar:</strong><br>${escapeHtml(item.status?.action || item.decision_label || "Analisar")}</div><div class="radar-reasons">${positives}${warnings}</div><div class="validity"><span>Dados ${formatNumber(item.data_completeness_percentage || 0,0)}%</span><strong>Framework ${formatNumber(item.framework_coverage_percentage || 0,0)}%</strong></div><div class="card-actions"><button class="ghost radar-analyze" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}" data-exchange="${escapeHtml(item.analysis_exchange || "")}" data-ticker="${escapeHtml(item.analysis_ticker || item.symbol)}">Analisar</button><button class="ghost radar-compare" data-symbol="${escapeHtml(item.analysis_query || item.symbol)}">Comparar</button><button class="primary radar-watch" data-record="${encodeURIComponent(JSON.stringify(item))}">Watchlist</button></div></article>`;
     }).join("");
   }
 
@@ -6720,7 +7261,57 @@ function escapeHtml(value){
   function portfolioOpenModal(prefill={}){const m=$("#portfolioTransactionModal");m.classList.add("open");m.setAttribute("aria-hidden","false");$("#portfolioTxType").value=prefill.type||"BUY";$("#portfolioTxDate").value=prefill.date||portfolioToday();$("#portfolioTxSymbol").value=prefill.symbol||"";$("#portfolioTxName").value=prefill.name||"";$("#portfolioTxExchange").value=prefill.exchange||"";$("#portfolioTxAssetType").value=prefill.asset_type||"stock";$("#portfolioTxCurrency").value=prefill.currency||"USD";$("#portfolioTxQuantity").value=prefill.quantity||"";$("#portfolioTxUnitPrice").value=prefill.unit_price||"";$("#portfolioTxTotalEur").value=prefill.total_eur||"";$("#portfolioTxFeeEur").value=prefill.fee_eur||0;$("#portfolioTxCategory").value=prefill.category||((prefill.asset_type||"")==="etf"?"ETF Core":"Quality");$("#portfolioTxTargetWeight").value=prefill.target_weight||0;$("#portfolioTxNote").value=prefill.note||"";portfolioUpdateModalFields();}
   function portfolioCloseModal(){const m=$("#portfolioTransactionModal");m.classList.remove("open");m.setAttribute("aria-hidden","true");}
   function portfolioUpdateModalFields(){const type=$("#portfolioTxType").value,cash=["DEPOSIT","WITHDRAWAL"].includes(type),trade=["BUY","SELL"].includes(type);$$(".portfolio-asset-field").forEach(item=>item.style.display=cash?"none":"block");$$(".portfolio-trade-field").forEach(item=>item.style.display=trade?"block":"none");$("#portfolioTransactionTitle").textContent={BUY:"Registar compra",SELL:"Registar venda",DIVIDEND:"Registar dividendo",DEPOSIT:"Registar depósito",WITHDRAWAL:"Registar levantamento"}[type]||"Registar transação";}
-  async function portfolioFetchPositionQuote(p){const params=new URLSearchParams({base_currency:"EUR"});if(p.exchange)params.set("exchange",p.exchange);if(p.ticker)params.set("ticker",p.ticker);const response=await fetch(`/api/analysis/${encodeURIComponent(p.symbol)}?${params}`),data=await response.json();if(!response.ok)throw new Error(data.detail||data.error||`Erro em ${p.symbol}`);const priceEur=Number(data.fx?.converted_amount);if(!Number.isFinite(priceEur)||priceEur<=0)throw new Error(`Preço EUR indisponível para ${p.symbol}`);return {symbol:p.symbol,exchange:p.exchange,price_eur:priceEur,price:Number(data.market?.price),currency:data.market?.currency,name:data.asset?.name||p.name,asset_type:data.asset?.asset_type||p.asset_type,framework_score:data.framework_engine?.quantitative_snapshot?.score,technical_score:data.technical?.score,updated_at:data.generated_at||new Date().toISOString()};}
+  async function portfolioFetchPositionQuote(p){
+    const params=new URLSearchParams({base_currency:"EUR"});
+    if(p.exchange)params.set("exchange",p.exchange);
+    if(p.ticker)params.set("ticker",p.ticker);
+
+    const response=await fetch(
+      `/api/analysis/${encodeURIComponent(p.symbol)}?${params}`
+    );
+    const data=await response.json();
+
+    if(!response.ok){
+      throw new Error(
+        data.detail||data.error||`Erro em ${p.symbol}`
+      );
+    }
+
+    const priceEur=Number(data.fx?.converted_amount);
+    if(!Number.isFinite(priceEur)||priceEur<=0){
+      throw new Error(`Preço EUR indisponível para ${p.symbol}`);
+    }
+
+    const etfProfile=data.etf_profile||{};
+
+    return {
+      symbol:p.symbol,
+      exchange:p.exchange,
+      price_eur:priceEur,
+      price:Number(data.market?.price),
+      currency:data.market?.currency,
+      name:data.asset?.name||p.name,
+      asset_type:data.asset?.asset_type||p.asset_type,
+      country:data.asset?.country||null,
+      sector:data.asset?.sector||null,
+      industry:data.asset?.industry||null,
+      etf_sector_allocation:Array.isArray(etfProfile.sector_allocation)
+        ? etfProfile.sector_allocation
+        : [],
+      etf_market_allocation:Array.isArray(etfProfile.market_allocation)
+        ? etfProfile.market_allocation
+        : [],
+      etf_top_holdings:Array.isArray(etfProfile.top_holdings)
+        ? etfProfile.top_holdings
+        : [],
+      etf_concentration:etfProfile.concentration||{},
+      etf_largest_sector:etfProfile.largest_sector||null,
+      framework_score:data.framework_engine?.quantitative_snapshot?.score,
+      technical_score:data.technical?.score,
+      updated_at:data.generated_at||new Date().toISOString(),
+    };
+  }
+
   async function portfolioRefreshQuotes(){const s=portfolioSnapshot();if(!s.positions.length){showToast("A carteira está vazia.");return;}const b=$("#portfolioRefreshBtn");b.disabled=true;b.textContent="A atualizar…";const quotes=getPortfolioQuotes();let ok=0,errors=0;for(let i=0;i<s.positions.length;i+=3){const batch=s.positions.slice(i,i+3),results=await Promise.allSettled(batch.map(portfolioFetchPositionQuote));results.forEach((result,j)=>{if(result.status==="fulfilled"){quotes[batch[j].key]=result.value;ok++;}else errors++;});}savePortfolioQuotes(quotes);b.disabled=false;b.textContent="Atualizar preços";renderPortfolioManager();showToast(errors?`${ok} preços atualizados; ${errors} falharam.`:`${ok} preços atualizados.`);}
 
   function portfolioCsvEscape(value){const text=String(value??"");return /[;"\n]/.test(text)?`"${text.replace(/"/g,'""')}"`:text;}

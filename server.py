@@ -7995,6 +7995,7 @@ def radar_result_from_payload(payload: dict) -> dict:
     valuation = payload.get("valuation") or {}
     valuation_metrics = valuation.get("metrics", {})
     evidence = payload.get("evidence") or {}
+    etf_profile = payload.get("etf_profile") or {}
     indicators = technical.get("indicators", {})
     score_breakdown = radar_score_breakdown(payload)
     score = score_breakdown.get("score")
@@ -8029,6 +8030,14 @@ def radar_result_from_payload(payload: dict) -> dict:
         "asset_type": asset.get("asset_type"),
         "exchange": asset.get("exchange"),
         "currency": asset.get("currency"),
+        "country": asset.get("country"),
+        "sector": asset.get("sector"),
+        "industry": asset.get("industry"),
+        "etf_largest_sector": etf_profile.get("largest_sector"),
+        "etf_sector_allocation": etf_profile.get("sector_allocation", []),
+        "etf_market_allocation": etf_profile.get("market_allocation", []),
+        "etf_top_holdings": etf_profile.get("top_holdings", []),
+        "etf_concentration": etf_profile.get("concentration", {}),
         "price": asset.get("price"),
         "market_change_percentage": asset.get("change_percentage"),
         "radar_score": score,

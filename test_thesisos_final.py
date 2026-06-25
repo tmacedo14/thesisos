@@ -319,6 +319,45 @@ def test_static(suite: Suite) -> None:
         ),
     )
 
+    concentration_gate_checks = {
+        "radar metadata country": '"country": asset.get("country")' in server,
+        "radar metadata industry": '"industry": asset.get("industry")' in server,
+        "ETF sector allocation": '"etf_sector_allocation"' in server,
+        "ETF market allocation": '"etf_market_allocation"' in server,
+        "ETF top holdings": '"etf_top_holdings"' in server,
+        "ETF concentration": '"etf_concentration"' in server,
+        "portfolio quote enrichment": "etf_sector_allocation:Array.isArray" in index,
+        "safe numeric handling": "function radarGateNumber(value)" in index,
+        "holding normalization": "function radarExposureName(value)" in index,
+        "holding matching": "function radarHoldingMatches(left,right)" in index,
+        "local concentration engine": "function radarConcentrationGate(item)" in index,
+        "sector policy limit": "policy.max_sector" in index,
+        "currency policy limit": "policy.max_currency" in index,
+        "direct currency disclosure": "directOnly:true" in index,
+        "partial overlap disclosure": "Overlap parcial" in index,
+        "coverage disclosure": "Cobertura setorial" in index,
+        "decision orchestrator": "function radarEffectiveDecision(" in index,
+        "concentration decision block": 'code:"concentration_block"' in index,
+        "overlap decision review": 'code:"overlap_review"' in index,
+        "projected metrics label": "simulationLabel" in index,
+        "frontend gate card": "Concentration & Overlap Gate" in index,
+        "private portfolio calculation": "portfolioSnapshot" not in server,
+    }
+    missing_concentration_gate = [
+        name
+        for name, present in concentration_gate_checks.items()
+        if not present
+    ]
+    suite.check(
+        "Concentration & Overlap Gate v2",
+        not missing_concentration_gate,
+        (
+            "sector, currency, partial overlap and decision orchestration"
+            if not missing_concentration_gate
+            else "missing: " + ", ".join(missing_concentration_gate)
+        ),
+    )
+
     dependency_ok = "pypdf" in requirements.lower() and "yfinance" in requirements.lower()
     suite.check("Runtime dependencies", dependency_ok, "pypdf and yfinance")
 
