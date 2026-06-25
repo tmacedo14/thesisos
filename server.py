@@ -454,45 +454,6 @@ def supabase_user_state_request(
         ) from error
 
 
-def supabase_admin_table_request(
-    table,
-    method="GET",
-    query="",
-    payload=None,
-    prefer=None,
-):
-    config = sync_configuration()
-    if not config["url"] or not config["key"]:
-        raise RuntimeError(
-            "A migração exige SUPABASE_URL e SUPABASE_SECRET_KEY."
-        )
-    url = f'{config["url"]}/rest/v1/{table}'
-    if query:
-        url += "?" + query
-    headers = {
-        "apikey": config["key"],
-        "Authorization": f'Bearer {config["key"]}',
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "User-Agent": "ThesisOS/1.1 LegacyMigration",
-    }
-    if prefer:
-        headers["Prefer"] = prefer
-    body = None if payload is None else json.dumps(
-        payload,
-        ensure_ascii=False,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    request = Request(url, data=body, headers=headers, method=method)
-    try:
-        with urlopen(request, timeout=25) as response:
-            raw = response.read()
-            return json.loads(raw.decode("utf-8")) if raw else None
-    except HTTPError as error:
-        detail = error.read().decode("utf-8", errors="replace")
-        raise RuntimeError(
-            f"Supabase respondeu HTTP {error.code}: {detail[:500]}"
-        ) from error
 
 
 def fetch_user_cloud_state(user_id, access_token):
@@ -577,60 +538,6 @@ def upsert_user_cloud_state(user_id, access_token, raw_state):
     }
 
 
-def migrate_legacy_state_to_user(user_id, overwrite=False):
-    legacy = fetch_cloud_state()
-    legacy_state = {
-        namespace: payload
-        for namespace, payload in legacy.get("state", {}).items()
-        if namespace in SYNC_ALLOWED_NAMESPACES and payload is not None
-    }
-    if not legacy_state:
-        return {
-            "migrated_count": 0,
-            "namespaces": [],
-            "legacy_workspace": sync_workspace_id(),
-        }
-
-    existing_query = urlencode({
-        "select": "namespace",
-        "user_id": f"eq.{user_id}",
-        "limit": "1",
-    })
-    existing = supabase_admin_table_request(
-        AUTH_USER_STATE_TABLE,
-        "GET",
-        query=existing_query,
-    ) or []
-    if existing and not overwrite:
-        raise ValueError(
-            "A conta já contém dados cloud. Ativa a substituição explícita "
-            "para importar o workspace antigo."
-        )
-
-    version = int(time.time() * 1000)
-    rows = [
-        {
-            "user_id": user_id,
-            "namespace": namespace,
-            "payload": payload,
-            "version": version,
-        }
-        for namespace, payload in legacy_state.items()
-    ]
-    query = urlencode({"on_conflict": "user_id,namespace"})
-    supabase_admin_table_request(
-        AUTH_USER_STATE_TABLE,
-        "POST",
-        query=query,
-        payload=rows,
-        prefer="resolution=merge-duplicates,return=minimal",
-    )
-    return {
-        "migrated_count": len(rows),
-        "namespaces": sorted(legacy_state),
-        "legacy_workspace": sync_workspace_id(),
-        "version": version,
-    }
 
 RADAR_UNIVERSES = {
     "core_us": [
@@ -8714,46 +8621,6 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
             except Exception as error:
                 self.send_json({
                     "error": "Não foi possível guardar o estado da conta.",
-                    "detail": str(error),
-                }, status=502)
-            return
-
-        if parsed_url.path == "/api/auth/migrate-legacy":
-            access_token, user = self.supabase_auth_context()
-            if not access_token or not user:
-                self.send_json({
-                    "error": "Inicia sessão antes de importar o workspace antigo."
-                }, status=401)
-                return
-            try:
-                body = self.read_json_body()
-                config = sync_configuration()
-                supplied = str(body.get("password") or "")
-                if (
-                    not config["configured"]
-                    or not hmac.compare_digest(
-                        supplied,
-                        config["password"],
-                    )
-                ):
-                    self.send_json({
-                        "error": "Palavra-passe do workspace antigo incorreta."
-                    }, status=401)
-                    return
-                result = migrate_legacy_state_to_user(
-                    user.get("id"),
-                    overwrite=bool(body.get("overwrite")),
-                )
-                self.send_json({
-                    "status": "ok",
-                    "user_id": user.get("id"),
-                    **result,
-                })
-            except ValueError as error:
-                self.send_json({"error": str(error)}, status=409)
-            except Exception as error:
-                self.send_json({
-                    "error": "Não foi possível importar o workspace antigo.",
                     "detail": str(error),
                 }, status=502)
             return

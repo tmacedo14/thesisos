@@ -136,7 +136,6 @@ def main():
                 "/api/auth/config",
                 "/api/auth/session",
                 "/api/user/state",
-                "/api/auth/migrate-legacy",
             )
         ),
     )
@@ -181,16 +180,7 @@ def main():
         f"HTTP {status}",
     )
 
-    status, _ = request_json(
-        f"{base}/api/auth/migrate-legacy",
-        method="POST",
-        payload={"password": "not-used"},
-    )
-    check(
-        "Anonymous migration denied",
-        status == 401,
-        f"HTTP {status}",
-    )
+
 
     if args.login:
         email = os.getenv("THESISOS_TEST_EMAIL", "").strip()
