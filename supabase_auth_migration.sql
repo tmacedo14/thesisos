@@ -1,6 +1,6 @@
 -- ThesisOS Supabase Auth migration
 -- Run once in Supabase > SQL Editor after the original supabase_schema.sql.
--- The legacy public.thesisos_state table is intentionally preserved as backup.
+-- Creates the isolated per-user state table used by ThesisOS.
 
 create table if not exists public.thesisos_user_state (
   user_id uuid not null references auth.users(id) on delete cascade,

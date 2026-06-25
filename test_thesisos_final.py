@@ -4,8 +4,7 @@
 Quick mode validates the repository, JavaScript, Python, local API and
 Supabase configuration status without writing data.
 
-Full mode also executes real AAPL analysis, valuation, evidence, Radar and
-read-only Cloud Sync authentication when THESISOS_SYNC_PASSWORD is available.
+Full mode also executes real AAPL analysis, valuation, evidence and Radar.
 
 Usage:
     python3 test_thesisos_final.py
@@ -158,7 +157,7 @@ def test_static(suite: Suite) -> None:
         "server.py",
         "requirements.txt",
         "README.md",
-        "supabase_schema.sql",
+        "supabase_auth_migration.sql",
         ".replit",
         ".gitignore",
     ]
@@ -175,7 +174,7 @@ def test_static(suite: Suite) -> None:
     server = read_text(ROOT / "server.py")
     readme = read_text(ROOT / "README.md")
     requirements = read_text(ROOT / "requirements.txt")
-    schema = read_text(ROOT / "supabase_schema.sql").lower()
+    schema = read_text(ROOT / "supabase_auth_migration.sql").lower()
     replit = read_text(ROOT / ".replit")
 
     try:
@@ -265,9 +264,9 @@ def test_static(suite: Suite) -> None:
     suite.check("Replit port mapping", port_ok, "3000 → 80")
 
     schema_checks = [
-        "create table if not exists public.thesisos_state",
+        "create table if not exists public.thesisos_user_state",
         "payload jsonb not null",
-        "primary key (workspace_id, namespace)",
+        "primary key (user_id, namespace)",
         "enable row level security",
         "revoke all",
     ]
@@ -388,108 +387,11 @@ def test_full(suite: Suite, base_url: str) -> None:
     except Exception as error:
         suite.fail("Opportunity Radar live run", str(error))
 
-    password = os.getenv("THESISOS_SYNC_PASSWORD")
-    if not password:
-        suite.warn("Cloud Sync read test", "THESISOS_SYNC_PASSWORD unavailable in this shell")
-        return
-
-    # Read the Set-Cookie response header explicitly. The production cookie is
-    # intentionally Secure, so automatic cookie jars will not resend it over
-    # plain HTTP localhost. Forwarding the server-issued cookie only inside
-    # this local, read-only test preserves the application's security policy.
-    try:
-        login_body = json.dumps({"password": password}).encode("utf-8")
-        login_request = Request(
-            endpoint(base_url, "/api/sync/login"),
-            data=login_body,
-            method="POST",
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-            },
-        )
-        try:
-            with urlopen(login_request, timeout=30) as response:
-                login_status = response.status
-                login = json.loads(response.read().decode("utf-8"))
-                set_cookie = response.headers.get("Set-Cookie", "")
-        except HTTPError as error:
-            raw = error.read().decode("utf-8", errors="replace")
-            try:
-                login = json.loads(raw)
-            except json.JSONDecodeError:
-                login = {"error": raw[:500]}
-            login_status = error.code
-            set_cookie = ""
-
-        if login_status != 200 or not login.get("authenticated"):
-            suite.fail(
-                "Cloud Sync authentication",
-                f"HTTP {login_status}: {login.get('error', 'failed')}",
-            )
-            return
-        suite.pass_(
-            "Cloud Sync authentication",
-            f"workspace={login.get('workspace_id')}",
-        )
-
-        cookie_pair = set_cookie.split(";", 1)[0].strip()
-        if not cookie_pair or "=" not in cookie_pair:
-            suite.fail(
-                "Cloud Sync read-only restore",
-                "login succeeded but no session cookie was returned",
-            )
-            return
-
-        state_request = Request(
-            endpoint(base_url, "/api/sync/state"),
-            method="GET",
-            headers={
-                "Accept": "application/json",
-                "Cookie": cookie_pair,
-            },
-        )
-        try:
-            with urlopen(state_request, timeout=30) as response:
-                state_status = response.status
-                state = json.loads(response.read().decode("utf-8"))
-        except HTTPError as error:
-            raw = error.read().decode("utf-8", errors="replace")
-            try:
-                state = json.loads(raw)
-            except json.JSONDecodeError:
-                state = {"error": raw[:500]}
-            state_status = error.code
-
-        cloud_state = state.get("state") if isinstance(state, dict) else None
-        row_count = state.get("row_count") if isinstance(state, dict) else None
-        if row_count is None and isinstance(cloud_state, dict):
-            row_count = len(cloud_state)
-
-        restore_ok = (
-            state_status == 200
-            and isinstance(state, dict)
-            and isinstance(cloud_state, dict)
-            and not state.get("error")
-        )
-        if restore_ok:
-            suite.pass_(
-                "Cloud Sync read-only restore",
-                f"{row_count or 0} namespaces",
-            )
-        else:
-            detail = state.get("error") or state.get("detail") or repr(state)[:500]
-            suite.fail(
-                "Cloud Sync read-only restore",
-                f"HTTP {state_status}: {detail}",
-            )
-    except Exception as error:
-        suite.fail("Cloud Sync read test", str(error))
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Final ThesisOS validation test")
-    parser.add_argument("--full", action="store_true", help="run live provider, Radar and Cloud Sync tests")
+    parser.add_argument("--full", action="store_true", help="run live provider, analysis and Radar tests")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="ThesisOS API base URL")
     return parser.parse_args()
 

@@ -125,7 +125,7 @@ O modelo é deliberadamente parcial e não substitui múltiplos históricos, com
 
 The Portfolio Construction Engine converts the saved Investment Policy into target category weights, compares them with the transaction-based portfolio, and proposes either contribution-only funding or a full simulated rebalance. Stress tests apply transparent shocks to policy buckets and are not forecasts or Value-at-Risk estimates. Direct currency concentration excludes ETF look-through unless official holdings data is available.
 
-## Supabase Auth and per-user Cloud Sync
+## Supabase Auth e sincronização por utilizador
 
 ThesisOS supports personal accounts through Supabase Auth. Each authenticated
 user receives an independent cloud workspace stored in
@@ -144,28 +144,24 @@ Synchronized namespaces:
 
 ### Supabase setup
 
-1. Execute `supabase_schema.sql` if the legacy Cloud Sync table does not yet
-   exist.
-2. Execute `supabase_auth_migration.sql` once.
-3. In **Authentication → URL Configuration**, set the production Site URL to
+1. Execute `supabase_auth_migration.sql` once.
+2. In **Authentication → URL Configuration**, set the production Site URL to
    the public ThesisOS URL and add the same origin to the allowed redirect
    URLs.
-4. Keep Email/Password enabled in **Authentication → Providers**.
-5. Add these Replit Secrets:
+3. Keep Email/Password enabled in **Authentication → Providers**.
+4. Add these Replit Secrets:
 
 ```text
 SUPABASE_URL
 SUPABASE_PUBLISHABLE_KEY
-SUPABASE_SECRET_KEY
 ```
 
-`SUPABASE_ANON_KEY` is supported as a legacy fallback for the publishable key,
-and `SUPABASE_SERVICE_ROLE_KEY` remains a legacy fallback for the secret key.
+`SUPABASE_ANON_KEY` pode ser usado como alternativa de compatibilidade à
+chave publicável.
 
-The publishable key is intentionally returned to the browser so the official
-Supabase JavaScript client can create and refresh user sessions. The secret key
-remains server-side and is used only for the optional one-time migration of the
-old single-workspace data.
+A chave publicável é enviada ao navegador para que o cliente oficial do
+Supabase possa criar e renovar sessões. A aplicação não necessita de uma chave
+`service_role` para guardar ou restaurar os dados dos utilizadores.
 
 ### Authorization model
 
@@ -175,9 +171,8 @@ old single-workspace data.
   backend.
 - The backend forwards that same user token to Supabase PostgREST.
 - Row Level Security enforces `auth.uid() = user_id`.
-- Anonymous users have no database privileges.
-- The legacy `public.thesisos_state` table remains server-only and can be kept
-  temporarily as a backup.
+- Utilizadores anónimos não têm acesso à tabela.
+- Cada conta acede apenas às linhas associadas ao respetivo `user_id`.
 
 ### Conflict strategy
 
@@ -188,8 +183,6 @@ old single-workspace data.
   associated with the account.
 - If both contain data, ThesisOS asks the user to choose which copy should
   prevail before enabling automatic synchronization.
-- The old workspace can be imported once by an authenticated user who knows
-  the former `THESISOS_SYNC_PASSWORD`.
 
 Cloud Sync stores application state only. It does not store broker credentials,
 place orders or replace tax records.
