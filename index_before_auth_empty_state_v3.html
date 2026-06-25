@@ -2795,16 +2795,16 @@
         <div class="card">
           <h2>Capacidade, horizonte e comportamento</h2>
           <div class="policy-form-grid">
-            <label>Idade<input id="policyAge" type="number" min="18" max="90" placeholder="Ex.: 30"></label>
-            <label>Capital de referência (€)<input id="policyPlanningCapital" type="number" min="0" step="10" placeholder="Ex.: 1000"></label>
-            <label>Horizonte<select id="policyHorizon"><option value="" selected disabled>Seleciona…</option><option value="20">Mais de 15 anos</option><option value="10">7–15 anos</option><option value="5">3–7 anos</option><option value="2">Menos de 3 anos</option></select></label>
-            <label>Objetivo<select id="policyGoal"><option value="" selected disabled>Seleciona…</option><option value="growth">Crescimento de capital</option><option value="income">Rendimento</option><option value="preservation">Preservação</option><option value="house">Compra de casa / objetivo definido</option></select></label>
-            <label>Necessidade de liquidez<select id="policyLiquidity"><option value="" selected disabled>Seleciona…</option><option value="low">Baixa</option><option value="medium">Média</option><option value="high">Alta</option></select></label>
-            <label>Estabilidade dos rendimentos<select id="policyIncomeStability"><option value="" selected disabled>Seleciona…</option><option value="high">Alta</option><option value="medium">Média</option><option value="low">Baixa</option></select></label>
-            <label>Reação provável a uma queda de 25%<select id="policyDropReaction"><option value="" selected disabled>Seleciona…</option><option value="buy">Reforçar gradualmente</option><option value="hold">Manter sem vender</option><option value="reduce">Reduzir uma parte</option><option value="sell">Vender grande parte</option></select></label>
-            <label>Fundo de emergência<select id="policyEmergencyFund"><option value="" selected disabled>Seleciona…</option><option value="complete">Completo</option><option value="partial">Parcial</option><option value="none">Ainda inexistente</option></select></label>
-            <label>Contribuição mensal (€)<input id="policyMonthlyContribution" type="number" min="0" step="10" placeholder="Ex.: 150"></label>
-            <label>Queda máxima tolerada (%)<input id="policyDrawdown" type="number" min="5" max="60" step="5" placeholder="Ex.: 30"></label>
+            <label>Idade<input id="policyAge" type="number" min="18" max="90" value="30"></label>
+            <label>Capital de referência (€)<input id="policyPlanningCapital" type="number" min="0" step="10" value="1000"></label>
+            <label>Horizonte<select id="policyHorizon"><option value="20">Mais de 15 anos</option><option value="10">7–15 anos</option><option value="5">3–7 anos</option><option value="2">Menos de 3 anos</option></select></label>
+            <label>Objetivo<select id="policyGoal"><option value="growth">Crescimento de capital</option><option value="income">Rendimento</option><option value="preservation">Preservação</option><option value="house">Compra de casa / objetivo definido</option></select></label>
+            <label>Necessidade de liquidez<select id="policyLiquidity"><option value="low">Baixa</option><option value="medium">Média</option><option value="high">Alta</option></select></label>
+            <label>Estabilidade dos rendimentos<select id="policyIncomeStability"><option value="high">Alta</option><option value="medium">Média</option><option value="low">Baixa</option></select></label>
+            <label>Reação provável a uma queda de 25%<select id="policyDropReaction"><option value="buy">Reforçar gradualmente</option><option value="hold">Manter sem vender</option><option value="reduce">Reduzir uma parte</option><option value="sell">Vender grande parte</option></select></label>
+            <label>Fundo de emergência<select id="policyEmergencyFund"><option value="complete">Completo</option><option value="partial">Parcial</option><option value="none">Ainda inexistente</option></select></label>
+            <label>Contribuição mensal (€)<input id="policyMonthlyContribution" type="number" min="0" step="10" value="150"></label>
+            <label>Queda máxima tolerada (%)<input id="policyDrawdown" type="number" min="5" max="60" step="5" value="30"></label>
           </div>
         </div>
         <div class="card">
@@ -6821,7 +6821,6 @@
   function hasSavedInvestorPolicy(){return Boolean(policyRead());}
   function getInvestorPolicy(){const stored=policyRead();if(!stored)return emptyInvestorPolicy();const fallback=defaultInvestorPolicy();return {...fallback,...stored,target_allocation:{...fallback.target_allocation,...(stored.target_allocation||{})}};}
   function policyFormInput(){return {age:Number($("#policyAge")?.value)||0,planning_capital:Number($("#policyPlanningCapital")?.value)||0,horizon:Number($("#policyHorizon")?.value)||0,goal:$("#policyGoal")?.value||"",liquidity:$("#policyLiquidity")?.value||"",income_stability:$("#policyIncomeStability")?.value||"",drop_reaction:$("#policyDropReaction")?.value||"",emergency_fund:$("#policyEmergencyFund")?.value||"",monthly_contribution:Number($("#policyMonthlyContribution")?.value)||0,drawdown:Number($("#policyDrawdown")?.value)||0};}
-  const POLICY_FORM_FIELD_IDS=["policyAge","policyPlanningCapital","policyHorizon","policyGoal","policyLiquidity","policyIncomeStability","policyDropReaction","policyEmergencyFund","policyMonthlyContribution","policyDrawdown"];
   function policyFormHasData(){return POLICY_FORM_FIELD_IDS.some(id=>String($("#"+id)?.value??"").trim()!=="");}
   function policyFromForm(){const input=policyFormInput(),score=policyRiskScore(input);return {...input,score,label:policyLabel(score),max_stock_weight:Number($("#policyMaxStock")?.value)||0,max_etf_weight:Number($("#policyMaxEtf")?.value)||0,initial_position_weight:Number($("#policyInitialWeight")?.value)||0,max_speculative:Number($("#policyMaxSpeculative")?.value)||0,max_sector:Number($("#policyMaxSector")?.value)||0,max_currency:Number($("#policyMaxCurrency")?.value)||0,min_cash:Number($("#policyMinCash")?.value)||0,rebalance_threshold:Number($("#policyRebalanceThreshold")?.value)||0,target_allocation:{core:Number($("#policyCoreAllocation")?.value)||0,quality:Number($("#policyQualityAllocation")?.value)||0,dividend:Number($("#policyDividendAllocation")?.value)||0,speculative:Number($("#policySpecAllocation")?.value)||0,cash:Number($("#policyCashAllocation")?.value)||0},updated_at:null};}
   function fillPolicyForm(policy=getInvestorPolicy()){

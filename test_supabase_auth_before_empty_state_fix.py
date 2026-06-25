@@ -92,22 +92,6 @@ def main():
         and "cloudSaveUserCache" in index,
     )
     check(
-        "Empty-account visual state",
-        'placeholder="Ex.: 30"' in index
-        and 'placeholder="Ex.: 150"' in index
-        and 'function emptyInvestorPolicy()' in index
-        and 'function policyFormHasData()' in index
-        and 'if(!stored&&!policyFormHasData())' in index,
-    )
-    check(
-        "Saved-policy gate",
-        'function hasSavedInvestorPolicy()' in index
-        and 'if(!hasSavedInvestorPolicy()){renderPortfolioConstructionEmptyState();return;}' in index
-        and 'Guarda uma Investment Policy antes de calcular limites e tamanho de posição.' in index
-        and 'updated_at:new Date().toISOString()' in index
-        and 'updated_at:null' in index,
-    )
-    check(
         "Password recovery diagnostics",
         "Supabase password recovery failed" in index
         and "error?.status===429" in index,
