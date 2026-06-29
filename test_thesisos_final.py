@@ -258,6 +258,8 @@ def test_static(suite: Suite) -> None:
         "/api/auth/config",
         "/api/auth/session",
         "/api/user/state",
+        "/api/ai-brief/config",
+        "/api/ai-brief",
     ]
     absent_routes = [route for route in routes if route not in server]
     suite.check(

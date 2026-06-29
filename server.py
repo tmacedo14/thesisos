@@ -22,6 +22,13 @@ from urllib.parse import (
 )
 from urllib.request import Request, urlopen
 
+from ai_brief_grounding import build_grounding_bundle
+from ai_brief_provider import (
+    ProviderConfig,
+    generate_ai_brief,
+    provider_configuration,
+)
+
 
 HOST = "0.0.0.0"
 PORT = 3000
@@ -71,6 +78,16 @@ EVIDENCE_CACHE = {}
 SEC_SUBMISSIONS_CACHE = {}
 
 SYNC_MAX_REQUEST_BYTES = 2_500_000
+AI_BRIEF_MAX_REQUEST_BYTES = 16_384
+AI_BRIEF_RATE_LIMIT_REQUESTS = 5
+AI_BRIEF_RATE_LIMIT_WINDOW_SECONDS = 60
+AI_BRIEF_ALLOWED_REQUEST_FIELDS = {
+    "identifier",
+    "base_currency",
+    "exchange",
+    "ticker",
+}
+_AI_BRIEF_RATE_LIMIT_STATE = {}
 SYNC_MAX_NAMESPACE_BYTES = 750_000
 SYNC_ALLOWED_NAMESPACES = {
     "watchlist",
@@ -9438,6 +9455,200 @@ def build_comparison(
     }, 200
 
 
+
+
+def public_ai_brief_configuration(
+    environ: dict | None = None,
+) -> dict:
+    config = provider_configuration(environ)
+
+    return {
+        "status": "ok",
+        "feature": "ai_investment_brief",
+        **config,
+        "http_provider_implemented": False,
+        "authentication_required": True,
+        "request_limit_bytes": AI_BRIEF_MAX_REQUEST_BYTES,
+        "rate_limit": {
+            "requests": AI_BRIEF_RATE_LIMIT_REQUESTS,
+            "window_seconds": AI_BRIEF_RATE_LIMIT_WINDOW_SECONDS,
+        },
+    }
+
+
+def normalize_ai_brief_request(body: dict) -> dict:
+    if not isinstance(body, dict):
+        raise ValueError(
+            "O corpo do pedido deve ser um objeto JSON."
+        )
+
+    unsupported = sorted(
+        set(body) - AI_BRIEF_ALLOWED_REQUEST_FIELDS
+    )
+
+    if unsupported:
+        raise ValueError(
+            "Campos não suportados: "
+            + ", ".join(unsupported)
+            + "."
+        )
+
+    identifier = str(body.get("identifier") or "").strip()
+
+    if not identifier or len(identifier) > 64:
+        raise ValueError("Identificador inválido.")
+
+    base_currency = str(
+        body.get("base_currency") or "EUR"
+    ).strip().upper()
+
+    if (
+        len(base_currency) != 3
+        or not base_currency.isalpha()
+    ):
+        raise ValueError("Moeda base inválida.")
+
+    exchange_value = body.get("exchange")
+    exchange = (
+        str(exchange_value).strip()
+        if exchange_value is not None
+        else None
+    )
+
+    ticker_value = body.get("ticker")
+    ticker = (
+        str(ticker_value).strip().upper()
+        if ticker_value is not None
+        else None
+    )
+
+    if exchange is not None and len(exchange) > 64:
+        raise ValueError("Exchange inválida.")
+
+    if ticker is not None and len(ticker) > 64:
+        raise ValueError("Ticker inválido.")
+
+    return {
+        "identifier": identifier,
+        "base_currency": base_currency,
+        "exchange": exchange or None,
+        "ticker": ticker or None,
+    }
+
+
+def consume_ai_brief_rate_limit(
+    user_id: str,
+    now: float | None = None,
+) -> tuple[bool, int]:
+    key = str(user_id or "").strip()
+
+    if not key:
+        return False, AI_BRIEF_RATE_LIMIT_WINDOW_SECONDS
+
+    current = time.time() if now is None else float(now)
+    threshold = current - AI_BRIEF_RATE_LIMIT_WINDOW_SECONDS
+
+    recent = [
+        timestamp
+        for timestamp in _AI_BRIEF_RATE_LIMIT_STATE.get(
+            key,
+            [],
+        )
+        if timestamp > threshold
+    ]
+
+    if len(recent) >= AI_BRIEF_RATE_LIMIT_REQUESTS:
+        retry_after = max(
+            1,
+            math.ceil(
+                recent[0]
+                + AI_BRIEF_RATE_LIMIT_WINDOW_SECONDS
+                - current
+            ),
+        )
+        _AI_BRIEF_RATE_LIMIT_STATE[key] = recent
+        return False, retry_after
+
+    recent.append(current)
+    _AI_BRIEF_RATE_LIMIT_STATE[key] = recent
+
+    if len(_AI_BRIEF_RATE_LIMIT_STATE) > 1000:
+        stale_keys = [
+            candidate
+            for candidate, timestamps
+            in _AI_BRIEF_RATE_LIMIT_STATE.items()
+            if not any(
+                timestamp > threshold
+                for timestamp in timestamps
+            )
+        ]
+
+        for candidate in stale_keys:
+            _AI_BRIEF_RATE_LIMIT_STATE.pop(
+                candidate,
+                None,
+            )
+
+    return True, 0
+
+
+def build_ai_brief_runtime_response(
+    body: dict,
+    *,
+    environ: dict | None = None,
+    analysis_resolver=None,
+) -> tuple[dict, int]:
+    request = normalize_ai_brief_request(body)
+    resolver = analysis_resolver or build_analysis_payload
+
+    analysis_payload, analysis_status = resolver(
+        request["identifier"],
+        base_currency=request["base_currency"],
+        exchange=request["exchange"],
+        ticker=request["ticker"],
+    )
+
+    if not isinstance(analysis_payload, dict):
+        return {
+            "error": (
+                "A análise ThesisOS devolveu "
+                "um formato inválido."
+            )
+        }, 502
+
+    try:
+        numeric_status = int(analysis_status)
+    except (TypeError, ValueError):
+        numeric_status = 500
+
+    if not 200 <= numeric_status < 300:
+        message = str(
+            analysis_payload.get("error")
+            or "Não foi possível preparar a análise ThesisOS."
+        )[:500]
+
+        return {
+            "error": message,
+            "analysis_status": numeric_status,
+        }, (
+            numeric_status
+            if 400 <= numeric_status < 500
+            else 502
+        )
+
+    grounding_bundle = build_grounding_bundle(
+        analysis_payload
+    )
+    config = ProviderConfig.from_env(environ)
+    brief = generate_ai_brief(
+        grounding_bundle,
+        config,
+        provider=None,
+    )
+
+    return brief, 200
+
+
 class ThesisOSHandler(SimpleHTTPRequestHandler):
     def send_json(
         self,
@@ -9466,14 +9677,17 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def read_json_body(self) -> dict:
+    def read_json_body(
+        self,
+        max_bytes: int = SYNC_MAX_REQUEST_BYTES,
+    ) -> dict:
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError as error:
             raise ValueError("Content-Length inválido.") from error
         if length <= 0:
             return {}
-        if length > SYNC_MAX_REQUEST_BYTES:
+        if length > max_bytes:
             raise ValueError("Pedido demasiado grande.")
         raw = self.rfile.read(length)
         try:
@@ -9497,6 +9711,12 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed_url = urlparse(self.path)
+
+        if parsed_url.path == "/api/ai-brief/config":
+            self.send_json(
+                public_ai_brief_configuration()
+            )
+            return
 
         if parsed_url.path == "/api/auth/config":
             config = auth_configuration()
@@ -9674,6 +9894,99 @@ class ThesisOSHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed_url = urlparse(self.path)
+
+        if parsed_url.path == "/api/ai-brief":
+            access_token, user = self.supabase_auth_context()
+
+            if not access_token or not user:
+                self.send_json(
+                    {
+                        "error": (
+                            "Inicia sessão com uma conta Supabase."
+                        )
+                    },
+                    status=401,
+                )
+                return
+
+            allowed, retry_after = (
+                consume_ai_brief_rate_limit(
+                    user.get("id"),
+                )
+            )
+
+            if not allowed:
+                self.send_json(
+                    {
+                        "error": (
+                            "Limite temporário de pedidos "
+                            "AI Investment Brief atingido."
+                        )
+                    },
+                    status=429,
+                    extra_headers={
+                        "Retry-After": str(retry_after),
+                    },
+                )
+                return
+
+            try:
+                body = self.read_json_body(
+                    max_bytes=AI_BRIEF_MAX_REQUEST_BYTES,
+                )
+                payload, status = (
+                    build_ai_brief_runtime_response(
+                        body,
+                    )
+                )
+                self.send_json(payload, status=status)
+
+            except ValueError as error:
+                message = str(error)
+                status = (
+                    413
+                    if message == "Pedido demasiado grande."
+                    else 400
+                )
+                self.send_json(
+                    {"error": message},
+                    status=status,
+                )
+
+            except HTTPError:
+                self.send_json(
+                    {
+                        "error": (
+                            "Um fornecedor de dados "
+                            "recusou o pedido."
+                        )
+                    },
+                    status=502,
+                )
+
+            except URLError:
+                self.send_json(
+                    {
+                        "error": (
+                            "Não foi possível contactar "
+                            "um fornecedor de dados."
+                        )
+                    },
+                    status=502,
+                )
+
+            except Exception:
+                self.send_json(
+                    {
+                        "error": (
+                            "Não foi possível gerar "
+                            "o AI Investment Brief."
+                        )
+                    },
+                    status=500,
+                )
+
+            return
 
         if parsed_url.path == "/api/user/state":
             access_token, user = self.supabase_auth_context()
