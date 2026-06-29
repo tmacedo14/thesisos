@@ -1,0 +1,146 @@
+{
+  "schema_version": "1.0",
+  "brief_id": "brief-85a6b768cc7785b71e95",
+  "status": "provider_unavailable",
+  "asset": {
+    "asset_type": "stock",
+    "currency": "USD",
+    "exchange": "DEMO",
+    "isin": null,
+    "name": "Demonstration Asset",
+    "symbol": "DEMO"
+  },
+  "generated_at": "2026-06-29T15:30:00+00:00",
+  "grounding": {
+    "source": "thesisos",
+    "bundle_version": "1.0",
+    "analysis_generated_at": "2026-06-29T15:30:00+00:00",
+    "data_completeness_pct": 94.0,
+    "evidence_count": 8,
+    "source_types": [
+      "official_filing",
+      "portfolio_state",
+      "technical_data",
+      "thesisos_engine"
+    ],
+    "evidence_refs": [
+      {
+        "as_of": "2026-06-28",
+        "field_paths": [
+          "evidence.events[0]"
+        ],
+        "id": "evidence-9f8ca1735e1a4d38",
+        "source_type": "official_filing",
+        "source_url": "https://example.invalid/filing",
+        "title": "Quarterly filing"
+      },
+      {
+        "as_of": null,
+        "field_paths": [
+          "grounded_data.portfolio"
+        ],
+        "id": "evidence-8f5fb54d0a9a0e6f",
+        "source_type": "portfolio_state",
+        "source_url": null,
+        "title": "ThesisOS portfolio"
+      },
+      {
+        "as_of": null,
+        "field_paths": [
+          "grounded_data.technical"
+        ],
+        "id": "evidence-b576ce73bbddf945",
+        "source_type": "technical_data",
+        "source_url": null,
+        "title": "ThesisOS technical"
+      },
+      {
+        "as_of": null,
+        "field_paths": [
+          "grounded_data.framework"
+        ],
+        "id": "evidence-1688e0c54ffe9804",
+        "source_type": "thesisos_engine",
+        "source_url": null,
+        "title": "ThesisOS framework"
+      },
+      {
+        "as_of": null,
+        "field_paths": [
+          "grounded_data.valuation"
+        ],
+        "id": "evidence-1a2dec1f4c3d6e67",
+        "source_type": "thesisos_engine",
+        "source_url": null,
+        "title": "ThesisOS valuation"
+      },
+      {
+        "as_of": null,
+        "field_paths": [
+          "grounded_data.fundamentals"
+        ],
+        "id": "evidence-5f1f01a3c2710774",
+        "source_type": "thesisos_engine",
+        "source_url": null,
+        "title": "ThesisOS fundamentals"
+      },
+      {
+        "as_of": null,
+        "field_paths": [
+          "grounded_data.evidence"
+        ],
+        "id": "evidence-63a1c0d5ff91f8a1",
+        "source_type": "thesisos_engine",
+        "source_url": null,
+        "title": "ThesisOS evidence"
+      },
+      {
+        "as_of": null,
+        "field_paths": [
+          "grounded_data.market_context"
+        ],
+        "id": "evidence-9adfcdf0d8621740",
+        "source_type": "thesisos_engine",
+        "source_url": null,
+        "title": "ThesisOS market context"
+      }
+    ],
+    "payload_sha256": "85a6b768cc7785b71e9544a5c98a33afd0bec2d0655990eb0354966f3a955fcd"
+  },
+  "uncertainty": {
+    "level": "low",
+    "reasons": [
+      "No critical or optional grounding fields are missing."
+    ],
+    "missing_fields": []
+  },
+  "sections": {
+    "executive_summary": null,
+    "thesis": [],
+    "strengths": [],
+    "risks": [],
+    "valuation": null,
+    "technical": null,
+    "portfolio_fit": null,
+    "catalysts": [],
+    "invalidation_signals": [],
+    "next_review": null
+  },
+  "decision": {
+    "action": "unavailable",
+    "confidence": 0,
+    "rationale": null,
+    "position_sizing": null,
+    "entry_zone": null
+  },
+  "model": null,
+  "error": {
+    "code": "provider_not_configured",
+    "message": "AI Brief provider configuration is incomplete.",
+    "retryable": false
+  },
+  "limitations": [
+    "No provider output was accepted.",
+    "The ThesisOS grounding bundle remains available."
+  ]
+}
