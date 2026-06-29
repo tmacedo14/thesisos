@@ -1,0 +1,113 @@
+name: ThesisOS CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop/v0.5.0-beta
+      - "release/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: thesisos-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      SUPABASE_URL: "https://example.supabase.co"
+      SUPABASE_ANON_KEY: "ci-public-anon-key"
+      THESISOS_AI_BRIEF_ENABLED: "false"
+      THESISOS_AI_BRIEF_CACHE_ENABLED: "true"
+      THESISOS_AI_BRIEF_LOG_EVENTS: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Compile Python
+        run: |
+          python -m py_compile \
+            server.py \
+            http_security.py \
+            ai_brief_cache.py \
+            ai_brief_grounding.py \
+            ai_brief_provider.py \
+            ai_brief_openai.py \
+            test_http_security.py \
+            test_ai_brief_cache.py \
+            test_ai_brief_openai.py \
+            test_ai_brief_runtime.py \
+            test_ai_brief_provider.py \
+            test_ai_brief_grounding.py \
+            test_ai_brief_contract.py \
+            test_supabase_auth.py \
+            test_thesisos_final.py
+
+      - name: Run deterministic tests
+        run: |
+          python test_http_security.py
+          python test_ai_brief_cache.py
+          python test_ai_brief_openai.py
+          python test_ai_brief_runtime.py
+          python test_ai_brief_provider.py
+          python test_ai_brief_grounding.py
+          python test_ai_brief_contract.py
+
+      - name: Start local server
+        run: |
+          python server.py >/tmp/thesisos-server.log 2>&1 &
+          echo $! >/tmp/thesisos-server.pid
+          python - <<'PY'
+          import time
+          from urllib.request import urlopen
+
+          for _ in range(30):
+              try:
+                  with urlopen(
+                      "http://127.0.0.1:3000/api/health",
+                      timeout=2,
+                  ) as response:
+                      if response.status == 200:
+                          raise SystemExit(0)
+              except Exception:
+                  time.sleep(1)
+
+          raise SystemExit("Server did not become ready")
+          PY
+
+      - name: Run live security and regression tests
+        run: |
+          python test_http_security.py --live
+          python test_ai_brief_runtime.py --live
+          python test_supabase_auth.py
+          python test_thesisos_final.py
+
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/thesisos-server.log || true
+
+      - name: Stop local server
+        if: always()
+        run: |
+          if [ -f /tmp/thesisos-server.pid ]; then
+            kill "$(cat /tmp/thesisos-server.pid)" || true
+          fi

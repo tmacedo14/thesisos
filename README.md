@@ -393,3 +393,15 @@ This project is an educational decision-support prototype and not financial advi
 Scores are partial models based on available data and must not be interpreted as automatic buy or sell recommendations.
 
 The system does not execute transactions, manage funds or replace professional financial, legal, accounting or tax advice.
+
+## Beta HTTP Security & CI v1
+
+A branch Beta inclui uma baseline de segurança HTTP aplicada à API e aos
+ficheiros estáticos, testes live dedicados e um workflow GitHub Actions
+sem segredos ou providers externos.
+
+A Content Security Policy é transitória porque o frontend Alpha ainda
+contém JavaScript e CSS inline. A extração desses blocos permitirá remover
+`unsafe-inline` numa fase posterior.
+
+Detalhes: `docs/http_security_ci.md`.

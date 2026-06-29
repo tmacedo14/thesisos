@@ -22,6 +22,10 @@ from urllib.parse import (
 )
 from urllib.request import Request, urlopen
 
+from http_security import (
+    ALLOWED_METHODS,
+    security_headers_for_request,
+)
 from ai_brief_cache import (
     AiBriefCache,
     cache_configuration,
@@ -9667,6 +9671,58 @@ def build_ai_brief_runtime_response(
 
 
 class ThesisOSHandler(SimpleHTTPRequestHandler):
+    server_version = "ThesisOS"
+    sys_version = ""
+
+    def end_headers(self):
+        for name, value in security_headers_for_request(
+            self.headers
+        ).items():
+            self.send_header(name, value)
+
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Allow", ALLOWED_METHODS)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+
+    def _method_not_allowed(self):
+        body = json.dumps(
+            {
+                "error": "method_not_allowed",
+                "allowed_methods": ALLOWED_METHODS.split(", "),
+            },
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+        self.send_response(405)
+        self.send_header("Allow", ALLOWED_METHODS)
+        self.send_header(
+            "Content-Type",
+            "application/json; charset=utf-8",
+        )
+        self.send_header("Cache-Control", "no-store")
+        self.send_header(
+            "Content-Length",
+            str(len(body)),
+        )
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_TRACE(self):
+        self._method_not_allowed()
+
+    def do_PUT(self):
+        self._method_not_allowed()
+
+    def do_PATCH(self):
+        self._method_not_allowed()
+
+    def do_DELETE(self):
+        self._method_not_allowed()
+
     def send_json(
         self,
         payload: dict,
