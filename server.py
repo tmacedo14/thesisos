@@ -22,6 +22,11 @@ from urllib.parse import (
 )
 from urllib.request import Request, urlopen
 
+from ai_brief_cache import (
+    AiBriefCache,
+    cache_configuration,
+    generate_ai_brief_with_cache,
+)
 from ai_brief_grounding import build_grounding_bundle
 from ai_brief_openai import build_openai_provider
 from ai_brief_provider import (
@@ -89,6 +94,7 @@ AI_BRIEF_ALLOWED_REQUEST_FIELDS = {
     "ticker",
 }
 _AI_BRIEF_RATE_LIMIT_STATE = {}
+_AI_BRIEF_CACHE = AiBriefCache.from_env()
 SYNC_MAX_NAMESPACE_BYTES = 750_000
 SYNC_ALLOWED_NAMESPACES = {
     "watchlist",
@@ -9470,6 +9476,7 @@ def public_ai_brief_configuration(
         "http_provider_implemented": True,
         "supported_providers": ["openai"],
         "authentication_required": True,
+        "cache": cache_configuration(environ),
         "request_limit_bytes": AI_BRIEF_MAX_REQUEST_BYTES,
         "rate_limit": {
             "requests": AI_BRIEF_RATE_LIMIT_REQUESTS,
@@ -9600,6 +9607,7 @@ def build_ai_brief_runtime_response(
     environ: dict | None = None,
     analysis_resolver=None,
     provider_builder=build_openai_provider,
+    brief_cache=None,
 ) -> tuple[dict, int]:
     request = normalize_ai_brief_request(body)
     resolver = analysis_resolver or build_analysis_payload
@@ -9647,10 +9655,12 @@ def build_ai_brief_runtime_response(
         config,
         environ=environ,
     )
-    brief = generate_ai_brief(
+    cache = brief_cache or _AI_BRIEF_CACHE
+    brief = generate_ai_brief_with_cache(
         grounding_bundle,
         config,
-        provider=provider,
+        provider,
+        cache=cache,
     )
 
     return brief, 200

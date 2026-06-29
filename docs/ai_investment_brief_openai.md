@@ -61,6 +61,10 @@ São permitidas no máximo três tentativas para:
 O header `Retry-After` é respeitado até dois segundos. Erros de
 autenticação ou pedidos inválidos não são repetidos.
 
+Antes de uma chamada, o runtime consulta o cache local usando o hash
+do grounding, provider e modelo. Apenas respostas `ready` ou `partial`
+são reutilizadas.
+
 ## Estados finais
 
 O adapter reutiliza a normalização existente:

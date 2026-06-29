@@ -8,6 +8,10 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import server
+from ai_brief_cache import (
+    AiBriefCache,
+    AiBriefCacheConfig,
+)
 
 
 PASSED = 0
@@ -140,6 +144,13 @@ def run_pure_tests() -> None:
     check(
         config["request_limit_bytes"] == 16384,
         "Runtime request-size limit",
+    )
+
+    check(
+        config["cache"]["enabled"] is True
+        and config["cache"]["ttl_seconds"] == 900
+        and config["cache"]["max_entries"] == 128,
+        "Runtime cache configuration",
     )
 
     serialized_config = json.dumps(config)
@@ -349,6 +360,13 @@ def run_pure_tests() -> None:
             and "provider = provider_builder(" in server_source
         ),
         "Concrete OpenAI provider factory wired",
+    )
+
+    check(
+        "generate_ai_brief_with_cache(" in server_source
+        and "_AI_BRIEF_CACHE = AiBriefCache.from_env()"
+        in server_source,
+        "Runtime cache service wired",
     )
 
 

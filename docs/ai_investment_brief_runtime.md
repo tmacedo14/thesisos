@@ -61,7 +61,9 @@ Apenas estes quatro campos são aceites. O cliente não pode enviar:
 5. construir a análise através do pipeline ThesisOS existente;
 6. construir o grounding bundle server-side;
 7. carregar a configuração server-side;
-8. produzir o estado normalizado através do provider adapter.
+8. consultar o cache por grounding hash, provider e modelo;
+9. produzir o estado normalizado através do provider adapter;
+10. guardar apenas respostas `ready` ou `partial`.
 
 Com a configuração por defeito, a resposta é `disabled`.
 
@@ -86,6 +88,8 @@ distribuída futura.
 - API key exclusivamente em variável de ambiente;
 - configuração pública expõe apenas um booleano sobre a chave;
 - nenhum provider HTTP é chamado enquanto a feature estiver desligada;
+- cache usa cópias defensivas e não guarda falhas;
+- logs opcionais não incluem payloads, prompts ou segredos;
 - respostas de erro não incluem payloads ou credenciais de providers.
 
 ## Próxima fase
