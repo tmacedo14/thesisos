@@ -23,6 +23,7 @@ from urllib.parse import (
 from urllib.request import Request, urlopen
 
 from ai_brief_grounding import build_grounding_bundle
+from ai_brief_openai import build_openai_provider
 from ai_brief_provider import (
     ProviderConfig,
     generate_ai_brief,
@@ -9466,7 +9467,8 @@ def public_ai_brief_configuration(
         "status": "ok",
         "feature": "ai_investment_brief",
         **config,
-        "http_provider_implemented": False,
+        "http_provider_implemented": True,
+        "supported_providers": ["openai"],
         "authentication_required": True,
         "request_limit_bytes": AI_BRIEF_MAX_REQUEST_BYTES,
         "rate_limit": {
@@ -9597,6 +9599,7 @@ def build_ai_brief_runtime_response(
     *,
     environ: dict | None = None,
     analysis_resolver=None,
+    provider_builder=build_openai_provider,
 ) -> tuple[dict, int]:
     request = normalize_ai_brief_request(body)
     resolver = analysis_resolver or build_analysis_payload
@@ -9640,10 +9643,14 @@ def build_ai_brief_runtime_response(
         analysis_payload
     )
     config = ProviderConfig.from_env(environ)
+    provider = provider_builder(
+        config,
+        environ=environ,
+    )
     brief = generate_ai_brief(
         grounding_bundle,
         config,
-        provider=None,
+        provider=provider,
     )
 
     return brief, 200

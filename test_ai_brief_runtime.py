@@ -123,13 +123,18 @@ def run_pure_tests() -> None:
     )
 
     check(
-        config["http_provider_implemented"] is False,
-        "HTTP provider explicitly unavailable",
+        config["http_provider_implemented"] is True,
+        "HTTP provider implementation available",
     )
 
     check(
         config["authentication_required"] is True,
         "Runtime authentication requirement",
+    )
+
+    check(
+        config["supported_providers"] == ["openai"],
+        "Runtime supported-provider registry",
     )
 
     check(
@@ -338,8 +343,12 @@ def run_pure_tests() -> None:
     )
 
     check(
-        "provider=None" in server_source,
-        "No concrete HTTP provider wired",
+        (
+            "provider_builder=build_openai_provider"
+            in server_source
+            and "provider = provider_builder(" in server_source
+        ),
+        "Concrete OpenAI provider factory wired",
     )
 
 

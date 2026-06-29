@@ -7,8 +7,9 @@ O backend expõe duas rotas:
 - `GET /api/ai-brief/config`;
 - `POST /api/ai-brief`.
 
-A feature permanece desativada por defeito e não existe ainda um
-provider HTTP real.
+A feature permanece desativada por defeito. O provider HTTP OpenAI
+Responses está implementado, mas só é construído quando a feature,
+provider, modelo e API key estiverem configurados no servidor.
 
 O frontend não foi alterado.
 
@@ -84,15 +85,13 @@ distribuída futura.
 - grounding construído apenas no servidor;
 - API key exclusivamente em variável de ambiente;
 - configuração pública expõe apenas um booleano sobre a chave;
-- nenhum provider HTTP é chamado nesta fase;
+- nenhum provider HTTP é chamado enquanto a feature estiver desligada;
 - respostas de erro não incluem payloads ou credenciais de providers.
 
 ## Próxima fase
 
-A implementação futura do provider HTTP deverá acrescentar:
+A fase seguinte deverá acrescentar:
 
-- adapter concreto;
-- retries com backoff limitado;
 - cache por hash do grounding;
 - logs estruturados sem prompts ou respostas brutas;
 - rate limit distribuído;
