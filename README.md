@@ -405,3 +405,12 @@ contém JavaScript e CSS inline. A extração desses blocos permitirá remover
 `unsafe-inline` numa fase posterior.
 
 Detalhes: `docs/http_security_ci.md`.
+
+## AI Investment Brief Frontend v1
+
+A análise integrada inclui uma interface explícita para o AI Investment Brief.
+A geração exige sessão Supabase e clique do utilizador, reutiliza o runtime
+server-side e nunca envia grounding construído no browser. O conteúdo é
+renderizado como texto seguro, pedidos obsoletos são cancelados e o provider
+continua desativado por defeito. Ver
+`docs/ai_investment_brief_frontend.md`.

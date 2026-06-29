@@ -1201,6 +1201,35 @@
     .nav-count{margin-left:auto;min-width:21px;height:21px;padding:0 6px;border-radius:999px;display:inline-grid;place-items:center;background:#263d64;color:#fff;font-size:10px}
     .page-action-row,.analysis-action-row{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
     .analysis-action-row{margin-top:10px}
+    #aiBriefCard{display:none;margin-bottom:16px}
+    #analysis.stock-mode #aiBriefCard,
+    #analysis.etf-mode #aiBriefCard{display:block}
+    #analysis.analysis-neutral #aiBriefCard{display:none!important}
+    .ai-brief-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+    .ai-brief-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+    .ai-brief-content{display:grid;gap:12px;margin-top:15px}
+    .ai-brief-notice{padding:14px;border:1px dashed #385174;border-radius:14px;color:var(--muted);line-height:1.55}
+    .ai-brief-notice strong{display:block;color:var(--text);margin-bottom:5px}
+    .ai-brief-section{padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--panel-2)}
+    .ai-brief-section h3{margin:0 0 8px;font-size:14px}
+    .ai-brief-section p{margin:0;color:#d5deec;line-height:1.6;white-space:pre-wrap}
+    .ai-brief-list{margin:8px 0 0;padding-left:20px;color:#d5deec;line-height:1.55}
+    .ai-brief-list li+li{margin-top:6px}
+    .ai-brief-kv{display:grid;grid-template-columns:minmax(130px,.45fr) 1fr;gap:8px 12px}
+    .ai-brief-kv dt{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+    .ai-brief-kv dd{margin:0;color:#d5deec;line-height:1.5;white-space:pre-wrap}
+    .ai-brief-decision{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .ai-brief-decision .mini{min-height:86px}
+    .ai-brief-status-ready{border-color:#2f6e5b}
+    .ai-brief-status-partial{border-color:#7b6531}
+    .ai-brief-status-error{border-color:#7a4550}
+    .ai-brief-actions{display:flex;justify-content:flex-end;margin-top:12px}
+    @media(max-width:720px){
+      .ai-brief-top{flex-direction:column}
+      .ai-brief-meta{justify-content:flex-start}
+      .ai-brief-decision{grid-template-columns:1fr}
+      .ai-brief-kv{grid-template-columns:1fr}
+    }
     #technicalEngineCard{display:none;margin-bottom:16px}
     #analysis.stock-mode #technicalEngineCard,#analysis.etf-mode #technicalEngineCard{display:block}
     .technical-engine-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
@@ -1664,6 +1693,7 @@
             <button class="ghost" id="analysisDecisionBtn" type="button">✎ Decisão</button>
             <button class="ghost" id="analysisAlertBtn" type="button">◉ Alerta</button>
             <button class="ghost" id="analysisCompareBtn" type="button">⇄ Comparar</button>
+            <button class="ghost" id="analysisAiBriefBtn" type="button" disabled>✦ Investment Brief</button>
             <button class="primary" id="analysisPrintBtn" type="button">Imprimir / PDF</button>
           </div>
           <div class="fx-note" id="assetFx">A conversão para EUR aparecerá depois da pesquisa.</div>
@@ -1759,6 +1789,25 @@
         </div>
 
         <div class="analysis-quality-warning" id="analysisWarnings"></div>
+      </section>
+
+      <section class="card" id="aiBriefCard" aria-live="polite">
+        <div class="ai-brief-top">
+          <div>
+            <h2 style="margin:0 0 6px">AI Investment Brief</h2>
+            <p class="sub" id="aiBriefSummary" style="margin:0">
+              Pesquisa um ativo para preparar um brief fundamentado nos dados do ThesisOS.
+            </p>
+          </div>
+          <div class="ai-brief-meta">
+            <span class="pill" id="aiBriefStatus">A aguardar</span>
+            <span class="freshness" id="aiBriefGeneratedAt">Sem geração</span>
+          </div>
+        </div>
+        <div class="ai-brief-content" id="aiBriefContent"></div>
+        <div class="ai-brief-actions">
+          <button class="ghost" id="aiBriefRetryBtn" type="button" hidden>Tentar novamente</button>
+        </div>
       </section>
 
       <section class="card" id="frameworkEngineCard">
@@ -3605,6 +3654,9 @@
   }
 
   let unifiedAnalysisRequestId=0;
+  let aiBriefAbortController=null;
+  let aiBriefRequestId=0;
+  let aiBriefConfig={loaded:false,enabled:false,status:"unknown"};
 
   function analysisStatusLabel(status){
     const labels={
@@ -5182,8 +5234,401 @@
     }
   }
 
+  const AI_BRIEF_STATUS_LABELS={
+    ready:"Pronto",
+    partial:"Parcial",
+    insufficient_data:"Dados insuficientes",
+    provider_unavailable:"Provider indisponível",
+    disabled:"Desativado",
+    generation_failed:"Falha na geração"
+  };
+
+  const AI_BRIEF_ACTION_LABELS={
+    buy:"Comprar",
+    initiate_small:"Iniciar pequena",
+    accumulate:"Acumular",
+    hold:"Manter",
+    watch:"Observar",
+    reduce:"Reduzir",
+    avoid:"Evitar",
+    sell:"Vender",
+    unavailable:"Indisponível"
+  };
+
+  function aiBriefHumanLabel(value){
+    return String(value || "")
+      .replace(/_/g," ")
+      .replace(/\b\w/g,letter=>letter.toUpperCase());
+  }
+
+  function aiBriefNode(tag,className,textValue){
+    const node=document.createElement(tag);
+    if(className) node.className=className;
+    if(textValue!==undefined && textValue!==null){
+      node.textContent=String(textValue);
+    }
+    return node;
+  }
+
+  function aiBriefTextValue(value){
+    if(value===null || value===undefined || value==="") return "—";
+    if(typeof value==="boolean") return value ? "Sim" : "Não";
+    if(typeof value==="number") return Number.isFinite(value) ? String(value) : "—";
+    return String(value);
+  }
+
+  function aiBriefAppendValue(container,value,depth=0){
+    if(value===null || value===undefined){
+      container.append(aiBriefNode("p","","—"));
+      return;
+    }
+
+    if(Array.isArray(value)){
+      if(!value.length){
+        container.append(aiBriefNode("p","","Sem itens."));
+        return;
+      }
+
+      const list=aiBriefNode("ul","ai-brief-list");
+      value.forEach(item=>{
+        const entry=aiBriefNode("li");
+        if(item && typeof item==="object" && !Array.isArray(item)){
+          aiBriefAppendValue(entry,item,depth+1);
+        }else{
+          entry.textContent=aiBriefTextValue(item);
+        }
+        list.append(entry);
+      });
+      container.append(list);
+      return;
+    }
+
+    if(typeof value==="object"){
+      const entries=Object.entries(value);
+      if(!entries.length){
+        container.append(aiBriefNode("p","","Sem detalhe."));
+        return;
+      }
+
+      const list=aiBriefNode("dl","ai-brief-kv");
+      entries.forEach(([key,item])=>{
+        const term=aiBriefNode("dt","",aiBriefHumanLabel(key));
+        const detail=aiBriefNode("dd");
+        if(depth<2 && item && typeof item==="object"){
+          aiBriefAppendValue(detail,item,depth+1);
+        }else{
+          detail.textContent=aiBriefTextValue(item);
+        }
+        list.append(term,detail);
+      });
+      container.append(list);
+      return;
+    }
+
+    container.append(aiBriefNode("p","",aiBriefTextValue(value)));
+  }
+
+  function aiBriefSection(title,value){
+    const section=aiBriefNode("section","ai-brief-section");
+    section.append(aiBriefNode("h3","",title));
+    aiBriefAppendValue(section,value);
+    return section;
+  }
+
+  function aiBriefStatusClass(status){
+    if(status==="ready") return "pill ai-brief-status-ready";
+    if(status==="partial" || status==="insufficient_data"){
+      return "pill warn ai-brief-status-partial";
+    }
+    if(status==="provider_unavailable" || status==="generation_failed"){
+      return "pill bad ai-brief-status-error";
+    }
+    return "pill";
+  }
+
+  function aiBriefSetNotice(status,title,message,{retry=false}={}){
+    const content=$("#aiBriefContent");
+    const statusNode=$("#aiBriefStatus");
+    const summary=$("#aiBriefSummary");
+    const retryButton=$("#aiBriefRetryBtn");
+    if(!content || !statusNode || !summary || !retryButton) return;
+
+    content.replaceChildren();
+    const notice=aiBriefNode("div","ai-brief-notice");
+    notice.append(
+      aiBriefNode("strong","",title),
+      aiBriefNode("span","",message)
+    );
+    content.append(notice);
+    statusNode.textContent=AI_BRIEF_STATUS_LABELS[status] || aiBriefHumanLabel(status) || "A aguardar";
+    statusNode.className=aiBriefStatusClass(status);
+    summary.textContent=message;
+    retryButton.hidden=!retry;
+  }
+
+  function resetAiInvestmentBrief({abort=false,show=false}={}){
+    if(abort && aiBriefAbortController) aiBriefAbortController.abort();
+    if(abort) aiBriefRequestId+=1;
+    aiBriefAbortController=null;
+
+    const card=$("#aiBriefCard");
+    const button=$("#analysisAiBriefBtn");
+    const generated=$("#aiBriefGeneratedAt");
+    const retry=$("#aiBriefRetryBtn");
+
+    if(card) card.style.display=show ? "" : "none";
+    if(button){
+      button.disabled=true;
+      button.textContent="✦ Investment Brief";
+    }
+    if(generated) generated.textContent="Sem geração";
+    if(retry) retry.hidden=true;
+
+    aiBriefSetNotice(
+      "waiting",
+      show ? "Brief ainda não gerado" : "A aguardar análise",
+      show
+        ? "O Investment Brief só é gerado após uma ação explícita."
+        : "Pesquisa um ativo para preparar o Investment Brief."
+    );
+  }
+
+  function syncAiBriefButton(){
+    const button=$("#analysisAiBriefBtn");
+    const payload=window.currentAnalysisPayload;
+    if(!button) return;
+
+    const requestActive=Boolean(aiBriefAbortController);
+    const available=Boolean(payload && aiBriefConfig.loaded && aiBriefConfig.enabled);
+    button.disabled=requestActive || !available;
+    button.textContent=requestActive
+      ? "A gerar…"
+      : aiBriefConfig.loaded && !aiBriefConfig.enabled
+        ? "✦ Brief indisponível"
+        : "✦ Investment Brief";
+  }
+
+  async function ensureAiBriefConfig(){
+    if(aiBriefConfig.loaded){
+      syncAiBriefButton();
+      return aiBriefConfig;
+    }
+
+    try{
+      const config=await cloudRequest("/api/ai-brief/config",{method:"GET"});
+      aiBriefConfig={
+        loaded:true,
+        enabled:Boolean(config.enabled),
+        status:String(config.status || "unknown")
+      };
+
+      if(!aiBriefConfig.enabled){
+        aiBriefSetNotice(
+          "disabled",
+          "Funcionalidade desativada",
+          "O AI Investment Brief está integrado, mas o provider permanece desativado nesta configuração."
+        );
+      }else{
+        aiBriefSetNotice(
+          "ready",
+          "Pronto para gerar",
+          "Inicia sessão e usa o botão Investment Brief. A geração nunca é automática."
+        );
+      }
+    }catch(error){
+      aiBriefConfig={loaded:true,enabled:false,status:"provider_unavailable"};
+      aiBriefSetNotice(
+        "provider_unavailable",
+        "Configuração indisponível",
+        error.message || "Não foi possível consultar a configuração do Investment Brief.",
+        {retry:true}
+      );
+    }finally{
+      syncAiBriefButton();
+    }
+
+    return aiBriefConfig;
+  }
+
+  function renderAiInvestmentBrief(payload){
+    const content=$("#aiBriefContent");
+    const statusNode=$("#aiBriefStatus");
+    const summary=$("#aiBriefSummary");
+    const generated=$("#aiBriefGeneratedAt");
+    const retry=$("#aiBriefRetryBtn");
+    if(!content || !statusNode || !summary || !generated || !retry) return;
+
+    const status=String(payload?.status || "generation_failed");
+    const sections=(payload?.sections && typeof payload.sections==="object") ? payload.sections : {};
+    const decision=(payload?.decision && typeof payload.decision==="object") ? payload.decision : {};
+    const uncertainty=(payload?.uncertainty && typeof payload.uncertainty==="object") ? payload.uncertainty : {};
+    const grounding=(payload?.grounding && typeof payload.grounding==="object") ? payload.grounding : {};
+
+    content.replaceChildren();
+    statusNode.textContent=AI_BRIEF_STATUS_LABELS[status] || aiBriefHumanLabel(status);
+    statusNode.className=aiBriefStatusClass(status);
+    generated.textContent=payload?.generated_at
+      ? `Gerado ${formatAssetDate(payload.generated_at)}`
+      : "Sem geração";
+
+    const executiveSummary=sections.executive_summary;
+    summary.textContent=typeof executiveSummary==="string"
+      ? executiveSummary
+      : ({
+          disabled:"O provider do AI Brief está desativado.",
+          insufficient_data:"Os dados atuais não permitem gerar um brief fundamentado.",
+          provider_unavailable:"O provider está temporariamente indisponível.",
+          generation_failed:"A geração não foi concluída.",
+          partial:"O brief foi gerado com cobertura parcial.",
+          ready:"Investment Brief gerado a partir do grounding do ThesisOS."
+        }[status] || "Estado do Investment Brief atualizado.");
+
+    if(Object.keys(decision).length){
+      const decisionGrid=aiBriefNode("div","ai-brief-decision");
+      const action=aiBriefNode("div","mini");
+      const confidence=aiBriefNode("div","mini");
+      const rationale=aiBriefNode("div","mini");
+
+      action.append(
+        aiBriefNode("span","","Decisão"),
+        aiBriefNode("strong","",AI_BRIEF_ACTION_LABELS[decision.action] || aiBriefHumanLabel(decision.action))
+      );
+      confidence.append(
+        aiBriefNode("span","","Confiança"),
+        aiBriefNode("strong","",Number.isFinite(Number(decision.confidence)) ? `${Number(decision.confidence)}%` : "—")
+      );
+      rationale.append(
+        aiBriefNode("span","","Racional"),
+        aiBriefNode("strong","",decision.rationale || decision.reason || decision.summary || "Consultar as secções do brief.")
+      );
+      decisionGrid.append(action,confidence,rationale);
+      content.append(decisionGrid);
+    }
+
+    Object.entries(sections).forEach(([key,value])=>{
+      if(key==="executive_summary") return;
+      if(value===null || value===undefined || value==="") return;
+      content.append(aiBriefSection(aiBriefHumanLabel(key),value));
+    });
+
+    if(Object.keys(uncertainty).length){
+      content.append(aiBriefSection("Incerteza e dados em falta",uncertainty));
+    }
+
+    if(Object.keys(grounding).length){
+      const groundingSummary={};
+      ["bundle_version","source","completeness_percentage","evidence_count","grounding_hash"].forEach(key=>{
+        if(grounding[key]!==undefined) groundingSummary[key]=grounding[key];
+      });
+      if(Object.keys(groundingSummary).length){
+        content.append(aiBriefSection("Grounding",groundingSummary));
+      }
+    }
+
+    if(payload?.error){
+      content.append(aiBriefSection("Erro normalizado",payload.error));
+    }
+
+    if(!content.childElementCount){
+      aiBriefSetNotice(
+        status,
+        "Sem conteúdo adicional",
+        summary.textContent,
+        {retry:["provider_unavailable","generation_failed"].includes(status)}
+      );
+      return;
+    }
+
+    retry.hidden=!["provider_unavailable","generation_failed"].includes(status);
+  }
+
+  async function generateAiInvestmentBrief(){
+    const analysis=window.currentAnalysisPayload;
+    if(!analysis){
+      showToast("Pesquisa primeiro um ativo.");
+      return;
+    }
+
+    await ensureAiBriefConfig();
+    if(!aiBriefConfig.enabled){
+      aiBriefSetNotice(
+        "disabled",
+        "Funcionalidade desativada",
+        "O provider continua desativado. Nenhuma chamada de IA foi efetuada."
+      );
+      syncAiBriefButton();
+      return;
+    }
+
+    if(aiBriefAbortController) aiBriefAbortController.abort();
+    const requestId=++aiBriefRequestId;
+    const controller=new AbortController();
+    aiBriefAbortController=controller;
+
+    const asset=analysis.asset || {};
+    const identifier=String(analysis.query || asset.symbol || "").trim().toUpperCase();
+    if(!identifier){
+      aiBriefAbortController=null;
+      syncAiBriefButton();
+      showToast("O ativo atual não tem um identificador válido.");
+      return;
+    }
+
+    const requestBody={
+      identifier,
+      base_currency:"EUR",
+      exchange:asset.exchange_code || asset.exchange || null,
+      ticker:asset.symbol || identifier
+    };
+
+    const button=$("#analysisAiBriefBtn");
+    const generated=$("#aiBriefGeneratedAt");
+    if(button){
+      button.disabled=true;
+      button.textContent="A gerar…";
+    }
+    if(generated) generated.textContent="A gerar";
+    aiBriefSetNotice(
+      "ready",
+      "A gerar Investment Brief",
+      "A consolidar apenas os dados já recolhidos pelo ThesisOS."
+    );
+
+    try{
+      const brief=await cloudRequest(
+        "/api/ai-brief",
+        {
+          method:"POST",
+          body:JSON.stringify(requestBody),
+          signal:controller.signal
+        },
+        true
+      );
+
+      if(requestId!==aiBriefRequestId || controller.signal.aborted) return;
+      renderAiInvestmentBrief(brief);
+    }catch(error){
+      if(error?.name==="AbortError" || controller.signal.aborted) return;
+      if(requestId!==aiBriefRequestId) return;
+      aiBriefSetNotice(
+        "generation_failed",
+        "Não foi possível gerar o brief",
+        error.message || "O pedido falhou.",
+        {retry:true}
+      );
+      showToast(error.message || "Investment Brief indisponível.");
+    }finally{
+      if(requestId===aiBriefRequestId){
+        aiBriefAbortController=null;
+        syncAiBriefButton();
+      }
+    }
+  }
+
   function renderUnifiedAnalysis(payload){
     window.currentAnalysisPayload=payload;
+    resetAiInvestmentBrief({show:true});
+    void ensureAiBriefConfig();
     const asset=payload.asset || {};
     const market=payload.market || {};
     const currency=market.currency || asset.currency || "";
@@ -5359,8 +5804,10 @@
   }
 
   async function loadUnifiedAnalysis(identifier, options={}){
+    resetAiInvestmentBrief({abort:true});
     window.currentAnalysisPayload=null;
     syncAnalysisActionButtons();
+    syncAiBriefButton();
     const cleanIdentifier=String(identifier || "")
       .trim()
       .toUpperCase();
@@ -6387,10 +6834,12 @@ function escapeHtml(value){
   function syncAnalysisActionButtons(){
     const payload=window.currentAnalysisPayload;
     const button=$("#analysisWatchBtn");
-    if(!button) return;
-    const record=payload ? analysisRecord(payload) : null;
-    const exists=record && getWatchlist().some(item=>item.symbol===record.symbol && String(item.exchange||"")===String(record.exchange||""));
-    button.textContent=exists ? "★ Na watchlist" : "☆ Watchlist";
+    if(button){
+      const record=payload ? analysisRecord(payload) : null;
+      const exists=record && getWatchlist().some(item=>item.symbol===record.symbol && String(item.exchange||"")===String(record.exchange||""));
+      button.textContent=exists ? "★ Na watchlist" : "☆ Watchlist";
+    }
+    syncAiBriefButton();
   }
   function renderWatchlist(){
     const items=getWatchlist();const container=$("#watchlistCards");const empty=$("#watchlistEmpty");updateWatchlistCount();
@@ -7245,6 +7694,8 @@ function escapeHtml(value){
 
   $("#analysisWatchBtn")?.addEventListener("click",()=>{if(window.currentAnalysisPayload)addWatchlistRecord(analysisRecord(window.currentAnalysisPayload));else showToast("Pesquisa primeiro um ativo.");});
   $("#analysisCompareBtn")?.addEventListener("click",()=>{const symbol=window.currentAnalysisPayload?.query || window.currentAnalysisPayload?.asset?.symbol;if(symbol) $("#compareLeft").value=symbol;handlePageOpen("compare");});
+  $("#analysisAiBriefBtn")?.addEventListener("click",()=>void generateAiInvestmentBrief());
+  $("#aiBriefRetryBtn")?.addEventListener("click",()=>void generateAiInvestmentBrief());
   $("#analysisPrintBtn")?.addEventListener("click",()=>window.print());
   $("#runRadarBtn")?.addEventListener("click",()=>loadOpportunityRadar(true));
   resetOpportunityRadarView();
