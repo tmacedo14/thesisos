@@ -1,0 +1,607 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:thesisos:contract:ai-investment-brief:1.0",
+  "title": "ThesisOS AI Investment Brief",
+  "description": "Grounded AI Investment Brief generated exclusively from a server-prepared ThesisOS evidence bundle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "brief_id",
+    "status",
+    "asset",
+    "generated_at",
+    "grounding",
+    "uncertainty",
+    "sections",
+    "decision",
+    "model",
+    "error",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "brief_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "partial",
+        "insufficient_data",
+        "provider_unavailable",
+        "disabled",
+        "generation_failed"
+      ]
+    },
+    "asset": {
+      "$ref": "#/$defs/asset"
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "grounding": {
+      "$ref": "#/$defs/grounding"
+    },
+    "uncertainty": {
+      "$ref": "#/$defs/uncertainty"
+    },
+    "sections": {
+      "$ref": "#/$defs/sections"
+    },
+    "decision": {
+      "$ref": "#/$defs/decision"
+    },
+    "model": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/model"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "error": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/error"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "symbol",
+        "name",
+        "asset_type",
+        "isin",
+        "exchange",
+        "currency"
+      ],
+      "properties": {
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "asset_type": {
+          "type": "string",
+          "enum": [
+            "stock",
+            "etf",
+            "commodity",
+            "fund",
+            "bond",
+            "crypto",
+            "other"
+          ]
+        },
+        "isin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exchange": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "evidence_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "source_type",
+        "title",
+        "source_url",
+        "as_of",
+        "field_paths"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "type": "string",
+          "enum": [
+            "official_filing",
+            "official_fund_document",
+            "company_release",
+            "market_data",
+            "technical_data",
+            "portfolio_state",
+            "thesisos_engine",
+            "other"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "as_of": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "field_paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "grounding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "bundle_version",
+        "analysis_generated_at",
+        "data_completeness_pct",
+        "evidence_count",
+        "source_types",
+        "evidence_refs",
+        "payload_sha256"
+      ],
+      "properties": {
+        "source": {
+          "const": "thesisos"
+        },
+        "bundle_version": {
+          "const": "1.0"
+        },
+        "analysis_generated_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "data_completeness_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "evidence_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_types": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "official_filing",
+              "official_fund_document",
+              "company_release",
+              "market_data",
+              "technical_data",
+              "portfolio_state",
+              "thesisos_engine",
+              "other"
+            ]
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence_reference"
+          }
+        },
+        "payload_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "level",
+        "reasons",
+        "missing_fields"
+      ],
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "unknown"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "missing_fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "sections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executive_summary",
+        "thesis",
+        "strengths",
+        "risks",
+        "valuation",
+        "technical",
+        "portfolio_fit",
+        "catalysts",
+        "invalidation_signals",
+        "next_review"
+      ],
+      "properties": {
+        "executive_summary": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "thesis": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "strengths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "valuation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "technical": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "portfolio_fit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "catalysts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "invalidation_signals": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "next_review": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "confidence",
+        "rationale",
+        "position_sizing",
+        "entry_zone"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "buy",
+            "initiate_small",
+            "accumulate",
+            "hold",
+            "watch",
+            "reduce",
+            "avoid",
+            "sell",
+            "unavailable"
+          ]
+        },
+        "confidence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "rationale": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position_sizing": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "entry_zone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model",
+        "request_id"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "retryable"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "ready"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "model": {
+            "$ref": "#/$defs/model"
+          },
+          "error": {
+            "type": "null"
+          },
+          "sections": {
+            "properties": {
+              "executive_summary": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "insufficient_data"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "model": {
+            "type": "null"
+          },
+          "error": {
+            "type": "null"
+          },
+          "uncertainty": {
+            "properties": {
+              "missing_fields": {
+                "minItems": 1
+              }
+            }
+          },
+          "decision": {
+            "properties": {
+              "action": {
+                "const": "unavailable"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "disabled"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "model": {
+            "type": "null"
+          },
+          "error": {
+            "type": "null"
+          },
+          "decision": {
+            "properties": {
+              "action": {
+                "const": "unavailable"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "provider_unavailable",
+              "generation_failed"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "error": {
+            "$ref": "#/$defs/error"
+          },
+          "decision": {
+            "properties": {
+              "action": {
+                "const": "unavailable"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

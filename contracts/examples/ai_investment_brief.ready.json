@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0",
+  "brief_id": "brief-demo-ready-001",
+  "status": "ready",
+  "asset": {
+    "symbol": "DEMO",
+    "name": "Demonstration Asset",
+    "asset_type": "stock",
+    "isin": null,
+    "exchange": "DEMO",
+    "currency": "USD"
+  },
+  "generated_at": "2026-06-29T00:00:00Z",
+  "grounding": {
+    "source": "thesisos",
+    "bundle_version": "1.0",
+    "analysis_generated_at": "2026-06-29T00:00:00Z",
+    "data_completeness_pct": 92,
+    "evidence_count": 2,
+    "source_types": [
+      "official_filing",
+      "thesisos_engine"
+    ],
+    "evidence_refs": [
+      {
+        "id": "evidence-001",
+        "source_type": "official_filing",
+        "title": "Official filing evidence",
+        "source_url": null,
+        "as_of": "2026-06-28",
+        "field_paths": [
+          "fundamentals.revenue",
+          "fundamentals.free_cash_flow"
+        ]
+      },
+      {
+        "id": "evidence-002",
+        "source_type": "thesisos_engine",
+        "title": "ThesisOS framework output",
+        "source_url": null,
+        "as_of": "2026-06-29",
+        "field_paths": [
+          "framework.score",
+          "framework.risks",
+          "valuation.status"
+        ]
+      }
+    ],
+    "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "uncertainty": {
+    "level": "low",
+    "reasons": [
+      "No critical grounding fields are missing."
+    ],
+    "missing_fields": []
+  },
+  "sections": {
+    "executive_summary": "The grounded ThesisOS evidence supports continued observation rather than an immediate full-size position.",
+    "thesis": [
+      "The business demonstrates measurable operating strengths."
+    ],
+    "strengths": [
+      "Evidence coverage is high.",
+      "The framework identifies positive operating signals."
+    ],
+    "risks": [
+      "Valuation may already reflect part of the expected growth."
+    ],
+    "valuation": "The valuation engine indicates that the current entry case requires discipline.",
+    "technical": "Technical evidence is treated as an entry-timing input rather than the primary thesis.",
+    "portfolio_fit": "Position sizing must respect portfolio concentration limits.",
+    "catalysts": [
+      "Next official results publication."
+    ],
+    "invalidation_signals": [
+      "Material deterioration in cash conversion."
+    ],
+    "next_review": "Review after the next material official filing."
+  },
+  "decision": {
+    "action": "watch",
+    "confidence": 74,
+    "rationale": "The grounded evidence is constructive, but valuation and portfolio-fit constraints limit conviction.",
+    "position_sizing": "No full-size position before further evidence.",
+    "entry_zone": "Use ThesisOS valuation and pullback rules."
+  },
+  "model": {
+    "provider": "example-provider",
+    "model": "example-model",
+    "request_id": "example-request-001"
+  },
+  "error": null,
+  "limitations": [
+    "The brief does not execute orders.",
+    "The brief does not introduce facts outside the ThesisOS bundle."
+  ]
+}

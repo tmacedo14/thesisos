@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "brief_id": "brief-demo-insufficient-001",
+  "status": "insufficient_data",
+  "asset": {
+    "symbol": "DEMO",
+    "name": "Demonstration Asset",
+    "asset_type": "stock",
+    "isin": null,
+    "exchange": null,
+    "currency": null
+  },
+  "generated_at": "2026-06-29T00:00:00Z",
+  "grounding": {
+    "source": "thesisos",
+    "bundle_version": "1.0",
+    "analysis_generated_at": null,
+    "data_completeness_pct": 42,
+    "evidence_count": 0,
+    "source_types": [],
+    "evidence_refs": [],
+    "payload_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "uncertainty": {
+    "level": "high",
+    "reasons": [
+      "Critical valuation and official evidence fields are missing."
+    ],
+    "missing_fields": [
+      "valuation.status",
+      "evidence.official_filings"
+    ]
+  },
+  "sections": {
+    "executive_summary": null,
+    "thesis": [],
+    "strengths": [],
+    "risks": [],
+    "valuation": null,
+    "technical": null,
+    "portfolio_fit": null,
+    "catalysts": [],
+    "invalidation_signals": [],
+    "next_review": null
+  },
+  "decision": {
+    "action": "unavailable",
+    "confidence": 0,
+    "rationale": null,
+    "position_sizing": null,
+    "entry_zone": null
+  },
+  "model": null,
+  "error": null,
+  "limitations": [
+    "No AI generation is performed when critical grounding is missing."
+  ]
+}
