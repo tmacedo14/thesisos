@@ -1,0 +1,51 @@
+{
+  "analysis_generated_at": "2026-06-29T15:30:00+00:00",
+  "asset": {
+    "asset_type": "other",
+    "currency": "USD",
+    "exchange": null,
+    "isin": null,
+    "name": "Unknown Demonstration Asset",
+    "symbol": null
+  },
+  "bundle_version": "1.0",
+  "coverage": {
+    "data_completeness_pct": 14.29,
+    "missing_critical_fields": [
+      "asset.asset_type",
+      "asset.symbol",
+      "grounded_data.framework"
+    ],
+    "missing_optional_fields": [
+      "grounded_data.evidence",
+      "grounded_data.market_context",
+      "grounded_data.portfolio",
+      "grounded_data.valuation"
+    ],
+    "status": "insufficient_data",
+    "uncertainty_level": "high"
+  },
+  "evidence_refs": [
+    {
+      "as_of": null,
+      "field_paths": [
+        "grounded_data.technical"
+      ],
+      "id": "evidence-b576ce73bbddf945",
+      "source_type": "technical_data",
+      "source_url": null,
+      "title": "ThesisOS technical"
+    }
+  ],
+  "grounded_data": {
+    "technical": {
+      "status": "ok",
+      "trend": "unknown"
+    }
+  },
+  "source": "thesisos",
+  "source_types": [
+    "technical_data"
+  ],
+  "payload_sha256": "1d8525017656fed2d8151ed4112e976c58f0b5d5d5fe9b7d6f8c17422eebddf0"
+}
