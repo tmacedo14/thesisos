@@ -57,6 +57,7 @@ jobs:
             test_ai_brief_openai.py \
             test_ai_brief_runtime.py \
             test_ai_brief_frontend.py \
+            test_ai_brief_live_smoke.py \
             test_ai_brief_provider.py \
             test_ai_brief_grounding.py \
             test_ai_brief_contract.py \
@@ -70,6 +71,7 @@ jobs:
           python test_ai_brief_openai.py
           python test_ai_brief_runtime.py
           python test_ai_brief_frontend.py
+          python test_ai_brief_live_smoke.py
           python test_ai_brief_provider.py
           python test_ai_brief_grounding.py
           python test_ai_brief_contract.py

@@ -414,3 +414,11 @@ server-side e nunca envia grounding construído no browser. O conteúdo é
 renderizado como texto seguro, pedidos obsoletos são cancelados e o provider
 continua desativado por defeito. Ver
 `docs/ai_investment_brief_frontend.md`.
+
+## AI Investment Brief Live Smoke Harness v1
+
+O repositório inclui um harness manual para validar uma única chamada real à
+OpenAI Responses API sem ativar o provider no runtime normal. O modo
+predefinido é dry-run, uma segunda ida à rede é bloqueada, `store=false` é
+forçado e a saída contém apenas metadados e usage. Ver
+`docs/ai_brief_live_smoke.md`.
