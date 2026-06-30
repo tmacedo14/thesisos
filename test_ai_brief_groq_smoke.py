@@ -7,17 +7,19 @@ from pathlib import Path
 
 from ai_brief_groq import (
     GROQ_API_KEY_ENV,
+    GROQ_CHAT_COMPLETIONS_URL,
     GROQ_DEFAULT_MODEL,
     GROQ_PROVIDER_NAME,
-    GROQ_RESPONSES_URL,
 )
 from ai_brief_groq_smoke import (
     CONFIRM_ENV,
     CONFIRM_VALUE,
     GroqSmokeGuardError,
+    SingleActualRequestTransport,
     dry_run_summary,
     run_live,
 )
+from ai_brief_live_smoke import LiveSmokeLimitError
 from ai_brief_openai import TransportResponse
 
 ROOT = Path(__file__).resolve().parent
@@ -55,26 +57,23 @@ def provider_content() -> dict:
 
 def success_response() -> TransportResponse:
     payload = {
-        "id": "resp_groq_smoke_fake",
-        "status": "completed",
+        "id": "chatcmpl_groq_smoke_fake",
         "model": GROQ_DEFAULT_MODEL,
-        "output": [
+        "choices": [
             {
-                "type": "message",
-                "status": "completed",
-                "content": [
-                    {
-                        "type": "output_text",
-                        "text": json.dumps(
-                            provider_content()
-                        ),
-                    }
-                ],
+                "index": 0,
+                "finish_reason": "stop",
+                "message": {
+                    "role": "assistant",
+                    "content": json.dumps(
+                        provider_content()
+                    ),
+                },
             }
         ],
         "usage": {
-            "input_tokens": 700,
-            "output_tokens": 350,
+            "prompt_tokens": 700,
+            "completion_tokens": 350,
             "total_tokens": 1050,
         },
     }
@@ -138,7 +137,8 @@ def main() -> int:
         "Groq default model",
     )
     check(
-        dry["endpoint"] == GROQ_RESPONSES_URL,
+        dry["endpoint"]
+        == GROQ_CHAT_COMPLETIONS_URL,
         "Groq dry-run endpoint",
     )
     check(
@@ -150,8 +150,8 @@ def main() -> int:
         "Groq dry-run confirms no tools",
     )
     check(
-        dry["store_will_be_forced_false"] is True,
-        "Groq dry-run declares store false",
+        dry["store_parameter_sent"] is False,
+        "Groq dry-run sends no store parameter",
     )
     check(
         dry["actual_request_limit"] == 1,
@@ -250,7 +250,7 @@ def main() -> int:
     )
     check(
         summary["response_id"]
-        == "resp_groq_smoke_fake",
+        == "chatcmpl_groq_smoke_fake",
         "Groq response id summarized",
     )
     check(
@@ -259,22 +259,27 @@ def main() -> int:
         "Groq request id summarized",
     )
     check(
-        summary.get("usage", {}).get("total_tokens")
-        == 1050,
+        summary["usage"]["total_tokens"] == 1050,
         "Groq usage summarized",
     )
     check(
         summary["request"]["endpoint"]
-        == GROQ_RESPONSES_URL,
+        == GROQ_CHAT_COMPLETIONS_URL,
         "Groq endpoint transmitted",
     )
     check(
-        summary["request"]["store"] is False,
-        "Groq store=false forced",
+        summary["request"]["store_parameter_sent"]
+        is False,
+        "Groq store parameter omitted",
     )
     check(
         summary["request"]["strict"] is True,
         "Groq strict format preserved",
+    )
+    check(
+        summary["request"]["tools_enabled"]
+        is False,
+        "Groq tools remain disabled",
     )
     check(
         summary["runtime_activated"] is False,
@@ -286,15 +291,18 @@ def main() -> int:
     )
 
     check(
-        sent["store"] is False,
-        "Groq transmitted store=false",
+        "store" not in sent,
+        "Groq transmitted no store parameter",
     )
     check(
         "tools" not in sent,
         "Groq transmitted no tools",
     )
     check(
-        sent["text"]["format"]["strict"] is True,
+        sent["response_format"]["json_schema"][
+            "strict"
+        ]
+        is True,
         "Groq transmitted strict schema",
     )
 
@@ -314,18 +322,60 @@ def main() -> int:
         "Groq grounding excluded",
     )
 
+    inner = RecordingTransport()
+    limiter = SingleActualRequestTransport(inner)
+    body = json.dumps({
+        "model": GROQ_DEFAULT_MODEL,
+        "messages": [{
+            "role": "user",
+            "content": "test",
+        }],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "test",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "max_completion_tokens": 16,
+    }).encode("utf-8")
+    limiter(
+        url=GROQ_CHAT_COMPLETIONS_URL,
+        headers={"Authorization": "Bearer fake"},
+        body=body,
+        timeout_seconds=5.0,
+    )
+    second_blocked = False
+
+    try:
+        limiter(
+            url=GROQ_CHAT_COMPLETIONS_URL,
+            headers={"Authorization": "Bearer fake"},
+            body=body,
+            timeout_seconds=5.0,
+        )
+    except LiveSmokeLimitError:
+        second_blocked = True
+
+    check(
+        second_blocked,
+        "Second Groq request blocked",
+    )
+    check(
+        len(inner.calls) == 1,
+        "Only one inner Groq call",
+    )
+
     source = (
         ROOT / "ai_brief_groq_smoke.py"
     ).read_text(encoding="utf-8")
-    shared_smoke_source = (
-        ROOT / "ai_brief_live_smoke.py"
-    ).read_text(encoding="utf-8")
 
-    check(
-        "self.inner(\n            url=url,"
-        in shared_smoke_source,
-        "Shared transport uses keyword-only url",
-    )
     check(
         GROQ_API_KEY_ENV
         == "THESISOS_AI_BRIEF_GROQ_API_KEY"

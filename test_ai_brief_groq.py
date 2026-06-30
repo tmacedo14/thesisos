@@ -7,15 +7,19 @@ from pathlib import Path
 
 from ai_brief_groq import (
     GROQ_API_KEY_ENV,
+    GROQ_CHAT_COMPLETIONS_URL,
     GROQ_DEFAULT_MODEL,
+    GROQ_MAX_COMPLETION_TOKENS,
     GROQ_PROVIDER_NAME,
-    GROQ_RESPONSES_URL,
+    RETRYABLE_HTTP_STATUSES,
+    GroqChatCompletionsProvider,
     GroqResponsesProvider,
     build_groq_provider,
 )
 from ai_brief_openai import TransportResponse
 from ai_brief_provider import (
     ProviderConfig,
+    ProviderContractError,
     ProviderGenerationError,
 )
 
@@ -36,23 +40,25 @@ def check(condition: bool, label: str) -> None:
 
 
 def grounding_bundle() -> dict:
-    path = (
-        ROOT
-        / "contracts"
-        / "examples"
-        / "ai_investment_brief_grounding.ready.json"
+    return json.loads(
+        (
+            ROOT
+            / "contracts"
+            / "examples"
+            / "ai_investment_brief_grounding.ready.json"
+        ).read_text(encoding="utf-8")
     )
-    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def valid_content() -> dict:
-    path = (
-        ROOT
-        / "contracts"
-        / "examples"
-        / "ai_investment_brief.ready.json"
+    example = json.loads(
+        (
+            ROOT
+            / "contracts"
+            / "examples"
+            / "ai_investment_brief.ready.json"
+        ).read_text(encoding="utf-8")
     )
-    example = json.loads(path.read_text(encoding="utf-8"))
 
     return {
         "sections": example["sections"],
@@ -63,26 +69,23 @@ def valid_content() -> dict:
 
 def success_response() -> TransportResponse:
     payload = {
-        "id": "resp_groq_fake_001",
-        "status": "completed",
+        "id": "chatcmpl_groq_fake_001",
         "model": GROQ_DEFAULT_MODEL,
-        "output": [
+        "choices": [
             {
-                "type": "message",
-                "status": "completed",
-                "content": [
-                    {
-                        "type": "output_text",
-                        "text": json.dumps(
-                            valid_content()
-                        ),
-                    }
-                ],
+                "index": 0,
+                "finish_reason": "stop",
+                "message": {
+                    "role": "assistant",
+                    "content": json.dumps(
+                        valid_content()
+                    ),
+                },
             }
         ],
         "usage": {
-            "input_tokens": 600,
-            "output_tokens": 300,
+            "prompt_tokens": 600,
+            "completion_tokens": 300,
             "total_tokens": 900,
         },
     }
@@ -170,14 +173,14 @@ def config(
 def main() -> int:
     bundle = grounding_bundle()
     transport = SequenceTransport([success_response()])
-    selected = GroqResponsesProvider(
+    provider = GroqChatCompletionsProvider(
         api_key="groq-test-secret",
         model=GROQ_DEFAULT_MODEL,
         transport=transport,
         sleep_fn=lambda _: None,
     )
 
-    result = selected.generate(
+    result = provider.generate(
         bundle,
         timeout_seconds=15.0,
     )
@@ -195,7 +198,7 @@ def main() -> int:
         "Groq model metadata preserved",
     )
     check(
-        result.request_id == "resp_groq_fake_001",
+        result.request_id == "chatcmpl_groq_fake_001",
         "Groq response id preserved",
     )
     check(
@@ -207,15 +210,22 @@ def main() -> int:
     request = json.loads(
         call["body"].decode("utf-8")
     )
+    response_format = request["response_format"]
+    schema_config = response_format["json_schema"]
 
     check(
-        call["url"] == GROQ_RESPONSES_URL,
-        "Official Groq Responses endpoint",
+        call["url"] == GROQ_CHAT_COMPLETIONS_URL,
+        "Official Groq Chat Completions endpoint",
     )
     check(
         call["headers"]["Authorization"]
         == "Bearer groq-test-secret",
         "Bearer authentication header",
+    )
+    check(
+        call["headers"]["User-Agent"]
+        == "ThesisOS-AI-Brief/0.5",
+        "Stable ThesisOS User-Agent header",
     )
     check(
         "groq-test-secret"
@@ -227,14 +237,29 @@ def main() -> int:
         "Configured Groq model in request",
     )
     check(
-        request["text"]["format"]["type"]
-        == "json_schema"
-        and request["text"]["format"]["strict"]
-        is True,
+        request["max_completion_tokens"]
+        == GROQ_MAX_COMPLETION_TOKENS,
+        "Groq output budget increased",
+    )
+    check(
+        request["reasoning_effort"] == "low",
+        "Groq reasoning effort reduced",
+    )
+    check(
+        request["include_reasoning"] is False,
+        "Groq reasoning excluded from response",
+    )
+    check(
+        422 in RETRYABLE_HTTP_STATUSES,
+        "Groq semantic generation errors retryable",
+    )
+    check(
+        response_format["type"] == "json_schema"
+        and schema_config["strict"] is True,
         "Strict Structured Outputs enabled",
     )
     check(
-        request["text"]["format"]["schema"][
+        schema_config["schema"][
             "additionalProperties"
         ]
         is False,
@@ -245,21 +270,27 @@ def main() -> int:
         "No Groq tools enabled",
     )
     check(
+        "store" not in request,
+        "No storage parameter sent",
+    )
+    check(
         bundle["payload_sha256"]
-        in request["input"][1]["content"],
+        in request["messages"][1]["content"],
         "Grounding hash sent to Groq",
     )
     check(
-        "Do not browse" in request["input"][0]["content"],
+        "Do not browse"
+        in request["messages"][0]["content"],
         "System instruction forbids browsing",
     )
     check(
-        "groq-test-secret" not in repr(selected),
+        "groq-test-secret" not in repr(provider),
         "Groq provider repr redacts key",
     )
     check(
-        "OpenAIResponsesProvider" not in repr(selected),
-        "Groq repr exposes no delegate",
+        GroqResponsesProvider
+        is GroqChatCompletionsProvider,
+        "Legacy Groq class alias preserved",
     )
 
     sleeps = []
@@ -271,7 +302,7 @@ def main() -> int:
         ),
         success_response(),
     ])
-    retry_provider = GroqResponsesProvider(
+    retry_provider = GroqChatCompletionsProvider(
         api_key="groq-test-secret",
         model=GROQ_DEFAULT_MODEL,
         transport=retry_transport,
@@ -289,7 +320,8 @@ def main() -> int:
     )
     check(
         all(
-            call["url"] == GROQ_RESPONSES_URL
+            call["url"]
+            == GROQ_CHAT_COMPLETIONS_URL
             for call in retry_transport.calls
         ),
         "Retries remain on Groq endpoint",
@@ -305,7 +337,7 @@ def main() -> int:
     auth_failed = False
 
     try:
-        GroqResponsesProvider(
+        GroqChatCompletionsProvider(
             api_key="groq-test-secret",
             model=GROQ_DEFAULT_MODEL,
             transport=auth_transport,
@@ -326,62 +358,93 @@ def main() -> int:
         "Authentication error is not retried",
     )
 
-    factory_transport = SequenceTransport([
-        success_response()
-    ])
+    malformed = TransportResponse(
+        status=200,
+        headers={},
+        body=json.dumps({
+            "id": "chatcmpl_bad",
+            "model": GROQ_DEFAULT_MODEL,
+            "choices": [{
+                "message": {
+                    "content": "not-json",
+                }
+            }],
+        }).encode("utf-8"),
+    )
+    malformed_failed = False
+
+    try:
+        GroqChatCompletionsProvider(
+            api_key="groq-test-secret",
+            model=GROQ_DEFAULT_MODEL,
+            transport=SequenceTransport([malformed]),
+            sleep_fn=lambda _: None,
+        ).generate(
+            bundle,
+            timeout_seconds=15.0,
+        )
+    except ProviderContractError:
+        malformed_failed = True
+
+    check(
+        malformed_failed,
+        "Malformed structured content rejected",
+    )
+
     built = build_groq_provider(
         config(),
         environ={
             GROQ_API_KEY_ENV: "factory-groq-key",
         },
-        transport=factory_transport,
+        transport=SequenceTransport([
+            success_response()
+        ]),
         sleep_fn=lambda _: None,
     )
 
     check(
-        isinstance(built, GroqResponsesProvider),
+        isinstance(
+            built,
+            GroqChatCompletionsProvider,
+        ),
         "Groq provider factory",
     )
-
-    disabled = build_groq_provider(
-        config(enabled=False),
-        environ={
-            GROQ_API_KEY_ENV: "factory-groq-key",
-        },
-    )
     check(
-        disabled is None,
+        build_groq_provider(
+            config(enabled=False),
+            environ={
+                GROQ_API_KEY_ENV: "factory-groq-key",
+            },
+        )
+        is None,
         "Factory blocked while feature disabled",
     )
-
-    unsupported = build_groq_provider(
-        config(provider="openai"),
-        environ={
-            GROQ_API_KEY_ENV: "factory-groq-key",
-        },
-    )
     check(
-        unsupported is None,
+        build_groq_provider(
+            config(provider="openai"),
+            environ={
+                GROQ_API_KEY_ENV: "factory-groq-key",
+            },
+        )
+        is None,
         "Unsupported provider not constructed",
     )
-
-    missing_key = build_groq_provider(
-        config(),
-        environ={},
-    )
     check(
-        missing_key is None,
+        build_groq_provider(
+            config(),
+            environ={},
+        )
+        is None,
         "Missing Groq key prevents construction",
     )
-
-    missing_model = build_groq_provider(
-        config(model=""),
-        environ={
-            GROQ_API_KEY_ENV: "factory-groq-key",
-        },
-    )
     check(
-        missing_model is None,
+        build_groq_provider(
+            config(model=""),
+            environ={
+                GROQ_API_KEY_ENV: "factory-groq-key",
+            },
+        )
+        is None,
         "Missing Groq model prevents construction",
     )
 
@@ -390,9 +453,14 @@ def main() -> int:
     ).read_text(encoding="utf-8")
 
     check(
-        "api.groq.com/openai/v1/responses"
+        "api.groq.com/openai/v1/chat/completions"
         in source,
-        "Groq endpoint is explicit",
+        "Groq Chat endpoint is explicit",
+    )
+    check(
+        "api.groq.com/openai/v1/responses"
+        not in source,
+        "Groq Responses endpoint removed",
     )
     check(
         "THESISOS_AI_BRIEF_GROQ_API_KEY"

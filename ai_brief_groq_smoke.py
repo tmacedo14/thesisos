@@ -10,20 +10,20 @@ from typing import Any, Callable, Mapping
 
 from ai_brief_groq import (
     GROQ_API_KEY_ENV,
+    GROQ_CHAT_COMPLETIONS_URL,
     GROQ_DEFAULT_MODEL,
     GROQ_PROVIDER_NAME,
-    GROQ_RESPONSES_URL,
-    GroqResponsesProvider,
+    GroqChatCompletionsProvider,
     build_groq_provider,
 )
 from ai_brief_live_smoke import (
-    SingleActualRequestTransport,
+    LiveSmokeLimitError,
+    LiveSmokeValidationError,
     _redact_error,
     load_grounding_fixture,
     validate_contract,
 )
 from ai_brief_openai import (
-    MAX_ATTEMPTS,
     TransportResponse,
     urllib_transport,
 )
@@ -76,6 +76,155 @@ def _config(
     )
 
 
+def _safe_usage(value: Any) -> dict:
+    if not isinstance(value, Mapping):
+        return {}
+
+    result = {}
+
+    for field in (
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+    ):
+        raw = value.get(field)
+
+        if isinstance(raw, int) and raw >= 0:
+            result[field] = raw
+
+    return result
+
+
+class SingleActualRequestTransport:
+    def __init__(
+        self,
+        inner: Callable[..., TransportResponse],
+    ) -> None:
+        self.inner = inner
+        self.attempts = 0
+        self.actual_calls = 0
+        self.response_id: str | None = None
+        self.request_id: str | None = None
+        self.usage: dict = {}
+        self.request_metadata: dict = {}
+
+    def __call__(
+        self,
+        *,
+        url: str,
+        headers: Mapping[str, str],
+        body: bytes,
+        timeout_seconds: float,
+    ) -> TransportResponse:
+        self.attempts += 1
+
+        if self.actual_calls >= 1:
+            raise LiveSmokeLimitError(
+                "A second real Groq request was blocked."
+            )
+
+        try:
+            request_payload = json.loads(
+                body.decode("utf-8")
+            )
+        except Exception as error:
+            raise LiveSmokeValidationError(
+                "Groq request must be valid JSON."
+            ) from error
+
+        if not isinstance(request_payload, dict):
+            raise LiveSmokeValidationError(
+                "Groq request must be a JSON object."
+            )
+
+        if "tools" in request_payload:
+            raise LiveSmokeValidationError(
+                "Groq tools are not allowed."
+            )
+
+        if "store" in request_payload:
+            raise LiveSmokeValidationError(
+                "Groq Chat request must not send store."
+            )
+
+        response_format = request_payload.get(
+            "response_format"
+        )
+
+        if not isinstance(response_format, Mapping):
+            raise LiveSmokeValidationError(
+                "Groq response_format is missing."
+            )
+
+        schema_config = response_format.get(
+            "json_schema"
+        )
+
+        if not isinstance(schema_config, Mapping):
+            raise LiveSmokeValidationError(
+                "Groq json_schema is missing."
+            )
+
+        if (
+            response_format.get("type") != "json_schema"
+            or schema_config.get("strict") is not True
+        ):
+            raise LiveSmokeValidationError(
+                "Groq strict Structured Outputs are required."
+            )
+
+        self.request_metadata = {
+            "endpoint": url,
+            "model": request_payload.get("model"),
+            "store_parameter_sent": (
+                "store" in request_payload
+            ),
+            "strict": schema_config.get("strict"),
+            "format_type": response_format.get("type"),
+            "max_completion_tokens": (
+                request_payload.get(
+                    "max_completion_tokens"
+                )
+            ),
+            "tools_enabled": (
+                "tools" in request_payload
+            ),
+            "request_bytes": len(body),
+        }
+        self.actual_calls += 1
+
+        response = self.inner(
+            url=url,
+            headers=headers,
+            body=body,
+            timeout_seconds=timeout_seconds,
+        )
+
+        try:
+            payload = json.loads(
+                response.body.decode("utf-8")
+            )
+        except Exception:
+            payload = {}
+
+        if isinstance(payload, Mapping):
+            response_id = payload.get("id")
+
+            if isinstance(response_id, str):
+                self.response_id = response_id
+
+            self.usage = _safe_usage(
+                payload.get("usage")
+            )
+
+        for name, value in response.headers.items():
+            if str(name).lower() == "x-request-id":
+                self.request_id = str(value)
+                break
+
+        return response
+
+
 def dry_run_summary(
     environ: Mapping[str, str] | None = None,
 ) -> dict:
@@ -99,15 +248,17 @@ def dry_run_summary(
             "Groq dry-run attempted network access."
         )
 
-    provider = GroqResponsesProvider(
+    provider = GroqChatCompletionsProvider(
         api_key="groq-dry-run-placeholder",
         model=config.model or GROQ_DEFAULT_MODEL,
         transport=no_network,
         sleep_fn=lambda _: None,
     )
     request = provider._request_payload(bundle)
-    response_format = (
-        request.get("text", {}).get("format", {})
+    response_format = request.get("response_format", {})
+    schema_config = response_format.get(
+        "json_schema",
+        {},
     )
 
     return {
@@ -121,21 +272,21 @@ def dry_run_summary(
         ),
         "provider": GROQ_PROVIDER_NAME,
         "model": config.model,
-        "endpoint": GROQ_RESPONSES_URL,
+        "endpoint": GROQ_CHAT_COMPLETIONS_URL,
         "grounding_status": bundle["coverage"]["status"],
         "grounding_hash_prefix": (
             bundle["payload_sha256"][:16]
         ),
         "strict_structured_outputs": (
-            response_format.get("type") == "json_schema"
-            and response_format.get("strict") is True
+            response_format.get("type")
+            == "json_schema"
+            and schema_config.get("strict") is True
         ),
         "tools_enabled": "tools" in request,
-        "store_will_be_forced_false": True,
-        "max_output_tokens": request.get(
-            "max_output_tokens"
+        "store_parameter_sent": "store" in request,
+        "max_completion_tokens": request.get(
+            "max_completion_tokens"
         ),
-        "adapter_max_attempts": MAX_ATTEMPTS,
         "actual_request_limit": 1,
         "runtime_activated": False,
     }
@@ -281,16 +432,22 @@ def run_live(
         error_metadata = {}
 
     status = brief.get("status")
+    request_metadata = (
+        single_transport.request_metadata
+    )
     success = bool(
         status in {"ready", "partial"}
         and schema_valid
         and single_transport.actual_calls == 1
-        and single_transport.request_metadata.get(
-            "endpoint"
+        and request_metadata.get("endpoint")
+        == GROQ_CHAT_COMPLETIONS_URL
+        and request_metadata.get(
+            "store_parameter_sent"
         )
-        == GROQ_RESPONSES_URL
-        and single_transport.request_metadata.get(
-            "store"
+        is False
+        and request_metadata.get("strict") is True
+        and request_metadata.get(
+            "tools_enabled"
         )
         is False
     )

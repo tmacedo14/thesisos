@@ -1,8 +1,8 @@
-# AI Investment Brief — Groq Adapter v1
+# AI Investment Brief — Groq Adapter v2
 
 ## Estado
 
-Este adapter é experimental e isolado.
+Este adapter continua experimental e isolado.
 
 Ainda não está ligado ao `server.py`, ao endpoint autenticado ou ao botão do
 frontend. A feature flag normal continua desativada.
@@ -11,12 +11,27 @@ frontend. A feature flag normal continua desativada.
 
 - Provider: `groq`
 - Modelo recomendado: `openai/gpt-oss-120b`
-- Endpoint: `https://api.groq.com/openai/v1/responses`
+- Endpoint: `https://api.groq.com/openai/v1/chat/completions`
 - Secret: `THESISOS_AI_BRIEF_GROQ_API_KEY`
 
-O adapter reutiliza o pedido, schema, parsing, retries e normalização já
-testados pelo adapter OpenAI, mas redireciona o transporte para o endpoint
-Groq e normaliza o provider final como `groq`.
+Para reduzir falhas ocasionais em gerações longas, o pedido usa:
+
+- `reasoning_effort: low`;
+- `include_reasoning: false`;
+- `max_completion_tokens: 3200`;
+- retry de erros HTTP `422` no provider normal.
+
+A integração passou da Groq Responses API para Chat Completions porque:
+
+- autenticação, modelo e inferência foram validados;
+- a Responses API mínima funcionou;
+- o pedido completo ThesisOS recebeu `403`;
+- o mesmo grounding e o mesmo JSON Schema estrito funcionaram através de
+  Chat Completions com `HTTP 200` e contrato válido.
+
+O adapter continua a reutilizar o construtor de pedido do adapter OpenAI para
+preservar as instruções, o grounding, o SHA-256 e o schema ThesisOS. Apenas o
+formato HTTP específico da Groq é convertido para Chat Completions.
 
 ## Segurança
 
@@ -25,17 +40,16 @@ Groq e normaliza o provider final como `groq`.
 - grounding ThesisOS validado por SHA-256;
 - Structured Outputs com `strict=true`;
 - nenhum tool, browser ou function call;
-- `store=false` forçado no smoke test;
-- uma chamada HTTP real no máximo por processo;
+- o pedido Chat Completions não envia o parâmetro `store`;
+- uma chamada HTTP real no máximo por processo de smoke;
 - CI apenas com transportes falsos;
 - conteúdo integral do brief não é impresso pelo smoke.
 
-Antes de utilizar dados reais, ativar Zero Data Retention nos Data Controls
-da organização GroqCloud.
+Manter Zero Data Retention ativado nos Data Controls da organização GroqCloud.
 
 ## Dry-run
 
-Sem chave e sem rede:
+Sem rede:
 
 ```bash
 python3 ai_brief_groq_smoke.py --dry-run
@@ -48,15 +62,12 @@ Resultado esperado:
 - `model: openai/gpt-oss-120b`
 - `strict_structured_outputs: true`
 - `tools_enabled: false`
+- `store_parameter_sent: false`
 - `runtime_activated: false`
 
 ## Uma chamada real
 
-Depois de criar o Replit Secret:
-
-`THESISOS_AI_BRIEF_GROQ_API_KEY`
-
-executar:
+Com o Replit Secret `THESISOS_AI_BRIEF_GROQ_API_KEY` configurado:
 
 ```bash
 THESISOS_AI_BRIEF_MODEL=openai/gpt-oss-120b \
@@ -70,16 +81,14 @@ Um resultado bem-sucedido deve apresentar:
 - `transport_attempts: 1`
 - `status: ready` ou `partial`
 - `schema_valid: true`
-- `request.store: false`
+- `request.store_parameter_sent: false`
+- `request.strict: true`
+- `request.tools_enabled: false`
 - `success: true`
 - `runtime_activated: false`
 
 ## Próxima decisão
 
-Só depois do smoke real passar deverá ser criado o patch separado que:
-
-1. reconhece o secret Groq em `ProviderConfig`;
-2. adiciona `groq` ao provider registry;
-3. liga a factory Groq ao runtime;
-4. mantém o provider desativado por defeito;
-5. testa o botão numa Beta controlada.
+Só depois do smoke real passar novamente deverá ser criado um patch separado
+para ligar `groq` ao runtime. Essa integração deve continuar desativada por
+defeito e preservar o adapter OpenAI.
