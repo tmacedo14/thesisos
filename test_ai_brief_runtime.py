@@ -137,7 +137,8 @@ def run_pure_tests() -> None:
     )
 
     check(
-        config["supported_providers"] == ["openai"],
+        config["supported_providers"]
+        == ["openai", "groq"],
         "Runtime supported-provider registry",
     )
 
@@ -157,13 +158,56 @@ def run_pure_tests() -> None:
 
     check(
         "THESISOS_AI_BRIEF_API_KEY"
+        not in serialized_config
+        and "THESISOS_AI_BRIEF_GROQ_API_KEY"
         not in serialized_config,
-        "Configuration excludes API-key name",
+        "Configuration excludes API-key names",
     )
 
     check(
         "secret" not in serialized_config.lower(),
         "Configuration excludes secret material",
+    )
+
+    groq_public_config = (
+        server.public_ai_brief_configuration(
+            {
+                "THESISOS_AI_BRIEF_ENABLED": "true",
+                "THESISOS_AI_BRIEF_PROVIDER": "groq",
+                "THESISOS_AI_BRIEF_MODEL": (
+                    "openai/gpt-oss-120b"
+                ),
+                "THESISOS_AI_BRIEF_GROQ_API_KEY": (
+                    "configured-but-not-exposed"
+                ),
+            }
+        )
+    )
+
+    check(
+        groq_public_config["api_key_configured"] is True,
+        "Groq dedicated secret recognized",
+    )
+
+    groq_with_generic_key = (
+        server.public_ai_brief_configuration(
+            {
+                "THESISOS_AI_BRIEF_ENABLED": "true",
+                "THESISOS_AI_BRIEF_PROVIDER": "groq",
+                "THESISOS_AI_BRIEF_MODEL": (
+                    "openai/gpt-oss-120b"
+                ),
+                "THESISOS_AI_BRIEF_API_KEY": (
+                    "wrong-secret-for-groq"
+                ),
+            }
+        )
+    )
+
+    check(
+        groq_with_generic_key["api_key_configured"]
+        is False,
+        "Groq rejects generic OpenAI secret",
     )
 
     normalized = server.normalize_ai_brief_request(
@@ -253,6 +297,98 @@ def run_pure_tests() -> None:
     check(
         len(brief["grounding"]["payload_sha256"]) == 64,
         "Runtime grounding hash",
+    )
+
+    openai_environ = {
+        "THESISOS_AI_BRIEF_ENABLED": "true",
+        "THESISOS_AI_BRIEF_PROVIDER": "openai",
+        "THESISOS_AI_BRIEF_MODEL": "test-openai-model",
+        "THESISOS_AI_BRIEF_API_KEY": "test-openai-key",
+    }
+    openai_config = server.ProviderConfig.from_env(
+        openai_environ
+    )
+    openai_provider = (
+        server.build_ai_brief_runtime_provider(
+            openai_config,
+            environ=openai_environ,
+        )
+    )
+
+    check(
+        openai_provider is not None
+        and openai_provider.__class__.__name__
+        == "OpenAIResponsesProvider",
+        "Runtime selects OpenAI provider",
+    )
+
+    groq_environ = {
+        "THESISOS_AI_BRIEF_ENABLED": "true",
+        "THESISOS_AI_BRIEF_PROVIDER": "groq",
+        "THESISOS_AI_BRIEF_MODEL": (
+            "openai/gpt-oss-120b"
+        ),
+        "THESISOS_AI_BRIEF_GROQ_API_KEY": (
+            "test-groq-key"
+        ),
+    }
+    groq_config = server.ProviderConfig.from_env(
+        groq_environ
+    )
+    groq_provider = (
+        server.build_ai_brief_runtime_provider(
+            groq_config,
+            environ=groq_environ,
+        )
+    )
+
+    check(
+        groq_provider is not None
+        and groq_provider.__class__.__name__
+        == "GroqChatCompletionsProvider",
+        "Runtime selects Groq provider",
+    )
+
+    unknown_environ = {
+        "THESISOS_AI_BRIEF_ENABLED": "true",
+        "THESISOS_AI_BRIEF_PROVIDER": "unknown",
+        "THESISOS_AI_BRIEF_MODEL": "unknown-model",
+        "THESISOS_AI_BRIEF_API_KEY": "test-key",
+    }
+    unknown_config = server.ProviderConfig.from_env(
+        unknown_environ
+    )
+
+    check(
+        server.build_ai_brief_runtime_provider(
+            unknown_config,
+            environ=unknown_environ,
+        )
+        is None,
+        "Runtime rejects unknown provider",
+    )
+
+    missing_groq_key = {
+        "THESISOS_AI_BRIEF_ENABLED": "true",
+        "THESISOS_AI_BRIEF_PROVIDER": "groq",
+        "THESISOS_AI_BRIEF_MODEL": (
+            "openai/gpt-oss-120b"
+        ),
+    }
+    missing_groq_config = (
+        server.ProviderConfig.from_env(
+            missing_groq_key
+        )
+    )
+
+    check(
+        missing_groq_config.api_key_configured is False
+        and server.build_ai_brief_runtime_provider(
+            missing_groq_config,
+            environ=missing_groq_key,
+        )
+        is None,
+        "Runtime blocks Groq without dedicated secret",
     )
 
     configured_without_provider, configured_status = (
@@ -355,11 +491,19 @@ def run_pure_tests() -> None:
 
     check(
         (
-            "provider_builder=build_openai_provider"
+            "from ai_brief_groq import "
+            "build_groq_provider"
             in server_source
-            and "provider = provider_builder(" in server_source
+            and '"openai": build_openai_provider'
+            in server_source
+            and '"groq": build_groq_provider'
+            in server_source
+            and (
+                "build_ai_brief_runtime_provider("
+                in server_source
+            )
         ),
-        "Concrete OpenAI provider factory wired",
+        "OpenAI and Groq runtime factories wired",
     )
 
     check(

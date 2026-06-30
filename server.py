@@ -32,6 +32,7 @@ from ai_brief_cache import (
     generate_ai_brief_with_cache,
 )
 from ai_brief_grounding import build_grounding_bundle
+from ai_brief_groq import build_groq_provider
 from ai_brief_openai import build_openai_provider
 from ai_brief_provider import (
     ProviderConfig,
@@ -9478,7 +9479,7 @@ def public_ai_brief_configuration(
         "feature": "ai_investment_brief",
         **config,
         "http_provider_implemented": True,
-        "supported_providers": ["openai"],
+        "supported_providers": ["openai", "groq"],
         "authentication_required": True,
         "cache": cache_configuration(environ),
         "request_limit_bytes": AI_BRIEF_MAX_REQUEST_BYTES,
@@ -9605,12 +9606,35 @@ def consume_ai_brief_rate_limit(
     return True, 0
 
 
+def build_ai_brief_runtime_provider(
+    config: ProviderConfig,
+    *,
+    environ: dict | None = None,
+):
+    provider_name = str(
+        config.provider or ""
+    ).strip().lower()
+    builders = {
+        "openai": build_openai_provider,
+        "groq": build_groq_provider,
+    }
+    builder = builders.get(provider_name)
+
+    if builder is None:
+        return None
+
+    return builder(
+        config,
+        environ=environ,
+    )
+
+
 def build_ai_brief_runtime_response(
     body: dict,
     *,
     environ: dict | None = None,
     analysis_resolver=None,
-    provider_builder=build_openai_provider,
+    provider_builder=None,
     brief_cache=None,
 ) -> tuple[dict, int]:
     request = normalize_ai_brief_request(body)
@@ -9655,10 +9679,18 @@ def build_ai_brief_runtime_response(
         analysis_payload
     )
     config = ProviderConfig.from_env(environ)
-    provider = provider_builder(
-        config,
-        environ=environ,
-    )
+
+    if provider_builder is None:
+        provider = build_ai_brief_runtime_provider(
+            config,
+            environ=environ,
+        )
+    else:
+        provider = provider_builder(
+            config,
+            environ=environ,
+        )
+
     cache = brief_cache or _AI_BRIEF_CACHE
     brief = generate_ai_brief_with_cache(
         grounding_bundle,

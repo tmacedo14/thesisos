@@ -17,6 +17,7 @@ FEATURE_FLAG_ENV = "THESISOS_AI_BRIEF_ENABLED"
 PROVIDER_ENV = "THESISOS_AI_BRIEF_PROVIDER"
 MODEL_ENV = "THESISOS_AI_BRIEF_MODEL"
 API_KEY_ENV = "THESISOS_AI_BRIEF_API_KEY"
+GROQ_API_KEY_ENV = "THESISOS_AI_BRIEF_GROQ_API_KEY"
 TIMEOUT_ENV = "THESISOS_AI_BRIEF_TIMEOUT_SECONDS"
 
 DEFAULT_TIMEOUT_SECONDS = 20.0
@@ -103,8 +104,14 @@ class ProviderConfig:
         timeout_seconds = _parse_timeout(
             source.get(TIMEOUT_ENV)
         )
+        provider_name = str(provider or "").strip().lower()
+        api_key_env = (
+            GROQ_API_KEY_ENV
+            if provider_name == "groq"
+            else API_KEY_ENV
+        )
         api_key_configured = bool(
-            _clean_optional(source.get(API_KEY_ENV))
+            _clean_optional(source.get(api_key_env))
         )
 
         return cls(
