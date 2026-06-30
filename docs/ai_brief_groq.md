@@ -133,3 +133,16 @@ grounding before it reaches the frontend.
   also removed from narrative fields, not only from the dedicated
   portfolio fields.
 - The canonical grounding bundle and `payload_sha256` are not changed.
+
+### Decision action aliases
+
+The AI Brief adapter translates internal framework actions into the
+public brief contract before the canonical grounding hash is computed.
+The current deterministic alias is:
+
+- `monitor` → `watch`
+
+The source analysis payload is not mutated. Providers therefore receive
+`watch`, which is valid in the response schema, while the internal
+framework may continue to use `monitor`. The same alias is applied
+defensively to provider output before action validation.

@@ -185,6 +185,56 @@ def main() -> int:
         "Input payload is not mutated",
     )
 
+    monitor_payload = ready_payload()
+    monitor_payload["framework_engine"]["decision"] = {
+        "status": "awaiting_full_assessment",
+        "action": "monitor",
+        "label": "Await qualitative review",
+        "buy_hold_avoid_sell": None,
+        "entry_zone": None,
+        "position_size": None,
+    }
+
+    monitor_bundle = build_grounding_bundle(
+        monitor_payload
+    )
+
+    check(
+        monitor_bundle["grounded_data"]["framework"][
+            "decision"
+        ]["action"]
+        == "watch",
+        "Framework monitor action normalized to watch",
+    )
+
+    check(
+        monitor_payload["framework_engine"]["decision"][
+            "action"
+        ]
+        == "monitor",
+        "Decision normalization does not mutate input",
+    )
+
+    check(
+        verify_grounding_hash(monitor_bundle),
+        "Normalized decision included in canonical hash",
+    )
+
+    hold_payload = ready_payload()
+    hold_payload["framework_engine"]["decision"] = {
+        "action": "hold",
+    }
+
+    hold_bundle = build_grounding_bundle(hold_payload)
+
+    check(
+        hold_bundle["grounded_data"]["framework"][
+            "decision"
+        ]["action"]
+        == "hold",
+        "Supported framework action remains unchanged",
+    )
+
     check(
         bundle["source"] == "thesisos",
         "ThesisOS-only source",

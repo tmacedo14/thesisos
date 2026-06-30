@@ -163,6 +163,43 @@ def _sensitive_key(key: str) -> bool:
     )
 
 
+AI_BRIEF_DECISION_ACTION_ALIASES = {
+    "monitor": "watch",
+}
+
+
+def normalize_ai_brief_decision_action(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+
+    normalized = value.strip().casefold()
+
+    return AI_BRIEF_DECISION_ACTION_ALIASES.get(
+        normalized,
+        normalized,
+    )
+
+
+def _normalize_framework_decision_action(
+    sections: dict[str, Any],
+) -> None:
+    framework = sections.get("framework")
+
+    if not isinstance(framework, dict):
+        return
+
+    decision = framework.get("decision")
+
+    if not isinstance(decision, dict):
+        return
+
+    action = normalize_ai_brief_decision_action(
+        decision.get("action")
+    )
+
+    if isinstance(action, str) and action:
+        decision["action"] = action
+
 def _sanitize_value(value: Any, depth: int = 0) -> Any:
     if depth > MAX_DEPTH:
         return "[truncated:max_depth]"
@@ -621,6 +658,8 @@ def build_grounding_bundle(
     payload_copy = deepcopy(dict(analysis_payload))
     asset, asset_type_declared = _build_asset(payload_copy)
     sections = _build_sections(payload_copy)
+
+    _normalize_framework_decision_action(sections)
     completeness = _completeness(payload_copy, sections)
 
     evidence_refs = _deduplicate_references(

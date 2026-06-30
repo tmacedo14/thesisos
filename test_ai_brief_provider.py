@@ -440,6 +440,39 @@ def main() -> int:
         "Provider receives valid grounding",
     )
 
+    monitor_analysis = analysis_payload()
+    monitor_analysis["framework_engine"]["decision"] = {
+        "status": "awaiting_full_assessment",
+        "action": "monitor",
+        "label": "Await qualitative review",
+        "buy_hold_avoid_sell": None,
+        "entry_zone": None,
+        "position_size": None,
+    }
+    monitor_bundle = build_grounding_bundle(
+        monitor_analysis
+    )
+    monitor_provider = RecordingProvider()
+
+    monitor_brief = generate_ai_brief(
+        monitor_bundle,
+        configured(),
+        monitor_provider,
+    )
+
+    check(
+        monitor_provider.last_bundle["grounded_data"][
+            "framework"
+        ]["decision"]["action"]
+        == "watch",
+        "Provider receives normalized framework action",
+    )
+
+    check(
+        monitor_brief["decision"]["action"] == "watch",
+        "Normalized framework action supports watch decision",
+    )
+
     check(
         success["grounding"]["payload_sha256"]
         == ready_bundle["payload_sha256"],
@@ -466,6 +499,20 @@ def main() -> int:
     check(
         success["decision"]["action"] == "watch",
         "Provider decision accepted",
+    )
+
+    monitor_content = valid_content()
+    monitor_content["decision"]["action"] = "monitor"
+
+    normalized_monitor = generate_ai_brief(
+        ready_bundle,
+        configured(),
+        RecordingProvider(content=monitor_content),
+    )
+
+    check(
+        normalized_monitor["decision"]["action"] == "watch",
+        "Provider monitor alias normalized to watch",
     )
 
     check(

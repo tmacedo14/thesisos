@@ -12,6 +12,7 @@ from ai_brief_grounding import (
     brief_grounding_metadata,
     generation_allowed,
     verify_grounding_hash,
+    normalize_ai_brief_decision_action,
 )
 
 
@@ -860,7 +861,9 @@ def _validate_provider_content(
             "provider decision must be a mapping"
         )
 
-    action = _clean_optional(raw_decision.get("action"))
+    action = normalize_ai_brief_decision_action(
+        _clean_optional(raw_decision.get("action"))
+    )
 
     if action not in ALLOWED_DECISION_ACTIONS:
         raise ProviderContractError(
