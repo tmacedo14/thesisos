@@ -92,3 +92,24 @@ Um resultado bem-sucedido deve apresentar:
 Só depois do smoke real passar novamente deverá ser criado um patch separado
 para ligar `groq` ao runtime. Essa integração deve continuar desativada por
 defeito e preservar o adapter OpenAI.
+
+## Deterministic transport projection
+
+Groq requests use a provider-specific compact projection of the
+canonical ThesisOS grounding bundle. The canonical bundle is still
+validated before provider execution and its `payload_sha256` remains
+the identity used by the final brief, cache and observability layers.
+
+The projection removes exact framework snapshot duplicates, limits
+event and evidence-reference detail, truncates long narrative fields,
+and retains explicit omitted-item counts. It does not mutate the
+canonical bundle.
+
+Safety ceilings:
+
+- projected grounding: 11,000 bytes;
+- complete Groq request: 16,000 bytes;
+- no tools, browsing or storage parameters;
+- strict JSON Schema output remains enabled.
+
+Requests exceeding either ceiling fail locally before transport.

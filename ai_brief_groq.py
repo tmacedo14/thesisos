@@ -5,6 +5,10 @@ import os
 import time
 from typing import Any, Callable, Mapping
 
+from ai_brief_groq_projection import (
+    GROQ_MAX_REQUEST_BYTES,
+    project_grounding_for_groq,
+)
 from ai_brief_openai import (
     HttpTransport,
     OpenAIResponsesProvider,
@@ -117,8 +121,13 @@ class GroqChatCompletionsProvider:
         self,
         grounding_bundle: Mapping[str, Any],
     ) -> dict:
+        projected_grounding = (
+            project_grounding_for_groq(
+                grounding_bundle
+            )
+        )
         source = self._request_builder._request_payload(
-            grounding_bundle
+            projected_grounding
         )
         source_input = source.get("input")
         text_format = (
@@ -175,7 +184,7 @@ class GroqChatCompletionsProvider:
                 "content": content,
             })
 
-        return {
+        request_payload = {
             "model": self.model,
             "messages": messages,
             "response_format": {
@@ -192,6 +201,22 @@ class GroqChatCompletionsProvider:
             "reasoning_effort": "low",
             "include_reasoning": False,
         }
+
+        request_size = len(
+            json.dumps(
+                request_payload,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+
+        if request_size > GROQ_MAX_REQUEST_BYTES:
+            raise ProviderGenerationError(
+                "Groq request exceeds the configured "
+                "input budget."
+            )
+
+        return request_payload
 
     def _parse_response(
         self,

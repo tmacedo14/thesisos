@@ -58,6 +58,7 @@ jobs:
             test_ai_brief_cache.py \
             test_ai_brief_openai.py \
             test_ai_brief_groq.py \
+            test_ai_brief_groq_projection.py \
             test_ai_brief_groq_smoke.py \
             test_ai_brief_runtime.py \
             test_ai_brief_frontend.py \
@@ -74,6 +75,7 @@ jobs:
           python test_ai_brief_cache.py
           python test_ai_brief_openai.py
           python test_ai_brief_groq.py
+          python test_ai_brief_groq_projection.py
           python test_ai_brief_groq_smoke.py
           python test_ai_brief_runtime.py
           python test_ai_brief_frontend.py
