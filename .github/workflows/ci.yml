@@ -52,9 +52,13 @@ jobs:
             ai_brief_grounding.py \
             ai_brief_provider.py \
             ai_brief_openai.py \
+            ai_brief_groq.py \
+            ai_brief_groq_smoke.py \
             test_http_security.py \
             test_ai_brief_cache.py \
             test_ai_brief_openai.py \
+            test_ai_brief_groq.py \
+            test_ai_brief_groq_smoke.py \
             test_ai_brief_runtime.py \
             test_ai_brief_frontend.py \
             test_ai_brief_live_smoke.py \
@@ -69,6 +73,8 @@ jobs:
           python test_http_security.py
           python test_ai_brief_cache.py
           python test_ai_brief_openai.py
+          python test_ai_brief_groq.py
+          python test_ai_brief_groq_smoke.py
           python test_ai_brief_runtime.py
           python test_ai_brief_frontend.py
           python test_ai_brief_live_smoke.py

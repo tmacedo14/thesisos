@@ -422,3 +422,11 @@ OpenAI Responses API sem ativar o provider no runtime normal. O modo
 predefinido é dry-run, uma segunda ida à rede é bloqueada, `store=false` é
 forçado e a saída contém apenas metadados e usage. Ver
 `docs/ai_brief_live_smoke.md`.
+
+## Groq AI Brief Adapter v1
+
+O repositório inclui um adapter Groq experimental e um smoke test manual para
+`openai/gpt-oss-120b`. O adapter preserva o grounding e o contrato ThesisOS,
+usa Structured Outputs estritos, não ativa tools e mantém o runtime normal
+desligado. A chave usa o secret dedicado
+`THESISOS_AI_BRIEF_GROQ_API_KEY`. Ver `docs/ai_brief_groq.md`.
