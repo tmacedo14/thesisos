@@ -15,6 +15,15 @@ from ai_brief_provider import (
     ProviderContractError,
     ProviderResult,
     ProviderUnavailableError,
+    MISSING_PORTFOLIO_LIMITATION,
+    NEXT_REVIEW_UNAVAILABLE,
+    PORTFOLIO_FIT_UNAVAILABLE,
+    POSITION_SIZING_UNAVAILABLE,
+    UNSUPPORTED_CATALYST_LIMITATION,
+    UNSUPPORTED_NEXT_REVIEW_LIMITATION,
+    UNSUPPORTED_CLAIM_FALLBACK,
+    UNSUPPORTED_NARRATIVE_CLAIM_LIMITATION,
+    UNSUPPORTED_PORTFOLIO_LANGUAGE_LIMITATION,
     generate_ai_brief,
     provider_configuration,
 )
@@ -73,6 +82,14 @@ def analysis_payload(*, complete: bool = True) -> dict:
         },
         "evidence": {
             "status": "ok",
+            "events": [
+                {
+                    "headline": "Next official results.",
+                    "summary": "Next official filing.",
+                    "event_date": "2026-07-31",
+                    "source_kind": "official",
+                },
+            ],
         },
         "portfolio_fit": {
             "status": "ok",
@@ -452,6 +469,18 @@ def main() -> int:
     )
 
     check(
+        success["sections"]["catalysts"]
+        == valid_content()["sections"]["catalysts"],
+        "Grounded catalyst retained",
+    )
+
+    check(
+        success["sections"]["next_review"]
+        == valid_content()["sections"]["next_review"],
+        "Grounded next review retained",
+    )
+
+    check(
         common_contract_checks(success),
         "Ready output matches common contract",
     )
@@ -469,6 +498,154 @@ def main() -> int:
     check(
         partial["status"] == "partial",
         "Partial grounding produces partial brief",
+    )
+
+    missing_context_payload = analysis_payload()
+    missing_context_payload.pop("portfolio_fit")
+    missing_context_payload.pop("market_context")
+    missing_context_bundle = build_grounding_bundle(
+        missing_context_payload
+    )
+    unsupported_content = valid_content()
+    unsupported_content["sections"]["portfolio_fit"] = (
+        "Use a defensive allocation with cautious sizing."
+    )
+    unsupported_content["sections"]["catalysts"] = [
+        (
+            "Potential share repurchase program or dividend "
+            "increase."
+        ),
+        "Next official results.",
+    ]
+    unsupported_content["sections"]["next_review"] = (
+        "Review after a dividend increase."
+    )
+    unsupported_content["decision"]["position_sizing"] = (
+        "Allocate five percent."
+    )
+
+    unsupported_content["sections"]["risks"].append(
+        (
+            "The capital allocation event may signal an upcoming "
+            "share-repurchase program or dividend increase."
+        )
+    )
+    unsupported_content["decision"]["rationale"] = (
+        "Valuation suggests avoiding new sizable positions "
+        "until further data is available."
+    )
+
+    normalized = generate_ai_brief(
+        missing_context_bundle,
+        configured(),
+        RecordingProvider(content=unsupported_content),
+    )
+
+    check(
+        normalized["status"] == "partial",
+        "Missing context remains a partial brief",
+    )
+
+    check(
+        normalized["sections"]["portfolio_fit"]
+        == PORTFOLIO_FIT_UNAVAILABLE,
+        "Portfolio fit normalized when grounding is missing",
+    )
+
+    check(
+        normalized["decision"]["position_sizing"]
+        == POSITION_SIZING_UNAVAILABLE,
+        "Position sizing normalized when grounding is missing",
+    )
+
+    check(
+        normalized["sections"]["catalysts"]
+        == ["Next official results."],
+        "Unsupported catalyst removed and grounded catalyst kept",
+    )
+
+    check(
+        normalized["sections"]["next_review"]
+        == NEXT_REVIEW_UNAVAILABLE,
+        "Unsupported next review normalized",
+    )
+
+    check(
+        MISSING_PORTFOLIO_LIMITATION
+        in normalized["limitations"],
+        "Missing portfolio limitation exposed",
+    )
+
+    check(
+        UNSUPPORTED_CATALYST_LIMITATION
+        in normalized["limitations"],
+        "Unsupported catalyst limitation exposed",
+    )
+
+    check(
+        UNSUPPORTED_NEXT_REVIEW_LIMITATION
+        in normalized["limitations"],
+        "Unsupported next review limitation exposed",
+    )
+
+    check(
+        not any(
+            "repurchase" in risk.casefold()
+            or "dividend increase" in risk.casefold()
+            for risk in normalized["sections"]["risks"]
+        ),
+        "Unsupported corporate-action risk removed",
+    )
+
+    check(
+        normalized["decision"]["rationale"]
+        == UNSUPPORTED_CLAIM_FALLBACK,
+        "Ungrounded portfolio language removed from rationale",
+    )
+
+    check(
+        UNSUPPORTED_NARRATIVE_CLAIM_LIMITATION
+        in normalized["limitations"],
+        "Narrative corporate-action limitation exposed",
+    )
+
+    check(
+        UNSUPPORTED_PORTFOLIO_LANGUAGE_LIMITATION
+        in normalized["limitations"],
+        "Narrative portfolio-language limitation exposed",
+    )
+
+    supported_action_payload = analysis_payload()
+    supported_action_payload["evidence"]["events"].append(
+        {
+            "headline": "Board approves share repurchase program.",
+            "summary": (
+                "The board approved a share repurchase program."
+            ),
+            "event_date": "2026-07-01",
+            "source_kind": "official",
+        }
+    )
+    supported_action_bundle = build_grounding_bundle(
+        supported_action_payload
+    )
+    supported_action_content = valid_content()
+    supported_action_content["sections"]["risks"] = [
+        "The board approved a share repurchase program.",
+    ]
+
+    supported_action = generate_ai_brief(
+        supported_action_bundle,
+        configured(),
+        RecordingProvider(
+            content=supported_action_content,
+        ),
+    )
+
+    check(
+        supported_action["sections"]["risks"]
+        == ["The board approved a share repurchase program."],
+        "Explicitly grounded corporate action retained",
     )
 
     invalid_content = valid_content()

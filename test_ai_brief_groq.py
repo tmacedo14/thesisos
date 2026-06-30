@@ -283,6 +283,18 @@ def main() -> int:
         in request["messages"][0]["content"],
         "System instruction forbids browsing",
     )
+
+    check(
+        "grounded_data.portfolio is absent"
+        in request["messages"][0]["content"],
+        "System instruction blocks ungrounded portfolio sizing",
+    )
+
+    check(
+        "Never infer repurchases"
+        in request["messages"][0]["content"],
+        "System instruction blocks inferred corporate actions",
+    )
     check(
         "groq-test-secret" not in repr(provider),
         "Groq provider repr redacts key",

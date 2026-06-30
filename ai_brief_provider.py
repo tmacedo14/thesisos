@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import re
+import unicodedata
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
@@ -64,6 +66,84 @@ ALLOWED_PROVIDER_CONTENT_KEYS = {
     "sections",
     "decision",
     "limitations",
+}
+
+PORTFOLIO_FIT_UNAVAILABLE = (
+    "Unavailable: portfolio grounding is missing."
+)
+POSITION_SIZING_UNAVAILABLE = (
+    "Unavailable: portfolio grounding is missing."
+)
+NEXT_REVIEW_UNAVAILABLE = (
+    "Unavailable: no explicit grounded review trigger was found."
+)
+MISSING_PORTFOLIO_LIMITATION = (
+    "Portfolio fit and position sizing are unavailable because "
+    "portfolio grounding is missing."
+)
+UNSUPPORTED_CATALYST_LIMITATION = (
+    "Unsupported model-generated catalysts were removed."
+)
+UNSUPPORTED_NEXT_REVIEW_LIMITATION = (
+    "The model-proposed next review trigger was removed because "
+    "it was not supported by grounding."
+)
+
+UNSUPPORTED_NARRATIVE_CLAIM_LIMITATION = (
+    "Unsupported corporate-action statements were removed from "
+    "narrative fields."
+)
+UNSUPPORTED_PORTFOLIO_LANGUAGE_LIMITATION = (
+    "Portfolio-specific allocation or sizing language was removed "
+    "from narrative fields because portfolio grounding is missing."
+)
+UNSUPPORTED_CLAIM_FALLBACK = (
+    "Unavailable: no supported statement remained after grounding "
+    "validation."
+)
+
+_CORPORATE_ACTION_PATTERN = re.compile(
+    r"\b("
+    r"share[- ]?repurchase(?: program)?|"
+    r"repurchase program|"
+    r"buyback|"
+    r"dividend increase|"
+    r"increase(?:d|s|ing)? dividend"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_PORTFOLIO_ADVICE_PATTERN = re.compile(
+    r"\b("
+    r"defensive allocation|"
+    r"cautious sizing|"
+    r"position sizing|"
+    r"sizable positions?|"
+    r"full[- ]?size entry|"
+    r"allocate(?:d|s|ing)?\b|"
+    r"concentration limits?"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_NARRATIVE_LIST_SECTIONS = (
+    "thesis",
+    "strengths",
+    "risks",
+    "invalidation_signals",
+)
+
+_NARRATIVE_TEXT_SECTIONS = (
+    "executive_summary",
+    "valuation",
+    "technical",
+)
+
+_CLAIM_STOPWORDS = {
+    "a", "an", "and", "after", "before", "could", "event",
+    "events", "for", "from", "in", "into", "is", "latest",
+    "may", "next", "of", "on", "or", "pending", "potential",
+    "review", "the", "to", "with",
 }
 
 
@@ -210,6 +290,366 @@ def _text_list(value: Any) -> list[str]:
 
     return result
 
+
+def _meaningful(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, set, dict)):
+        return bool(value)
+    return True
+
+
+def _normalized_text(value: Any) -> str:
+    decomposed = unicodedata.normalize("NFKD", str(value or ""))
+    without_marks = "".join(
+        character
+        for character in decomposed
+        if not unicodedata.combining(character)
+    )
+    return " ".join(without_marks.casefold().split())
+
+
+def _claim_tokens(value: Any) -> set[str]:
+    tokens = set()
+    for token in re.findall(r"[a-z0-9]+", _normalized_text(value)):
+        if token in _CLAIM_STOPWORDS:
+            continue
+        if token.isdigit() or len(token) >= 4:
+            tokens.add(token)
+    return tokens
+
+
+def _walk_strings(value: Any):
+    if isinstance(value, Mapping):
+        for child in value.values():
+            yield from _walk_strings(child)
+        return
+    if isinstance(value, (list, tuple)):
+        for child in value:
+            yield from _walk_strings(child)
+        return
+    if isinstance(value, str) and value.strip():
+        yield value
+
+
+def _grounded_event_strings(
+    bundle: Mapping[str, Any],
+) -> list[str]:
+    grounded = bundle.get("grounded_data")
+    if not isinstance(grounded, Mapping):
+        grounded = {}
+
+    evidence = grounded.get("evidence")
+    candidates: list[Any] = []
+
+    if isinstance(evidence, Mapping):
+        for key in (
+            "events",
+            "material_events",
+            "latest_event",
+            "latest_official_filing",
+            "review_reason",
+        ):
+            candidates.append(evidence.get(key))
+
+    references = bundle.get("evidence_refs")
+    if isinstance(references, list):
+        for reference in references:
+            if not isinstance(reference, Mapping):
+                continue
+            candidates.extend(
+                (reference.get("title"), reference.get("as_of"))
+            )
+
+    result = []
+    observed = set()
+
+    for candidate in candidates:
+        for text in _walk_strings(candidate):
+            cleaned = text.strip()
+            if cleaned in observed:
+                continue
+            observed.add(cleaned)
+            result.append(cleaned)
+
+    return result
+
+
+def _claim_supported(
+    claim: Any,
+    sources: list[str],
+) -> bool:
+    cleaned = _text(claim)
+    if not cleaned:
+        return False
+
+    normalized_claim = _normalized_text(cleaned)
+    claim_tokens = _claim_tokens(cleaned)
+    if not claim_tokens:
+        return False
+
+    numeric_tokens = {
+        token for token in claim_tokens if token.isdigit()
+    }
+
+    for source in sources:
+        normalized_source = _normalized_text(source)
+
+        if (
+            len(normalized_claim) >= 12
+            and normalized_claim in normalized_source
+        ):
+            return True
+
+        if (
+            len(normalized_source) >= 12
+            and normalized_source in normalized_claim
+        ):
+            return True
+
+        source_tokens = _claim_tokens(source)
+
+        if (
+            numeric_tokens
+            and not numeric_tokens.issubset(source_tokens)
+        ):
+            continue
+
+        matched = claim_tokens & source_tokens
+        required = 1 if len(claim_tokens) == 1 else 2
+        ratio = len(matched) / len(claim_tokens)
+
+        if len(matched) >= required and ratio >= 0.60:
+            return True
+
+    return False
+
+
+def _append_limitation(
+    limitations: list[str],
+    value: str,
+) -> None:
+    if value not in limitations:
+        limitations.append(value)
+
+
+def _split_sentences(value: Any) -> list[str]:
+    cleaned = _text(value)
+
+    if not cleaned:
+        return []
+
+    return [
+        sentence.strip()
+        for sentence in re.split(
+            r"(?<=[.!?])\s+",
+            cleaned,
+        )
+        if sentence.strip()
+    ]
+
+
+def _sanitize_narrative_text(
+    value: Any,
+    support_strings: list[str],
+    *,
+    portfolio_available: bool,
+) -> tuple[str, bool, bool]:
+    retained = []
+    removed_corporate = False
+    removed_portfolio = False
+
+    for sentence in _split_sentences(value):
+        if (
+            _CORPORATE_ACTION_PATTERN.search(sentence)
+            and not _claim_supported(
+                sentence,
+                support_strings,
+            )
+        ):
+            removed_corporate = True
+            continue
+
+        if (
+            not portfolio_available
+            and _PORTFOLIO_ADVICE_PATTERN.search(sentence)
+        ):
+            removed_portfolio = True
+            continue
+
+        retained.append(sentence)
+
+    return (
+        " ".join(retained).strip(),
+        removed_corporate,
+        removed_portfolio,
+    )
+
+
+def _sanitize_generated_narratives(
+    sections: dict,
+    decision: dict,
+    limitations: list[str],
+    support_strings: list[str],
+    *,
+    portfolio_available: bool,
+) -> tuple[dict, dict, list[str]]:
+    removed_corporate = False
+    removed_portfolio = False
+
+    for key in _NARRATIVE_LIST_SECTIONS:
+        retained_items = []
+
+        for item in sections.get(key) or []:
+            (
+                cleaned,
+                item_corporate,
+                item_portfolio,
+            ) = _sanitize_narrative_text(
+                item,
+                support_strings,
+                portfolio_available=portfolio_available,
+            )
+
+            removed_corporate = (
+                removed_corporate or item_corporate
+            )
+            removed_portfolio = (
+                removed_portfolio or item_portfolio
+            )
+
+            if cleaned:
+                retained_items.append(cleaned)
+
+        sections[key] = retained_items
+
+    for key in _NARRATIVE_TEXT_SECTIONS:
+        (
+            cleaned,
+            item_corporate,
+            item_portfolio,
+        ) = _sanitize_narrative_text(
+            sections.get(key),
+            support_strings,
+            portfolio_available=portfolio_available,
+        )
+
+        removed_corporate = (
+            removed_corporate or item_corporate
+        )
+        removed_portfolio = (
+            removed_portfolio or item_portfolio
+        )
+
+        if not cleaned and (
+            item_corporate or item_portfolio
+        ):
+            cleaned = UNSUPPORTED_CLAIM_FALLBACK
+
+        sections[key] = cleaned
+
+    for key in ("rationale", "entry_zone"):
+        (
+            cleaned,
+            item_corporate,
+            item_portfolio,
+        ) = _sanitize_narrative_text(
+            decision.get(key),
+            support_strings,
+            portfolio_available=portfolio_available,
+        )
+
+        removed_corporate = (
+            removed_corporate or item_corporate
+        )
+        removed_portfolio = (
+            removed_portfolio or item_portfolio
+        )
+
+        if not cleaned and (
+            item_corporate or item_portfolio
+        ):
+            cleaned = UNSUPPORTED_CLAIM_FALLBACK
+
+        decision[key] = cleaned
+
+    if removed_corporate:
+        _append_limitation(
+            limitations,
+            UNSUPPORTED_NARRATIVE_CLAIM_LIMITATION,
+        )
+
+    if removed_portfolio:
+        _append_limitation(
+            limitations,
+            UNSUPPORTED_PORTFOLIO_LANGUAGE_LIMITATION,
+        )
+
+    return sections, decision, limitations
+
+def _enforce_grounding_contract(
+    grounding_bundle: Mapping[str, Any],
+    sections: dict,
+    decision: dict,
+    limitations: list[str],
+) -> tuple[dict, dict, list[str]]:
+    grounded = grounding_bundle.get("grounded_data")
+    if not isinstance(grounded, Mapping):
+        grounded = {}
+
+    if not _meaningful(grounded.get("portfolio")):
+        sections["portfolio_fit"] = PORTFOLIO_FIT_UNAVAILABLE
+        decision["position_sizing"] = POSITION_SIZING_UNAVAILABLE
+        _append_limitation(
+            limitations,
+            MISSING_PORTFOLIO_LIMITATION,
+        )
+
+    support_strings = _grounded_event_strings(grounding_bundle)
+    retained_catalysts = []
+    removed_catalysts = 0
+
+    for catalyst in sections.get("catalysts") or []:
+        if _claim_supported(catalyst, support_strings):
+            retained_catalysts.append(catalyst)
+        else:
+            removed_catalysts += 1
+
+    sections["catalysts"] = retained_catalysts
+
+    if removed_catalysts:
+        _append_limitation(
+            limitations,
+            UNSUPPORTED_CATALYST_LIMITATION,
+        )
+
+    next_review = sections.get("next_review")
+
+    if not _claim_supported(next_review, support_strings):
+        sections["next_review"] = NEXT_REVIEW_UNAVAILABLE
+        if next_review:
+            _append_limitation(
+                limitations,
+                UNSUPPORTED_NEXT_REVIEW_LIMITATION,
+            )
+
+    portfolio_available = _meaningful(
+        grounded.get("portfolio")
+    )
+
+    sections, decision, limitations = (
+        _sanitize_generated_narratives(
+            sections,
+            decision,
+            limitations,
+            support_strings,
+            portfolio_available=portfolio_available,
+        )
+    )
+
+    return sections, decision, limitations
 
 def _empty_sections() -> dict:
     return {
@@ -528,6 +968,14 @@ def generate_ai_brief(
     try:
         sections, decision, limitations = (
             _validate_provider_content(result.content)
+        )
+        sections, decision, limitations = (
+            _enforce_grounding_contract(
+                grounding_bundle,
+                sections,
+                decision,
+                limitations,
+            )
         )
     except ProviderContractError as exc:
         return _error_brief(

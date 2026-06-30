@@ -291,6 +291,18 @@ def main() -> int:
     )
 
     check(
+        "grounded_data.portfolio is absent"
+        in request_payload["input"][0]["content"],
+        "System instruction blocks ungrounded portfolio sizing",
+    )
+
+    check(
+        "Never infer repurchases"
+        in request_payload["input"][0]["content"],
+        "System instruction blocks inferred corporate actions",
+    )
+
+    check(
         "[redacted]" in repr(selected)
         and "test-secret-key" not in repr(selected),
         "Provider repr redacts key",

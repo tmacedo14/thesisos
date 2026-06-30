@@ -113,3 +113,23 @@ Safety ceilings:
 - strict JSON Schema output remains enabled.
 
 Requests exceeding either ceiling fail locally before transport.
+
+## Response grounding quality gate
+
+Provider output is normalized against the canonical ThesisOS
+grounding before it reaches the frontend.
+
+- When `grounded_data.portfolio` is absent, portfolio fit and position
+  sizing are explicitly marked unavailable.
+- Catalyst claims are retained only when they are traceable to
+  ThesisOS evidence events or evidence references.
+- An unsupported next-review trigger is replaced with an unavailable
+  message.
+- Removed or normalized claims are disclosed in the brief
+  limitations.
+- Corporate-action statements in narrative fields such as risks and
+  decision rationale are removed unless they match explicit evidence.
+- When portfolio grounding is absent, allocation or sizing language is
+  also removed from narrative fields, not only from the dedicated
+  portfolio fields.
+- The canonical grounding bundle and `payload_sha256` are not changed.
